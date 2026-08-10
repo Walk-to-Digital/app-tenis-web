@@ -1,0 +1,2708 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15100D">
+<title>App de Tênis — protótipo navegável</title>
+<style>
+:root{
+  --bg:#15100D; --sup:#1E1714; --sup2:#241C18; --linha:#312720; --linha2:#443830;
+  --ink:#E8DED2; --ink2:#BCAC9E; --ink3:#8A7B6F;
+  --acc:#FBF6EE; --acc-ink:#15100D;          /* giz age */
+  --up:#C6FF3D; --up-bg:#232B10;             /* lime premia */
+  --dn:#D0724A; --dn-bg:#2E1A12; --clay:#C9663C;  /* saibro é o chão */
+  --gold:#E0C48A; --gold-bg:#2A2114;
+  --r:6px;
+  --f-disp:"Bodoni 72","Didot",Georgia,"Times New Roman",serif;
+  --f-ui:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:#0B0806;color:var(--ink);font:14px/1.5 var(--f-ui);
+  display:flex;align-items:center;justify-content:center;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select{font:inherit;color:inherit}
+
+/* ---------- moldura ---------- */
+#fone{
+  width:400px;height:860px;max-height:100vh;background:var(--bg);position:relative;
+  overflow:hidden;display:flex;flex-direction:column;
+  border-radius:38px;box-shadow:0 30px 90px rgba(0,0,0,.65);border:1px solid #241C18;
+}
+@media(max-width:640px){
+  body{align-items:stretch}
+  #fone{width:100%;height:100%;max-height:none;border-radius:0;border:0;box-shadow:none}
+}
+
+/* linha de cal no fundo */
+#fone::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:repeating-linear-gradient(58deg,transparent 0 30px,rgba(232,222,210,.028) 30px 32px);
+}
+
+/* ---------- barra de status ---------- */
+.status{
+  flex:0 0 42px;display:flex;align-items:center;justify-content:flex-end;
+  padding:0 14px;z-index:5;
+}
+
+/* ---------- topo ---------- */
+.topo{
+  flex:0 0 auto;padding:6px 18px 13px;display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--linha);background:var(--bg);z-index:2;position:relative;
+}
+.topo .voltar{
+  width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--linha2);
+  background:none;display:none;align-items:center;justify-content:center;font-size:15px;cursor:pointer;
+}
+.topo.temvoltar .voltar{display:flex}
+.topo h1{
+  font-family:var(--f-disp);font-size:17px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.topo .dir{font-size:11px;color:var(--ink3);white-space:nowrap}
+.topo .marca{
+  width:28px;height:28px;border-radius:50%;background:var(--clay);border:1.5px solid var(--acc);
+  display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);
+  font-size:13px;font-weight:700;color:#FDF6EE;flex:0 0 28px;
+}
+
+/* ---------- corpo ---------- */
+#tela{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;z-index:1;padding-bottom:16px}
+#tela::-webkit-scrollbar{width:0}
+.pad{padding:16px 18px}
+.sec{padding:18px 18px 0}
+.rot{
+  font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin-bottom:11px;display:flex;justify-content:space-between;align-items:baseline;
+}
+.rot span{letter-spacing:0;text-transform:none;font-size:10.5px;font-weight:400}
+
+/* ---------- componentes ---------- */
+.card{
+  background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);
+  padding:14px;margin-bottom:10px;
+}
+.card.clic{cursor:pointer;transition:.12s}
+.card.clic:active{background:var(--sup2)}
+.linha-item{display:flex;align-items:center;gap:12px}
+.linha-item .txt{flex:1;min-width:0}
+.linha-item .txt b{font-size:13.5px;font-weight:650;display:block;letter-spacing:-.005em}
+.linha-item .txt small{font-size:11px;color:var(--ink3);display:block;margin-top:2px}
+.linha-item .seta{color:var(--ink3);font-size:15px}
+
+/* avatar = boneco recortado + aro na cor da camisa (a cor é o identificador) */
+.av{
+  width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:var(--sup2);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--ink2);
+  position:relative;overflow:hidden;box-shadow:0 0 0 2px var(--camisa,var(--linha2));
+}
+.av img{position:absolute;left:50%;top:-14%;transform:translateX(-50%);width:250%;display:block}
+.av.g{width:52px;height:52px;flex:0 0 52px;font-size:16px;box-shadow:0 0 0 2.5px var(--camisa,var(--linha2))}
+.av.gg{width:76px;height:76px;flex:0 0 76px;box-shadow:0 0 0 3px var(--camisa,var(--linha2))}
+.av.eu{background:var(--clay);color:#FDF6EE}
+
+.pil{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;
+  font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap;
+}
+.pil.acc{background:var(--acc);color:var(--acc-ink)}
+.pil.up{background:var(--up-bg);color:var(--up)}
+.pil.dn{background:var(--dn-bg);color:var(--dn)}
+.pil.gold{background:var(--gold-bg);color:var(--gold)}
+.pil.gh{border:1px solid var(--linha2);color:var(--ink3)}
+
+.btn{
+  display:block;width:100%;padding:14px;border:0;border-radius:var(--r);
+  background:var(--acc);color:var(--acc-ink);font-weight:700;font-size:13.5px;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;margin-bottom:9px;
+}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.sec{background:transparent;border:1px solid var(--linha2);color:var(--ink2);letter-spacing:.06em}
+.btn.gh{background:transparent;border:1px dashed var(--linha2);color:var(--ink3);
+  text-transform:none;letter-spacing:0;font-weight:500}
+
+.nota{font-size:11px;color:var(--ink3);line-height:1.55;margin-top:2px}
+.nota b{color:var(--ink2)}
+
+/* grade de seleção (propor horário) */
+.grade{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--sup);border:1px solid var(--linha2);color:var(--ink2);
+  padding:10px 14px;border-radius:var(--r);font-size:13px;cursor:pointer;min-width:52px;text-align:center}
+.chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+
+/* hero do jogador */
+.hero{padding:20px 18px 18px;border-bottom:1px solid var(--linha);position:relative}
+.hero .cab-hero{display:flex;align-items:center;gap:14px;margin-bottom:2px}
+.hero .cab-hero .txt{flex:1;min-width:0}
+.hero .nm{font-family:var(--f-disp);font-size:25px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.08}
+.hero .sub{font-size:11.5px;color:var(--ink3);margin-top:5px}
+.hero .linha-nivel{display:flex;align-items:flex-end;gap:11px;margin-top:16px}
+.hero .n{font-family:var(--f-disp);font-size:54px;font-weight:700;line-height:.85;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.hero .d{font-family:var(--f-disp);font-size:17px;font-weight:700;padding-bottom:6px}
+.hero .lb{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);padding-bottom:8px;font-weight:700}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--linha);
+  border:1px solid var(--linha);border-radius:var(--r);overflow:hidden;margin-top:15px}
+.stats>div{background:var(--sup);padding:11px 10px}
+.stats .v{font-family:var(--f-disp);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.stats .k{font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);margin-top:3px;font-weight:700}
+
+/* tabela */
+.tab{background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);overflow:hidden}
+.tab .cab{display:grid;grid-template-columns:22px 30px 1fr 40px 48px;gap:8px;padding:9px 12px;
+  border-bottom:1px solid var(--linha);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700}
+.tab .cab .r{text-align:right}
+.tab .cab .c{text-align:center}
+.ln{display:grid;grid-template-columns:22px 30px 1fr 40px 48px;gap:8px;align-items:center;
+  padding:10px 12px;border-bottom:1px solid var(--linha);font-size:13px;cursor:pointer}
+.ln .av{width:30px;height:30px;flex:0 0 30px}
+.ln:last-child{border-bottom:0}
+.ln.eu{background:var(--sup2)}
+.ln .pos{font-family:var(--f-disp);font-weight:700;font-size:14px;color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
+.ln.eu .pos{color:var(--acc)}
+.ln .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ln .nm small{display:block;font-weight:400;font-size:10.5px;color:var(--ink3);margin-top:1px}
+.ln .mv{font-size:11px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.ln .mv.up{color:var(--up)} .ln .mv.dn{color:var(--dn)} .ln .mv.eq{color:var(--ink3);opacity:.45}
+.ln .pt{font-family:var(--f-disp);font-weight:700;text-align:right;font-size:15px;font-variant-numeric:tabular-nums}
+
+/* placar */
+.placar{background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.pl-lado{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0}
+.pl-lado+.pl-lado{border-top:1px solid var(--linha)}
+.pl-lado .q{display:flex;align-items:center;gap:9px;font-weight:650;font-size:13.5px;min-width:0}
+.pl-lado .q span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sets{display:flex;gap:6px;flex:0 0 auto}
+.sets b{
+  font-family:var(--f-disp);font-weight:700;font-size:19px;width:30px;height:36px;border-radius:4px;
+  background:var(--sup2);display:flex;align-items:center;justify-content:center;
+  font-variant-numeric:tabular-nums;cursor:pointer;user-select:none;border:1px solid var(--linha);
+}
+.sets b.g{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.sets b.vazio{color:var(--ink3);opacity:.4}
+
+/* selos */
+.selos{display:flex;gap:9px;flex-wrap:wrap}
+.selo{width:54px;height:54px;border-radius:50%;background:var(--sup2);border:1px solid var(--linha);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:17px}
+.selo b{font-size:7px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.selo.off{opacity:.28}
+
+/* abas */
+.abas{display:flex;border-bottom:1px solid var(--linha);padding:0 18px;gap:20px;position:sticky;top:0;background:var(--bg);z-index:3}
+.abas button{background:none;border:0;padding:12px 0;font-size:12.5px;color:var(--ink3);
+  cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
+.abas button.on{color:var(--ink);border-bottom-color:var(--acc)}
+
+/* barra inferior */
+.nav{
+  flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);
+  border-top:1px solid var(--linha);background:var(--sup);padding:8px 0 max(14px,env(safe-area-inset-bottom));z-index:3;
+}
+.nav button{background:none;border:0;cursor:pointer;text-align:center;
+  font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.nav button i{display:block;font-style:normal;font-size:17px;margin-bottom:3px;opacity:.5}
+.nav button.on{color:var(--acc)}
+.nav button.on i{opacity:1}
+.nav button .badge{
+  display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:99px;
+  background:var(--up);color:#12180B;font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
+}
+
+/* efeitos / o que mexeu */
+.mexeu{background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);overflow:hidden;margin-bottom:10px}
+.mexeu .l{display:flex;align-items:center;gap:11px;padding:12px 13px}
+.mexeu .l+.l{border-top:1px solid var(--linha)}
+.mexeu .l .i{flex:1;min-width:0}
+.mexeu .l .t{font-size:12.5px;font-weight:650}
+.mexeu .l .d{font-size:10.5px;color:var(--ink3);margin-top:2px}
+.mexeu .l .v{font-family:var(--f-disp);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.celebra{
+  text-align:center;padding:30px 20px 22px;border-bottom:1px solid var(--linha);
+  background:radial-gradient(120% 90% at 50% 0%,rgba(198,255,61,.09),transparent 62%);
+}
+.celebra .ic{font-size:40px}
+.celebra .reacao{height:200px;width:auto;object-fit:contain;object-position:top;margin:-14px auto 0;display:block;
+  -webkit-mask-image:radial-gradient(120% 92% at 50% 42%,#000 60%,transparent 92%);
+          mask-image:radial-gradient(120% 92% at 50% 42%,#000 60%,transparent 92%)}
+.celebra h2{font-family:var(--f-disp);font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:8px}
+.celebra p{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.55}
+.celebra .big{font-family:var(--f-disp);font-size:52px;font-weight:700;color:var(--up);
+  line-height:1;margin-top:12px;font-variant-numeric:tabular-nums}
+
+/* toast */
+#toast{
+  position:absolute;left:14px;right:14px;bottom:88px;z-index:20;
+  background:var(--sup2);border:1px solid var(--linha2);border-radius:var(--r);
+  padding:12px 14px;font-size:12.5px;box-shadow:0 12px 34px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(10px);transition:.22s;pointer-events:none;
+}
+#toast.on{opacity:1;transform:none}
+#toast b{color:var(--up)}
+
+/* gaveta de teste */
+#gaveta{
+  position:absolute;inset:0;background:rgba(11,8,6,.78);z-index:30;display:none;
+  align-items:flex-end;
+}
+#gaveta.on{display:flex}
+#gaveta .cx{width:100%;background:var(--sup);border-top:1px solid var(--linha2);
+  border-radius:14px 14px 0 0;padding:18px 18px max(20px,env(safe-area-inset-bottom))}
+#gaveta h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:12px;font-weight:700}
+/* alvo de toque de 40px: a engrenagem é o acesso às ferramentas de teste e vai
+   ser muito usada agora que o teste é no aparelho, não no desktop. */
+#eng{position:relative;z-index:5;width:40px;height:40px;border-radius:50%;
+  display:grid;place-items:center;cursor:pointer;
+  background:rgba(21,16,13,.66);border:1px solid var(--linha2);color:var(--ink2);
+  font-size:20px;line-height:1;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#eng:active{transform:scale(.94)}
+
+/* 07/08: folha do cenário da vitrine — miniatura de verdade da quadra, porque
+   nome de superfície ("saibro", "grama") não diz nada até você ver a cor. */
+#cenas{position:absolute;inset:0;background:rgba(11,8,6,.78);z-index:30;display:none;align-items:flex-end}
+#cenas.on{display:flex}
+#cenas .cx{width:100%;background:var(--sup);border-top:1px solid var(--linha2);
+  border-radius:14px 14px 0 0;padding:18px 18px max(20px,env(safe-area-inset-bottom));
+  max-height:82%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#cenas h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;font-weight:700}
+#cenas .sub{font-size:11.5px;color:var(--ink3);margin-bottom:14px}
+.qgrade{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qcard{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;padding:0;border:2px solid transparent;
+  background:#0F0C09;aspect-ratio:16/10}
+.qcard img{width:100%;height:100%;object-fit:cover;display:block}
+.qcard span{position:absolute;left:0;right:0;bottom:0;padding:14px 9px 7px;text-align:left;
+  font:700 11.5px system-ui;color:#FBF6EE;background:linear-gradient(180deg,transparent,rgba(11,8,6,.9))}
+.qcard.on{border-color:var(--acc)}
+.qcard.on span{color:var(--acc)}
+
+.vazio{text-align:center;padding:46px 24px;color:var(--ink3);font-size:12.5px;line-height:1.6}
+.vazio .ic{font-size:34px;opacity:.4;display:block;margin-bottom:10px}
+
+/* ===== INÍCIO — a home vitrine (organização Tennis Clash, sem loot) ===== */
+.ini{position:relative;min-height:100%;display:flex;flex-direction:column}
+.ini .cena{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center top}
+.ini .scrim{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,8,6,.55) 0%,rgba(11,8,6,.12) 24%,rgba(11,8,6,.08) 52%,rgba(11,8,6,.34) 82%,rgba(11,8,6,.62) 100%)}
+.ini .hud{position:relative;z-index:2;padding:8px 16px 0}
+.ini .linha1{display:flex;align-items:center;gap:10px}
+.ini .temp{flex:1;background:rgba(30,23,20,.72);border:1px solid var(--linha);border-radius:99px;
+  padding:7px 14px;font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px)}
+.ini .temp b{color:var(--ink);font-weight:700}
+.ini .temp .dot{width:6px;height:6px;border-radius:50%;background:var(--up)}
+.ini .ic{width:38px;height:38px;flex:0 0 38px;border-radius:50%;background:rgba(30,23,20,.72);border:1px solid var(--linha);
+  display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;backdrop-filter:blur(6px);cursor:pointer}
+/* 09/08: o ◈ era o terceiro círculo idêntico e ninguém achava o trocador de
+   cenário. Mesmo padrão do trilho do vestiário — o ícone PRÉ-VISUALIZA a
+   escolha atual: o próprio cenário aparece dentro do botão, com o glifo por
+   cima. Fica diferente dos vizinhos sem virar enfeite, e diz o que faz. */
+.ini .ic.vitrine{background-size:cover;background-position:center 62%;border-color:var(--linha2)}
+.ini .ic.vitrine::after{content:'';position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 50% 45%, rgba(21,16,13,.15), rgba(21,16,13,.72));}
+.ini .ic.vitrine i{position:relative;z-index:1;font-style:normal;font-size:15px;
+  color:var(--acc);text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.ini .ic .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;line-height:17px;
+  border-radius:99px;background:var(--up);color:#12180B;font-size:10px;font-weight:800;text-align:center;padding:0 4px}
+.ini .degrau{margin-top:11px;background:rgba(30,23,20,.72);border:1px solid var(--linha);border-radius:10px;padding:11px 14px;backdrop-filter:blur(6px)}
+.ini .degrau .top{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--ink3)}
+.ini .degrau .top b{font-family:var(--f-disp);font-size:14px;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
+.ini .degrau .bar{height:6px;border-radius:99px;background:var(--sup2);margin-top:8px;overflow:hidden}
+.ini .degrau .bar i{display:block;height:100%;background:var(--up);border-radius:99px}
+.ini .degrau .fim{font-size:10px;color:var(--ink3);margin-top:6px}
+.ini .palco{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:220px;z-index:1;padding:0 18px}
+.ini .sombra{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:170px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(11px);z-index:0}
+.ini .glow{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:230px;height:66px;border-radius:50%;
+  background:radial-gradient(closest-side,var(--camisa),transparent);opacity:.30;filter:blur(6px)}
+.ini .boneco{position:relative;height:300px;max-height:44vh;z-index:1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+.ini .boneco img{height:100%;width:auto;display:block}
+/* 06/08: o boneco virou corpo inteiro e ficou mais alto — a placa no topo
+   passou a cortar a cabeça. Desceu pro pé do palco, sobre a sombra. */
+.ini .placa{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);text-align:center;z-index:2;width:100%;padding:0 12px}
+.ini .placa .nm{font-family:var(--f-disp);font-size:21px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
+.ini .placa .meta b{font-family:var(--f-disp);font-size:14px;color:var(--ink)}
+.ini .placa .meta .pil2{background:var(--clay);color:#FDF6EE;font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
+.ini .acao{position:relative;z-index:2;padding:0 16px 8px}
+.ini .acao .big{width:100%;border:0;border-radius:14px;padding:16px;background:var(--acc);color:var(--acc-ink);font-weight:800;font-size:16px;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 8px 24px rgba(251,246,238,.14);cursor:pointer;font-family:var(--f-ui)}
+.ini .acao .big small{display:block;font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.62;margin-top:3px}
+.ini .acao .big.up{background:var(--up);box-shadow:0 8px 24px rgba(198,255,61,.18)}
+.ini .acao .big.marcado{background:rgba(30,23,20,.82);color:var(--ink);border:1px solid var(--linha2);box-shadow:none;backdrop-filter:blur(6px)}
+.ini .acao .big.marcado small{opacity:.8;color:var(--ink3)}
+.ini .strip-wrap{position:relative;z-index:2;padding:0 16px 14px}
+/* Ações secundárias sob o botão grande. Vidro escuro e texto discreto de
+   propósito: elas precisam EXISTIR sem competir com o registro, que é o elo
+   frágil do ciclo e a única ação que merece peso visual. */
+.acoes-sec{display:flex;gap:7px;margin-top:9px}
+.acoes-sec button{flex:1;padding:9px 4px;border-radius:10px;cursor:pointer;
+  background:rgba(30,23,20,.72);border:1px solid var(--linha);color:var(--ink2);
+  font:600 11px var(--f-ui);backdrop-filter:blur(6px);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.acoes-sec button:active{transform:scale(.97)}
+.ini .strip-rot{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
+.ini .strip-rot a{color:var(--ink3);text-decoration:none;cursor:pointer}
+.ini .strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.ini .strip::-webkit-scrollbar{display:none}
+.ini .mcard{flex:0 0 auto;min-width:158px;background:rgba(30,23,20,.82);border:1px solid var(--linha);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:9px;backdrop-filter:blur(6px)}
+.ini .mcard .mic{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink2)}
+.ini .mcard .mtx{min-width:0}
+.ini .mcard .mtx b{font-size:11.5px;font-weight:650;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ini .mcard .mtx small{font-size:10px;color:var(--ink3)}
+.ini .mcard .mv{margin-left:auto;font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--up)}
+
+/* ===== AMBIENTE NOTURNO — a mesma quadra Saibro Noturno corre por baixo das telas internas ===== */
+#amb{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:
+    linear-gradient(180deg,rgba(11,8,6,.64) 0%,rgba(11,8,6,.44) 15%,rgba(11,8,6,.42) 46%,rgba(11,8,6,.58) 70%,rgba(11,8,6,.90) 100%),
+    var(--cena-url,url('../quadras/saibro-noite.jpg')) center 14% / cover no-repeat;}
+#fone.noturno #amb{opacity:1}
+/* topo e nav viram vidro pra a quadra correr contínua por baixo */
+#fone.noturno .topo{background:rgba(21,16,13,.60);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:rgba(122,106,92,.18)}
+#fone.noturno .nav{background:rgba(21,16,13,.64);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top-color:rgba(122,106,92,.18)}
+/* superfícies flutuam como painéis de vidro sobre a quadra */
+#fone.noturno .card,
+#fone.noturno .tab,
+#fone.noturno .placar,
+#fone.noturno .mexeu{background:rgba(30,23,20,.74);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:rgba(122,106,92,.30)}
+#fone.noturno .card.clic:active{background:rgba(40,32,26,.84)}
+#fone.noturno .stats{background:rgba(122,106,92,.18);border-color:rgba(122,106,92,.30)}
+#fone.noturno .stats>div{background:rgba(30,23,20,.70);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#fone.noturno .tab .cab{border-bottom-color:rgba(122,106,92,.2)}
+#fone.noturno .ln{border-bottom-color:rgba(122,106,92,.14)}
+#fone.noturno .ln.eu{background:rgba(201,102,60,.15)}
+#fone.noturno .selo{background:rgba(30,23,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-color:rgba(122,106,92,.22)}
+#fone.noturno .sets b{background:rgba(30,23,20,.62)}
+#fone.noturno .chip{background:rgba(30,23,20,.60);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#fone.noturno .abas{background:rgba(21,16,13,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#fone.noturno #toast{background:rgba(36,28,24,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+/* o hero deixa a quadra aparecer e ganha um respiro de luz lime no topo, como a celebra */
+#fone.noturno .hero{background:radial-gradient(120% 80% at 50% 0%,rgba(198,255,61,.07),transparent 60%);border-bottom-color:rgba(122,106,92,.18)}
+/* texto que pousa direto na quadra (rótulos de seção, herói, notas soltas) ganha respiro pra não brigar com o saibro */
+#fone.noturno .rot,
+#fone.noturno .hero .nm,#fone.noturno .hero .n,#fone.noturno .hero .sub,#fone.noturno .hero .lb,#fone.noturno .hero .d,
+#fone.noturno .sec>.nota,#fone.noturno .vazio{text-shadow:0 1px 10px rgba(11,8,6,.85),0 1px 2px rgba(11,8,6,.7)}
+
+/* ===== VESTIÁRIO / PERSONALIZAR ===== */
+.ini .boneco{cursor:pointer}
+.edit-hint{position:absolute;bottom:0;left:50%;transform:translateX(-50%);z-index:3;
+  background:rgba(21,16,13,.74);border:1px solid var(--linha2);border-radius:99px;
+  padding:5px 12px;font-size:10px;letter-spacing:.06em;color:var(--ink2);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap}
+/* 07/08: o vestiário virou coluna de altura fixa — palco em faixa que não sai do
+   lugar, e o PAINEL é quem rola. Antes o palco era `sticky` e o painel passava
+   POR BAIXO dele, tapando os controles.
+   Como a tela toda não rola mais, a cena pode voltar a ser `absolute`: ela não
+   estica com o conteúdo, então some o motivo do `fixed` — e com ele o risco do
+   Safari iOS, onde `fixed` pula quando a barra de endereço aparece e some. */
+.vest{position:relative;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.vest .cena{position:absolute;inset:0;z-index:0;background-position:center top;background-repeat:no-repeat;background-size:cover;
+  background-image:var(--vest-url,url('../vestiario/tunel.jpg')),
+    radial-gradient(120% 70% at 50% 16%,rgba(96,54,32,.55),transparent 70%),
+    linear-gradient(180deg,#1c1410,#0B0806);}
+/* 06/08: o personagem é o preview inteiro, ancorado no chão do vestiário — de pé
+   no lugar, não flutuando. 07/08: faixa de altura fixa no topo da coluna; o
+   escudo e o patrocinador agora já vêm desenhados dentro do próprio canvas. */
+/* 07/08 (3ª volta): o personagem estava GRANDE DEMAIS e por isso lia como
+   adesivo colado na frente do vestiário. Integrar é questão de escala e de
+   ancoragem: ele volta pro tamanho medido (altura ~52% da tela, pés na linha do
+   chão da cena) — o mesmo enquadramento do QA, onde ele fica DENTRO da sala.
+   Ganha-se de brinde a margem que o trilho de ícones precisava. */
+.vpalco{position:absolute;inset:0;z-index:2}
+.vpalco img.bcv{position:absolute;width:auto;transform:translate(-50%,-100%);
+  filter:drop-shadow(0 12px 20px rgba(0,0,0,.5))}
+.vpalco .vsombra{position:absolute;border-radius:50%;background:#000;filter:blur(12px);
+  transform:translate(-50%,-50%);pointer-events:none}
+.vpalco .vglow{position:absolute;border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side,var(--camisa),transparent);
+  transform:translate(-50%,-50%);opacity:.26;filter:blur(9px)}
+
+/* Botão de confirmar. Só aparece quando há mudança pendente — botão que vive
+   aceso vira parte do cenário e para de significar "falta fazer isso".
+   Mora DENTRO da bandeja: flutuando sobre a cena ele cobria as pernas do
+   personagem, que é justamente o que a pessoa está tentando olhar. */
+.vestir{display:block;width:100%;margin-top:12px;border:0;border-radius:12px;
+  padding:14px;cursor:pointer;background:var(--acc);color:var(--acc-ink);
+  font:800 13px system-ui;letter-spacing:.08em;text-transform:uppercase}
+.vestir:active{transform:scale(.985)}
+/* bandeja que carrega só o botão (categoria fechada, mas troca pendente) */
+.vtray.so-vestir{padding-top:14px}
+.vest-preview .vfig{position:relative;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center}
+.vest-preview .vfig .chao{position:absolute;left:0;right:0;bottom:0;height:34%;
+  background:linear-gradient(180deg,transparent,rgba(11,8,6,.55) 55%,rgba(11,8,6,.9));pointer-events:none}
+.vest-preview .vfig .boneco{position:relative;z-index:1;height:97%;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
+.vest-preview .vfig .boneco > .bfig{height:100%}
+.vest-preview .vfig .sombra{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:150px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);filter:blur(12px)}
+.vest-preview .vfig .glow{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);width:190px;height:54px;border-radius:50%;background:radial-gradient(closest-side,var(--camisa),transparent);opacity:.32;filter:blur(7px)}
+/* 07/08: a figura é uma imagem só — o canvas já entrega o boneco pintado com o
+   escudo e o patrocinador desenhados no peito. Nada de máscara nem de multiply:
+   a composição pixel-exata mora no canvas, não no CSS, porque no CSS a imagem e
+   a máscara são dimensionadas por regras diferentes e nunca coincidem. */
+.bfig{position:relative;display:block;height:100%}
+.bfig img{display:block;height:100%;width:auto;margin:0 auto}
+
+/* 06/08: switch de esporte. Tênis e beach são trilhos paralelos — trocar aqui
+   troca Nível, divisão, quadro e pontos de uma vez. Nada é convertido. */
+.esp-sw{display:flex;gap:4px;margin-top:9px;padding:3px;border-radius:999px;
+  background:rgba(11,8,6,.5);border:1px solid rgba(232,222,210,.12);backdrop-filter:blur(8px);width:fit-content}
+.esp-sw button{border:0;cursor:pointer;padding:5px 15px;border-radius:999px;background:transparent;
+  color:var(--ink3);font:700 11px/1 system-ui;letter-spacing:.06em;text-transform:uppercase;transition:.18s}
+.esp-sw button.on{background:var(--acc);color:#14100c}
+
+/* os dois esportes na ficha, lado a lado */
+.dois-esp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.dois-esp .de{display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:12px;cursor:pointer;text-align:left;
+  background:rgba(30,23,20,.6);border:1px solid rgba(232,222,210,.10)}
+.dois-esp .de.on{border-color:rgba(198,255,61,.45);background:rgba(198,255,61,.09)}
+.dois-esp .de-ic{flex:0 0 30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:rgba(232,222,210,.07);color:var(--ink2);font-size:15px}
+.dois-esp .de.on .de-ic{background:rgba(198,255,61,.16);color:var(--acc)}
+.dois-esp .de-tx b{display:block;font-size:12.5px;color:var(--ink)}
+.dois-esp .de-tx small{display:block;font-size:10px;color:var(--ink3);white-space:nowrap}
+
+/* carrossel de atalhos da home. Registrar fica FORA daqui, no botão fixo —
+   o registro é o elo frágil do ciclo e não pode depender de rolagem. */
+.wgt-wrap{position:relative;z-index:1;margin-top:14px}
+.wgt{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;
+  scrollbar-width:none;padding:0 18px 2px}
+.wgt::-webkit-scrollbar{display:none}
+.wgt .w{scroll-snap-align:start;flex:0 0 168px;display:flex;align-items:center;gap:10px;
+  padding:11px 12px;border-radius:14px;cursor:pointer;text-align:left;
+  background:rgba(30,23,20,.80);border:1px solid rgba(232,222,210,.10);backdrop-filter:blur(10px)}
+.wgt .w:active{transform:scale(.975)}
+.wgt .w .wic{flex:0 0 34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  background:rgba(198,255,61,.12);color:var(--acc);font-size:15px}
+.wgt .w .wfig{flex:0 0 34px;height:42px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.wgt .w .wfig img{height:64px;width:auto;object-fit:contain;object-position:top}
+.wgt .w .wtx{min-width:0}
+.wgt .w .wtx b{display:block;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wgt .w .wtx small{display:block;font-size:10px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wgt .w.vest{background:linear-gradient(135deg,rgba(198,255,61,.14),rgba(30,23,20,.86))}
+
+/* 07/08: escurecimento MUITO mais leve. O anterior fechava em preto sólido a
+   74% da tela pra dar fundo ao painel de controles — e junto com o painel foi
+   embora o motivo. Agora o vestiário precisa aparecer: é a sala que integra o
+   personagem, e a bandeja já tem o próprio fundo. */
+.vest .scrim{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,8,6,.38) 0%,rgba(11,8,6,.10) 26%,rgba(11,8,6,.20) 62%,rgba(11,8,6,.55) 100%)}
+.vest .palco{position:relative;z-index:1;height:330px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 18px}
+.vest .palco .sombra{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:150px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(11px)}
+.vest .palco .glow{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);width:200px;height:56px;border-radius:50%;background:radial-gradient(closest-side,var(--camisa),transparent);opacity:.30;filter:blur(6px)}
+.vest .palco .boneco{position:relative;z-index:1;height:288px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+.vest .palco .boneco img{height:100%;width:auto;display:block}
+/* =========================================================================
+   07/08 (2ª volta) — O VESTIÁRIO NÃO ROLA.
+   A lista de controles empilhada obrigava a rolar, e rolar num provador é
+   errado: você perde o personagem de vista bem na hora de julgar a roupa.
+   Agora a tela é o personagem inteiro, e as categorias vivem num TRILHO de
+   ícones na borda. Tocar um ícone abre só as opções DELE numa bandeja curta;
+   tocar de novo fecha. Nenhuma vem aberta — é o que deixa a tela cheia de
+   opção sem ficar poluída.
+   ========================================================================= */
+.vrail{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:6;
+  display:flex;flex-direction:column;gap:9px;max-height:calc(100% - 16px);overflow-y:auto;
+  scrollbar-width:none}
+.vrail::-webkit-scrollbar{display:none}
+.vrail button{width:53px;padding:7px 0 5px;border-radius:15px;cursor:pointer;
+  background:rgba(21,16,13,.70);border:1px solid var(--linha2);color:var(--ink2);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:flex;flex-direction:column;align-items:center;gap:4px;transition:.16s}
+.vrail button:active{transform:scale(.94)}
+.vrail button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.vrail .vi{height:22px;display:grid;place-items:center;font-size:17px;line-height:1}
+.vrail .vl{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;opacity:.8;font-weight:700}
+/* o ícone PRÉ-VISUALIZA a escolha atual: a cor é a bolinha da cor, a pessoa é o
+   rosto de quem está vestido. Assim o trilho informa sem precisar de rótulo longo. */
+.vrail .sw{width:21px;height:21px;border-radius:50%;border:2px solid rgba(251,246,238,.6)}
+.vrail .mn{width:23px;height:23px;border-radius:50%;overflow:hidden;position:relative;
+  background:rgba(0,0,0,.35);background-repeat:no-repeat}
+
+.vtray{position:absolute;left:0;right:0;bottom:0;z-index:7;
+  background:linear-gradient(180deg,rgba(11,8,6,.35),rgba(19,14,11,.97) 20%);
+  border-top:1px solid var(--linha2);
+  padding:13px 16px max(15px,env(safe-area-inset-bottom));
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.vtray .tt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:11px}
+.vtray .tt b{font:700 10px system-ui;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+.vtray .tt span{font-size:10.5px;color:var(--ink3);text-align:right}
+/* 6 colunas: com a 11ª cor (o preto), 5 colunas jogava a paleta pra TRÊS
+   fileiras e a bandeja passava a rolar — e rolagem num provador é erro de
+   conceito, faz perder o personagem de vista bem na hora de julgar a roupa.
+   Em 6, tanto os 9 personagens quanto as 11 cores cabem em duas fileiras. */
+.vgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+/* O rosto entra como BACKGROUND posicionado pelo retângulo medido (ver ROSTO,
+   lá embaixo), não como <img> esticada. A imagem esticada era o defeito: um
+   deslocamento só pros 9 bonecos, e o sprite -mini (52x150) ampliado a 220%. */
+.vopt{position:relative;aspect-ratio:1;border-radius:50%;overflow:hidden;cursor:pointer;padding:0;
+  background:rgba(30,23,20,.72);background-repeat:no-repeat;border:2px solid transparent}
+.vopt.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(198,255,61,.28)}
+/* Anel interno nos swatches de cor: sem ele o preto se dissolve no painel
+   escuro e a opção fica invisível — cor que não aparece não é opção. */
+.vopt.cor{box-shadow:inset 0 0 0 1px rgba(251,246,238,.26)}
+.vopt.cor.on{box-shadow:inset 0 0 0 1px rgba(251,246,238,.26),0 0 0 2px rgba(198,255,61,.28)}
+.pick{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.pick::-webkit-scrollbar{display:none}
+.pboneco{flex:0 0 auto;width:60px;height:60px;border-radius:50%;overflow:hidden;position:relative;
+  background:rgba(30,23,20,.72);border:2px solid transparent;cursor:pointer;padding:0}
+.pboneco img{position:absolute;left:50%;top:-6%;transform:translateX(-50%);width:220%}
+.pboneco.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(198,255,61,.25)}
+.pcores{display:flex;flex-wrap:wrap;gap:10px}
+.pcor{width:38px;height:38px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.pcor.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--bg),0 0 0 4px rgba(198,255,61,.3)}
+.seg2{display:flex;gap:8px}
+.seg2 button{flex:1;padding:12px 10px;border-radius:8px;background:rgba(30,23,20,.7);border:1px solid var(--linha2);
+  color:var(--ink2);font-size:13px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.seg2 button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+
+/* ===== CADASTRO / ONBOARDING ===== */
+#onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:#0B0806;overflow:hidden}
+#onb.on{display:flex}
+#onb .onb-bg{position:absolute;inset:0;z-index:0;background:var(--cena-url,url('../quadras/saibro-noite.jpg')) center/cover}
+#onb .onb-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,8,6,.74),rgba(11,8,6,.88) 52%,rgba(11,8,6,.97))}
+#onb .onb-wrap{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding:18px 22px max(24px,env(safe-area-inset-bottom));overflow-y:auto}
+#onb .onb-wrap::-webkit-scrollbar{width:0}
+#onb .onb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;min-height:30px}
+#onb .onb-voltar{width:30px;height:30px;border-radius:50%;border:1px solid var(--linha2);background:rgba(30,23,20,.6);color:var(--ink2);font-size:15px;cursor:pointer}
+#onb .onb-dots{display:flex;gap:6px;margin-left:auto}
+#onb .onb-dots span{width:6px;height:6px;border-radius:99px;background:var(--linha2);transition:.2s}
+#onb .onb-dots span.on{background:var(--acc);width:18px}
+#onb .onb-brand{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:20px}
+#onb .onb-mark{width:64px;height:64px;border-radius:50%;background:var(--clay);border:2px solid var(--acc);display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-size:30px;font-weight:700;color:#FDF6EE}
+#onb .onb-brand h1{font-family:var(--f-disp);font-size:29px;text-transform:uppercase;letter-spacing:.03em}
+#onb .onb-brand p{font-size:13px;color:var(--ink2);max-width:290px;line-height:1.5}
+#onb .onb-acts{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+#onb .onb-fine{font-size:10.5px;color:var(--ink3);text-align:center;margin-top:8px;line-height:1.5}
+#onb .big{width:100%;padding:15px;border:0;border-radius:12px;background:var(--acc);color:var(--acc-ink);font-weight:800;font-size:15px;cursor:pointer;font-family:var(--f-ui)}
+#onb .big.alt{background:rgba(30,23,20,.72);color:var(--ink);border:1px solid var(--linha2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#onb .onb-head{margin:4px 0 16px}
+#onb .onb-head.center{text-align:center}
+#onb .onb-kick{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--up);font-weight:700;margin-bottom:7px}
+#onb .onb-head h2{font-family:var(--f-disp);font-size:24px;line-height:1.14;letter-spacing:.01em}
+#onb .onb-input{width:100%;padding:15px;border-radius:12px;background:rgba(30,23,20,.72);border:1px solid var(--linha2);color:var(--ink);font-size:17px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);margin-bottom:12px}
+#onb .onb-input:focus{outline:none;border-color:var(--acc)}
+#onb .onb-preview{position:relative;height:236px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:10px}
+#onb .onb-preview.tall{height:300px}
+#onb .onb-preview .glow{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:200px;height:56px;border-radius:50%;background:radial-gradient(closest-side,var(--camisa),transparent);opacity:.32;filter:blur(6px)}
+#onb .onb-preview .boneco{position:relative;z-index:1;height:100%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}
+#onb .onb-preview .boneco img{height:100%;width:auto;display:block}
+#onb .onb-cards{display:flex;flex-direction:column;gap:10px}
+#onb .onb-card{display:flex;align-items:center;gap:14px;text-align:left;padding:14px;border-radius:12px;background:rgba(30,23,20,.72);border:1px solid var(--linha2);color:var(--ink);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#onb .onb-card.on{border-color:var(--acc);background:rgba(201,102,60,.18)}
+#onb .onb-card .dv{font-family:var(--f-disp);font-size:26px;font-weight:700;width:38px;text-align:center;color:var(--acc);flex:0 0 38px}
+#onb .onb-card .tx b{font-size:14px;display:block}
+#onb .onb-card .tx small{font-size:11.5px;color:var(--ink3);display:block;margin-top:2px}
+#onb .onb-card>b{font-size:15px}
+#onb .onb-link{background:none;border:0;color:var(--ink2);text-decoration:underline;font-size:12.5px;margin-top:14px;cursor:pointer;align-self:center}
+#onb .onb-nav{margin-top:auto;padding-top:18px}
+#onb .onb-prim{width:100%;padding:16px;border:0;border-radius:12px;background:var(--acc);color:var(--acc-ink);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;font-family:var(--f-ui)}
+#onb .onb-prim:disabled{opacity:.4;cursor:default}
+#onb .onb-prim.lime{background:var(--up)}
+#onb .nota.center{text-align:center}
+
+/* ===== SALA DE TROFÉUS (Bloco 3) — overlay dentro do #fone ===== */
+#trofeus{position:absolute;inset:0;z-index:40;display:none;overflow:hidden;background:#0A0806}
+#trofeus.on{display:block}
+#trofeus .tr-cena{position:absolute;inset:0;z-index:0;background-repeat:no-repeat}
+#trofeus .tr-veu{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(10,8,6,.82) 0%,rgba(10,8,6,.28) 13%,rgba(10,8,6,0) 26%,rgba(10,8,6,0) 74%,rgba(10,8,6,.9) 100%)}
+#trofeus .tr-topo{position:absolute;top:0;left:0;right:0;z-index:4;padding:16px 54px 10px 18px;
+  display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+#trofeus .tr-topo h2{font:400 23px/1 var(--f-disp);margin:0;text-shadow:0 2px 12px rgba(0,0,0,.9)}
+#trofeus .tr-cnt{font:700 11px var(--f-ui);letter-spacing:.1em;color:var(--ink2);white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.9)}
+#trofeus .tr-cnt b{color:var(--gold)}
+#trofeus .tr-abas{position:absolute;top:58px;left:0;right:0;z-index:4;display:flex;gap:8px;padding:0 18px}
+#trofeus .tr-aba{flex:0 0 auto;padding:7px 14px;border-radius:99px;border:1px solid var(--linha);
+  background:rgba(12,9,8,.55);backdrop-filter:blur(6px);color:var(--ink2);font:600 12px var(--f-ui);cursor:pointer}
+#trofeus .tr-aba.on{background:var(--gold);color:#1a1208;border-color:var(--gold)}
+#trofeus .tr-x{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;
+  background:rgba(21,16,13,.7);border:1px solid var(--linha2);color:var(--ink);font-size:20px;cursor:pointer;z-index:5}
+#trofeus .tr-prat{position:absolute;left:0;right:0;z-index:3;display:flex;align-items:flex-end;justify-content:space-evenly;gap:2px;padding:0 26px}
+#trofeus .tr-cint{position:absolute;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+#trofeus .tr-peca{position:relative;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:0}
+#trofeus .tr-peca img,#trofeus .tr-cint img{display:block;filter:drop-shadow(0 6px 10px rgba(0,0,0,.6))}
+#trofeus .tr-cint img{height:78px}
+#trofeus .tr-peca.nao img,#trofeus .tr-cint.nao img{filter:brightness(0) opacity(.34) drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+#trofeus .tr-peca em,#trofeus .tr-cint em{position:absolute;top:100%;left:-8px;right:-8px;margin-top:3px;
+  font:600 8.5px var(--f-ui);letter-spacing:.02em;text-align:center;color:var(--ink2);font-style:normal;
+  text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#trofeus .tr-peca.nao em{color:var(--ink3)}
+#trofeus .tr-peca.sel::after{content:"";position:absolute;inset:-6px -4px 12px;border:1px solid var(--gold);border-radius:8px}
+#trofeus .tr-det{position:absolute;left:0;right:0;bottom:0;z-index:5;border-top:1px solid var(--linha);
+  background:rgba(12,9,8,.9);backdrop-filter:blur(10px);padding:14px 18px calc(16px + env(safe-area-inset-bottom))}
+#trofeus .tr-det b{font:600 14px var(--f-ui);display:flex;align-items:center}
+#trofeus .tr-det p{margin:5px 0 0;font-size:12px;color:var(--ink2)}
+#trofeus .tr-pill{font:700 9px var(--f-ui);letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-left:8px}
+#trofeus .tr-pill.tem{background:var(--up-bg);color:var(--up)}
+#trofeus .tr-pill.nao{background:var(--sup2);color:var(--ink3)}
+
+/* ===== TELA DE DESAFIO — VS (estilo Cartola) ===== */
+#vs{position:absolute;inset:0;z-index:60;display:none;overflow:hidden}
+#vs.on{display:flex;flex-direction:column}
+#vs .vs-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center}
+#vs .vs-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,8,6,.9) 0%,rgba(11,8,6,.28) 24%,rgba(11,8,6,.2) 52%,rgba(11,8,6,.88) 88%,rgba(11,8,6,.98) 100%)}
+#vs .vs-top{position:relative;z-index:3;padding:26px 20px 0;text-align:center}
+#vs .vs-kick{font:400 22px/1.15 var(--f-disp);color:var(--ink);text-shadow:0 2px 12px rgba(0,0,0,.9)}
+#vs .vs-arena{position:relative;z-index:2;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px}
+#vs .vs-lado{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0}
+#vs .vs-lado .bfig{position:relative;height:250px;max-height:38vh;display:flex;align-items:flex-end;justify-content:center}
+#vs .vs-lado .bfig::after{content:"";position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:120px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(10px);z-index:-1}
+#vs .vs-lado img.bcv{height:250px;max-height:38vh;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
+#vs .vs-nome{margin-top:8px;font:700 13px var(--f-ui);color:var(--ink);text-shadow:0 2px 8px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#vs .vs-x{z-index:2;font:400 30px var(--f-disp);color:var(--acc);text-shadow:0 2px 14px rgba(0,0,0,.9);flex:0 0 auto;padding-bottom:34px}
+#vs .vs-card{position:relative;z-index:3;padding:16px 18px calc(18px + env(safe-area-inset-bottom));background:rgba(12,9,8,.72);backdrop-filter:blur(10px);border-top:1px solid var(--linha)}
+#vs .vs-adv{text-align:center;margin-bottom:14px}
+#vs .vs-adv b{font:600 17px var(--f-ui);color:var(--ink)}
+#vs .vs-id{font-size:12px;color:var(--ink3);font-weight:400}
+#vs .vs-meta{font-size:12.5px;color:var(--ink2);margin-top:3px}
+#vs .vs-acoes{display:flex;gap:10px}
+#vs .vs-acoes button{flex:1;padding:15px;border-radius:13px;border:none;font:700 15px var(--f-ui);cursor:pointer}
+#vs .vs-no{background:#2a1a16;color:var(--ink);border:1px solid var(--linha2)}
+#vs .vs-ok{background:var(--up);color:#12180B}
+
+/* botão Concluir do vestiário quando ele é aberto durante o cadastro */
+.vest-concluir{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:20;
+  padding:11px 22px;border-radius:999px;border:none;background:var(--up);color:#12180B;
+  font:700 14px var(--f-ui);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+
+<div id="fone">
+  <div id="amb"></div>
+  <!-- 07/08: a barra de status falsa (hora + sinal) saiu. No desktop ela vendia
+       a ideia de "isso é um celular"; no celular de verdade ela duplica a barra
+       do sistema, que fica dois centímetros acima dela. Sobra a engrenagem. -->
+  <div class="status"><button id="eng" title="ferramentas de teste">⚙</button></div>
+
+  <div class="topo" id="topo">
+    <button class="voltar" id="voltar">‹</button>
+    <div class="marca" id="marca">P</div>
+    <h1 id="titulo">Quadro</h1>
+    <div class="dir" id="dir"></div>
+  </div>
+
+  <div id="tela"></div>
+
+  <div class="nav" id="nav">
+    <button data-t="inicio" class="on"><i>◈</i>Início</button>
+    <button data-t="radar"><i>◎</i>Radar</button>
+    <button data-t="comunidade"><i>▣</i>Comunidade</button>
+    <button data-t="ficha"><i>◇</i>Ficha</button>
+    <button data-t="vestiario"><i>❖</i>Vestiário</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="gaveta">
+    <div class="cx">
+      <h3>Ferramentas de teste</h3>
+      <button class="btn sec" onclick="simularConfirmacao()">Adversário confirma o placar pendente</button>
+      <button class="btn sec" onclick="avancarSemana()">Avançar 7 dias na temporada</button>
+      <button class="btn sec" onclick="resetar()">Recomeçar do zero</button>
+      <button class="btn sec" onclick="fecharGaveta();abrirCadastro()">Ver o cadastro (novo jogador)</button>
+      <button class="btn gh" onclick="fecharGaveta()">Fechar</button>
+      <p class="nota">Existe só pra destravar o teste — o app de verdade não tem essa tela. A confirmação do adversário e a passagem do tempo acontecem sozinhas.</p>
+    </div>
+  </div>
+  <!-- 07/08: seletor de cenário da vitrine. Vive na home (ícone ◈) porque é o
+       fundo da SUA home — o vestiário cuida de você, não do lugar. -->
+  <div id="cenas"><div class="cx" id="cenas-cx"></div></div>
+  <div id="onb"></div>
+</div>
+
+<!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="net.js?v=24"></script>
+
+<script>
+/* =========================================================================
+   ESTADO — espelha os requisitos de dado do §14 do documento de produto
+   ========================================================================= */
+const EU = 'u001';
+
+function estadoInicial(){ return {
+  dia: 0,
+  cadastroFeito: false,
+  semana: 0,
+  // 06/08: beach é esporte irmão — Nível, pontos e divisão próprios. Nunca se misturam.
+  esporte: 'tenis',
+  // bon = boneco do elenco · cor = camisa (vira o aro do avatar, o identificador a 34px)
+  // roupa = peça de tênis escolhida no vestiário; no beach a peça é sempre regata
+  // Mundo REAL: começa só com você. Os outros jogadores entram do banco
+  // (Supabase) ao conectar — não há mais elenco fake. Ver aplicarJogadoresReais().
+  jogadores: {
+    u001:{nome:'Você', ap:'VC', nivel:1200, div:'C', nivelB:1200, divB:'C', clube:'', calibrando:true, cal:0, bon:'m1', roupa:'camiseta', cor:'#C9663C', cena:{quadra:'saibro',momento:'noite'}, escudo:'bahiano', patroc:'stella', vestiario:'tunel'},
+  },
+  // pontos de temporada por jogador, por contexto — preenchidos por partida real
+  pontos:{  comunidade:{u001:0}, c_clube:{u001:0} },
+  pontosB:{ comunidade:{u001:0}, c_clube:{u001:0} },
+  ant:{comunidade:{},c_clube:{}},
+  comunidade:{ nome:'Sua comunidade', membros:['u001'], cinturao:null, patches:[] },
+  circuitos:[
+    {id:'c_clube', nome:'Circuito do Clube Bahiano', membros:1, principal:true, aberto:true},
+  ],
+  open:{nome:'Ace Open 2026', dias:52, inscrito:true},
+  pendentes:[],
+  aguardando:null,     // partida enviada esperando confirmação do adversário
+  historico:[],
+  selos:[
+    {ic:'◆',n:'Zebra',   tem:false},
+    {ic:'▲',n:'Subiu',   tem:false},
+    {ic:'✦',n:'Copa',    tem:false},
+    {ic:'◉',n:'10 jogos',tem:false},
+    {ic:'♦',n:'Cinturão',tem:false},
+    {ic:'✧',n:'Invicto', tem:false},
+  ],
+  titulos:[],
+  feed:[],
+  novidades:0,
+}}
+
+/* armazenamento tolerante: em file:// o iOS pode bloquear localStorage.
+   Sem ele o app roda igual, só não sobrevive a fechar a aba. */
+const guarda = (()=>{
+  try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return localStorage }
+  catch(e){ const m={}; return {getItem:k=>m[k]??null, setItem:(k,v)=>m[k]=v, removeItem:k=>delete m[k]} }
+})();
+
+let S;
+try{ S = JSON.parse(guarda.getItem('appTenis')||'null') }catch(e){ S=null }
+if(!S || !S.jogadores) S = estadoInicial();
+
+/* 06/08: estado salvo antes do beach não tem os campos novos. Em vez de zerar
+   o progresso de quem já testou, completa o que falta a partir do padrão. */
+(function migrar(){
+  const novo = estadoInicial();
+  if(!S.esporte)  S.esporte  = 'tenis';
+  if(!S.pontosB)  S.pontosB  = novo.pontosB;
+  S.circuitos.forEach(c=>{ if(!S.pontosB[c.id]) S.pontosB[c.id] = novo.pontosB[c.id] || {} });
+  if(!S.pontosB.comunidade) S.pontosB.comunidade = novo.pontosB.comunidade;
+  Object.keys(S.jogadores).forEach(id=>{
+    const j = S.jogadores[id], p = novo.jogadores[id];
+    if(j.nivelB==null) j.nivelB = p ? p.nivelB : 1200;
+    if(!j.divB)        j.divB   = divisaoDe(j.nivelB);
+    if(id===EU && !j.roupa) j.roupa = 'camiseta';
+  });
+  // 07/08: escudo e patrocinador deixaram de ser escolha e viraram dado autoral.
+  // Quem testou antes tem patroc:'none' salvo e veria a camisa sem patrocinador —
+  // justamente o que a gente quer olhar agora.
+  const _eu = S.jogadores[EU];
+  if(_eu){ if(!_eu.escudo || _eu.escudo==='none') _eu.escudo='bahiano';
+           if(!_eu.patroc || _eu.patroc==='none') _eu.patroc='stella' }
+  /* 10/08: `panela` virou `comunidade`. Este estado é salvo NO APARELHO, então
+     sem a tradução abaixo quem já usava abriria o app com a comunidade, o cinturão e
+     os patches zerados — e sem erro nenhum na tela, que é o pior tipo de perda.
+     Move em vez de copiar, pra não deixar as duas versões brigando depois. */
+  if(S.panela && !S.comunidade){ S.comunidade = S.panela; delete S.panela; }
+  ['pontos','pontosB'].forEach(p=>{
+    if(S[p] && S[p].panela && !S[p].comunidade){ S[p].comunidade = S[p].panela; delete S[p].panela; }
+  });
+  salvar();
+})();
+
+function salvar(){ try{ guarda.setItem('appTenis', JSON.stringify(S)) }catch(e){} }
+
+/* =========================================================================
+   MOTOR — as regras travadas em 31/07 e 03/08
+   ========================================================================= */
+const K_BASE = 32;                                    // 09/08: era 24. Vitória em nível igual = +16,
+                                                      // um quarto da categoria de 62 — a barra anda toda semana
+const BASE_PTS = {amistoso:6, copa_panela:12, copa_circuito:12, publico:24, oficial:48};
+const FAIXAS = [1250,1500,1750];
+const PISO_NIVEL = 800;                               // 09/08: o Nível não cai abaixo disso
+
+/* 09/08: calibragem em degrau — a incerteza é máxima na partida 1, não na 8.
+   Indexado por `cal` (partidas de calibragem JÁ concluídas, 0-based):
+   partidas 1–3 ×3 (K 96) · 4–6 ×2 (64) · 7–8 ×1,5 (48) · 9+ base (32).
+   Revisa o ×3 chapado de 31/07, onde o penhasco de 96 pra 32 era arbitrário. */
+const CAL_DEGRAU = [3,3,3, 2,2,2, 1.5,1.5];
+function multCal(calibrando, cal){
+  if(!calibrando) return 1;
+  // sem `cal` (chamada legada) assume o começo da calibragem — o degrau mais alto
+  const i = Number.isFinite(cal) ? Math.floor(cal) : 0;
+  return CAL_DEGRAU[i] ?? 1;
+}
+
+/* O formato tem dois vocabulários vivos: a tela local escreve 'md3'/'set' e o
+   backend escrevia 'melhor3'. Só 'set' desconta, então normalizar num lugar só
+   evita que partida online passe batido pelo ×0,75. */
+const ehSetUnico = (f)=> f==='set' || f==='set-unico' || f==='setunico';
+
+function faixa(n){ let f=0; FAIXAS.forEach(x=>{ if(n>=x) f++ }); return f }
+
+function esperado(a,b){ return 1/(1+Math.pow(10,(b-a)/400)) }
+
+/* 06/08: esporte é o eixo que separa tudo. Beach tem Nível, pontos e divisão próprios;
+   a máquina (Elo, zebra, confirmação) é a mesma. Em duplas o peso inverte:
+   no tênis duplas é o formato secundário (x0,6); no beach duplas É o jogo (x1,0). */
+const ehBeach = ()=> S.esporte==='beach';
+const ESPORTE_NOME = {tenis:'Tênis', beach:'Beach Tennis'};
+
+/* 06/08: a PEÇA é geração (silhueta muda); a COR é código (superfície).
+   No beach a peça é sempre regata — é o traje que preserva área branca
+   pra pintar, e sem área branca o jogador perde a cor que o identifica. */
+const ROUPAS_TENIS = [['camiseta','Camiseta'],['polo','Polo'],['vestido','Vestido']];
+const roupaAtual = (j)=> ehBeach() ? 'regata' : (j.roupa || 'camiseta');
+const bonecoSrc  = (j)=> `../bonecos-t/${j.bon}-${roupaAtual(j)}.png`;
+
+/* Elenco e paleta ficam aqui em cima, um lugar só. Estavam declarados duas
+   vezes (vestiário e onboarding) com o mesmo conteúdo copiado — é o tipo de
+   duplicação em que a cor nova entra num e não no outro, e ninguém percebe.
+   O preto (#141414) é escuro de propósito, não preto puro: ver _pintarMagenta. */
+const BONECOS = ['m1','m2','m3','m4','m5','f1','f2','f3','f4'];
+const PALETA  = ['#C9663C','#0C3B2A','#A8894F','#1E3A2F','#F2EAE0',
+                 '#5C2E3C','#3D4A5A','#2B3A17','#7A4B2A','#8E3D1E','#141414'];
+
+/* =========================================================================
+   07/08 — A PINTURA SAIU DO CSS E FOI PRO CANVAS.
+   A versão anterior mascarava um multiply com `-mask.png`. Esse arquivo nunca
+   existiu no elenco magenta: o multiply pintava em cima de nada e a cor do
+   uniforme simplesmente não funcionava no app.
+   O elenco sai do render em MAGENTA puro. Magenta não existe em pele, cabelo,
+   raquete nem calçado, então o próprio pixel diz se é tecido — não há máscara,
+   não há tolerância, não há como recortar errado. Troca-se matiz e saturação;
+   a LUMINÂNCIA fica, e com ela as dobras e a sombra do braço sobre o tecido.
+   Escudo e patrocinador entram NO MESMO canvas, em coordenadas da imagem, então
+   acompanham qualquer escala sem desalinhar — que era o bug do mask-image.
+   Os números vêm de atleta-numeros.json, medidos por sprite (o tronco de cada
+   recorte é diferente; número absoluto joga escudo no ombro de uns).
+   ========================================================================= */
+const ARQ_LOGO = {bahiano:'bahiano.png', qpc:'qpc.png', stella:'stella.png', aceopen:'aceopen.png'};
+let NUMEROS = null;
+
+const _imgs = new Map();
+function carregarImg(src){
+  if(_imgs.has(src)) return _imgs.get(src);
+  const p = new Promise(ok=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=()=>ok(null); i.src=src });
+  _imgs.set(src, p); return p;
+}
+
+function _rgbHsl(r,g,b){ r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;
+  if(mx===mn) return [0,0,l];
+  const d=mx-mn, s=l>.5?d/(2-mx-mn):d/(mx+mn);
+  let h; if(mx===r)h=((g-b)/d+(g<b?6:0)); else if(mx===g)h=((b-r)/d+2); else h=((r-g)/d+4);
+  return [h*60,s,l] }
+function _hslRgb(h,s,l){ h=((h%360)+360)%360;
+  if(s===0){ const v=Math.round(l*255); return [v,v,v] }
+  const q=l<.5?l*(1+s):l+s-l*s, p=2*l-q;
+  const f=t=>{ t=((t%1)+1)%1;
+    if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q;
+    if(t<2/3) return p+(q-p)*(2/3-t)*6; return p };
+  return [Math.round(f(h/360+1/3)*255),Math.round(f(h/360)*255),Math.round(f(h/360-1/3)*255)] }
+
+/* A luminância do magenta é o que carrega a DOBRA e a sombra do braço — por
+   isso ela é preservada e só matiz/saturação mudam. Mas a conta original era
+   multiplicativa (`l * aL/0.5`), e multiplicação morre nos extremos:
+
+     · preto  (aL=0)    → escala 0     → toda dobra vira zero, uniforme chapado
+     · creme  (aL=0.91) → escala 1.83  → tudo acima de l≈0.53 estoura no teto
+
+   A forma abaixo é AFIM em vez de multiplicativa: em vez de escalar a partir do
+   zero, desloca a luminância em torno do alvo. Nas cores do meio ela dá
+   exatamente o mesmo resultado de antes (l*2aL == aL + (l-0.5)*2aL), então
+   nenhuma cor já aprovada muda de aparência. O que muda é só onde antes
+   colapsava: o passo é limitado pra não estourar o teto nem o piso, e o alvo
+   tem um piso de luminância porque preto puro não tem onde mostrar sombra.
+   Por isso o preto da paleta é #141414 e sai como carvão, não como recorte. */
+function _pintarMagenta(ctx,W,H,alvo){
+  const [ar,ag,ab] = [1,3,5].map(i=>parseInt(alvo.slice(i,i+2),16));
+  const [aH,aS,aL0] = _rgbHsl(ar,ag,ab);
+  const aL   = Math.max(0.12, aL0);
+  const inc  = Math.min(2*aL, (0.97-aL)/0.35, (aL-0.03)/0.35);
+  const im = ctx.getImageData(0,0,W,H), d = im.data;
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3] < 8) continue;
+    const [h,s,l] = _rgbHsl(d[i],d[i+1],d[i+2]);
+    const dh = Math.min(Math.abs(h-302), 360-Math.abs(h-302));
+    // limiar baixo de propósito: a borda do tecido é antialiasada e o magenta
+    // chega diluído ali. Pele (h≈25°) fica longe demais pra ser pega por engano.
+    if(s < 0.10 || dh > 46) continue;
+    const w = Math.min(1,(s-0.10)/0.14) * Math.min(1,(46-dh)/16);
+    const [nr,ng,nb] = _hslRgb(aH, aS, Math.min(0.97, Math.max(0.03, aL + (l-0.5)*inc)));
+    d[i] += (nr-d[i])*w; d[i+1] += (ng-d[i+1])*w; d[i+2] += (nb-d[i+2])*w;
+  }
+  ctx.putImageData(im,0,0);
+}
+
+/* chave = tudo que muda o desenho. Repintar 660px de pixel a cada render
+   trava no celular, então cada combinação é pintada uma vez e vira dataURL. */
+const chaveBoneco = (j, comLogos) =>
+  [j.bon, roupaAtual(j), j.cor||'#C9663C',
+   comLogos ? (j.escudo||'none') : '-', comLogos ? (j.patroc||'none') : '-'].join('|');
+
+const _pintado = new Map();
+async function pintarChave(k){
+  if(_pintado.has(k)) return _pintado.get(k);
+  const [bon,peca,cor,esc,pat] = k.split('|');
+  const base = await carregarImg(`../bonecos-t/${bon}-${peca}.png`)
+            || await carregarImg(`../bonecos-t/${bon}.png`);
+  if(!base) return null;
+  const W=base.naturalWidth, H=base.naturalHeight;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  x.drawImage(base,0,0);
+  if(cor) _pintarMagenta(x,W,H,cor);
+  const n = NUMEROS && NUMEROS[`${bon}-${peca}`];
+  if(n){
+    for(const [chave,o] of [[esc,n.escudo],[pat,n.patroc]]){
+      if(!chave || chave==='-' || chave==='none' || !ARQ_LOGO[chave] || !o) continue;
+      const lg = await carregarImg('../marcas/'+ARQ_LOGO[chave]); if(!lg) continue;
+      const dw = W*o.tamanho/100, dh = dw*(lg.naturalHeight/lg.naturalWidth);
+      x.drawImage(lg, W*o.x/100 - dw/2, H*o.y/100 - dh/2, dw, dh);
+    }
+  }
+  // desloca pra centrar o TRONCO, não a caixa da imagem: o recorte do polo põe
+  // o corpo bem à direita do quadro, e centrar a imagem deixa o atleta torto.
+  let dx = 0;
+  if(n && n.atleta){
+    const larguraNaTela = 698*n.atleta.altura/100*(W/H);
+    dx = ((n.atleta.x - 49.8)/100*390) / larguraNaTela * 100;
+  }
+  const r = {url:c.toDataURL('image/png'), dx};
+  _pintado.set(k, r);
+  return r;
+}
+
+/* palco=true: a figura é posicionada por altura/x/chão do JSON (cena integrada,
+   como no vestiário). Sem palco ela é centrada por flex e só recebe o desloque
+   do tronco. Os dois modos NÃO podem usar o mesmo transform — no palco quem
+   manda é translate(-50%,-100%), que ancora os pés na linha do chão. */
+const bonecoImg = (j, comLogos, palco)=>
+  palco
+    ? `<img class="bcv" data-palco="1" data-k="${chaveBoneco(j, comLogos===true)}" alt="">`
+    : `<div class="bfig"><img class="bcv" data-k="${chaveBoneco(j, comLogos===true)}" alt=""></div>`;
+
+function pintarBonecos(){
+  document.querySelectorAll('img.bcv').forEach(el=>{
+    const k = el.dataset.k;
+    if(el.dataset.pronto === k) return;
+    pintarChave(k).then(r=>{
+      if(!r || el.dataset.k !== k) return;
+      el.src = r.url;
+      if(!el.dataset.palco) el.style.transform = r.dx ? `translateX(${r.dx.toFixed(2)}%)` : '';
+      el.dataset.pronto = k;
+    });
+  });
+}
+
+/* Posiciona a figura do vestiário com os números medidos: altura em % da tela,
+   x já corrigido pro tronco de cada recorte, pés na linha do chão da cena. */
+function posicionarVest(){
+  const img = document.querySelector('.vpalco img.bcv'); if(!img) return;
+  const palco = img.parentNode, look = lookAtual();
+  const n = (NUMEROS && NUMEROS[`${look.bon}-${roupaAtual(look)}`]) || null;
+  const a = (n && n.atleta) || {altura:52.5, x:49.5, chao:82.5, sombraLargura:51, sombraOpacidade:23};
+  const H = palco.clientHeight, W = palco.clientWidth;
+  img.style.height = (H*a.altura/100) + 'px';
+  img.style.left = a.x + '%';
+  img.style.top  = a.chao + '%';
+  const larg = W*a.sombraLargura/100;
+  for(const [sel,mult,op] of [['.vsombra',1,a.sombraOpacidade/100], ['.vglow',1.28,.26]]){
+    const e = palco.querySelector(sel); if(!e) continue;
+    e.style.width = (larg*mult)+'px'; e.style.height = (larg*mult*0.17)+'px';
+    e.style.left = a.x+'%'; e.style.top = a.chao+'%'; e.style.opacity = op;
+  }
+
+  /* Com a bandeja aberta os pés ficam atrás dela — e sapato é parte do uniforme.
+     Sobe a CENA e a FIGURA juntas, nunca só a figura: separadas, o personagem
+     descola do chão desenhado e volta a parecer adesivo, que é o problema que a
+     integração veio resolver. A faixa que fica vazia embaixo é exatamente a que
+     a bandeja cobre. */
+  const tray = document.querySelector('.vtray');
+  const cena = palco.parentNode.querySelector('.cena');
+  let sobe = 0;
+  if(tray){
+    const pesY  = H*a.chao/100;
+    const trayY = tray.getBoundingClientRect().top - palco.getBoundingClientRect().top;
+    sobe = Math.max(0, Math.round(pesY - trayY + 14));
+  }
+  const t = sobe ? `translateY(${-sobe}px)` : '';
+  palco.style.transform = t;
+  if(cena) cena.style.transform = t;
+
+  /* O trilho é centrado no que SOBRA acima da bandeja, não na tela inteira —
+     com a bandeja alta, o último ícone ficava escondido atrás dela. */
+  const rail = palco.parentNode.querySelector('.vrail');
+  if(rail){
+    const limite = tray ? (tray.getBoundingClientRect().top - palco.getBoundingClientRect().top) : H;
+    rail.style.top = Math.round(limite/2) + 'px';
+  }
+}
+const nivelDe = (j)=> ehBeach() ? (j.nivelB ?? 1200) : j.nivel;
+const divDe   = (j)=> ehBeach() ? (j.divB ?? 'D')    : j.div;
+const tabelaPontos = ()=> ehBeach() ? S.pontosB : S.pontos;
+
+function calcular(meu, advNivel, venceu, ctx, formato, dupla, calibrando, cal){
+  const beach = ehBeach();
+  let k = K_BASE;
+  if(ehSetUnico(formato)) k *= 0.75;   // 09/08: era ×0,5. Melhor de 3 com super tie-break fica ×1,0
+  if(dupla && !beach)     k *= 0.75;   // §3.9 — no beach duplas é o padrão, não desconta
+  k *= multCal(calibrando, cal);       // 09/08: degrau, não mais ×3 chapado
+  // os multiplicadores compõem (duplas em set único = 0,75 × 0,75)
+  let dNivel = Math.round(k * ((venceu?1:0) - esperado(meu, advNivel)));
+  /* Piso de 800 aplicado aqui, e não na atribuição, pra que o número que o
+     jogador VÊ na prévia seja o mesmo que entra na ficha. O min(0,…) evita que
+     um Nível legado abaixo do piso vire bônus numa derrota. */
+  dNivel = Math.max(dNivel, Math.min(0, PISO_NIVEL - meu));
+
+  let base = BASE_PTS[ctx] ?? 6;
+  if(dupla && !beach) base *= 0.6;   // 31/07 no tênis · 06/08 beach fica x1,0
+  let mult = 1;
+  if(venceu){
+    const df = faixa(advNivel) - faixa(meu);
+    mult = df>=2 ? 3 : df===1 ? 1.8 : 1;   // multiplicador de zebra
+  }
+  const dPts = Math.round(venceu ? base*mult : base*0.2);  // derrota rende 20%
+  return {dNivel, dPts, zebra: venceu && mult>1};
+}
+
+function divisaoDe(n){ return n>=1750?'A' : n>=1500?'B' : n>=1250?'C' : 'D' }
+
+/* 07/08: "Classe" passa a se chamar CLASSE, com 4 categorias dentro
+   (C4 → C1, ~62 pontos cada). A barra da classe inteira leva meses pra encher;
+   a categoria dá movimento visível toda semana, que é o motivo dela existir.
+
+   Categoria é SÓ progressão e vitrine: o pareamento continua por CLASSE. Se a
+   janela de ±1 divisão virasse ±1 categoria, o pool de adversários despencaria
+   — e densidade já é o gargalo nº 1 do produto.
+
+   Bordas: D começa no piso do Nível (800) e A não tem teto. Nos dois a régua
+   usa a mesma largura das classes do meio, senão "subir uma categoria" mediria
+   esforços diferentes dependendo de onde a pessoa está.
+
+   O campo no dado continua `div`/`divB` — só a palavra na tela mudou. Renomear
+   a coluna obrigaria migração e não muda nada pra ninguém. */
+const CLASSE_FAIXA = { D:[PISO_NIVEL,1250], C:[1250,1500], B:[1500,1750], A:[1750,2000] };
+
+/* A categoria é medida DENTRO da classe que está sendo exibida — por isso a
+   classe entra como parâmetro em vez de ser recalculada aqui.
+   O motivo é concreto: `j.div` é campo guardado e `divisaoDe(j.nivel)` é
+   calculado, e os dois podem discordar (o jogador semente nasce com div 'C' e
+   Nível 1200, que é faixa D). Calculando a categoria pela faixa do Nível e
+   colando na classe guardada, sai "C1" pra quem está abaixo do piso da C —
+   duas fontes brigando numa etiqueta só. Fora da faixa, cai na categoria da
+   ponta, que é o comportamento honesto. */
+function categoriaDe(n, cl){
+  const [piso,teto] = CLASSE_FAIXA[cl || divisaoDe(n)] || CLASSE_FAIXA.C;
+  return Math.min(4, Math.max(1, 4 - Math.floor((n - piso) / ((teto-piso)/4))));
+}
+// 'C3' — a etiqueta que aparece na vitrine
+const classeDe = (j)=> divDe(j) + categoriaDe(nivelDe(j), divDe(j));
+
+function aplicar(p){
+  const eu = S.jogadores[EU];
+  const adv = S.jogadores[p.adv];
+  const beach = ehBeach();
+  const r = calcular(nivelDe(eu), nivelDe(adv), p.venceu, p.contexto, p.formato, p.dupla, eu.calibrando, eu.cal);
+
+  const divAntes = divDe(eu), posAntes = posicoes();
+  if(beach) eu.nivelB = (eu.nivelB ?? 1200) + r.dNivel;
+  else      eu.nivel += r.dNivel;
+  const divDepois = divisaoDe(nivelDe(eu));
+  const subiuDiv = divDepois!==divAntes && ['A','B','C','D'].indexOf(divDepois) < ['A','B','C','D'].indexOf(divAntes);
+  const caiuDiv  = divDepois!==divAntes && !subiuDiv;
+  if(beach) eu.divB = divDepois; else eu.div = divDepois;
+
+  // pontos derramam na comunidade e em TODOS os circuitos (31/07: circuito é lente)
+  // 06/08: derramam só dentro do esporte da partida
+  const T = tabelaPontos();
+  T.comunidade[EU] = (T.comunidade[EU]||0) + r.dPts;
+  S.circuitos.forEach(c=>{ T[c.id][EU] = (T[c.id][EU]||0) + r.dPts });
+
+  S.historico.unshift({
+    adv:p.adv, venceu:p.venceu, placar:p.placar,
+    dnivel:r.dNivel, dpts:r.dPts, quando:'agora'
+  });
+  if(r.zebra){ const s=S.selos.find(x=>x.n==='Zebra'); if(s) s.tem=true }
+
+  const posDepois = posicoes();
+  S.ultimo = {
+    ...r, adv:p.adv, venceu:p.venceu, placar:p.placar, contexto:p.contexto,
+    posAntes, posDepois, subiuDiv, caiuDiv, div:divDepois,
+    nivel: nivelDe(eu), esporte: S.esporte
+  };
+  S.novidades++;
+  salvar();
+}
+
+function ordena(tabela){
+  return Object.entries(tabela).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+}
+function posicoes(){
+  const T = tabelaPontos();
+  const o = {comunidade: ordena(T.comunidade).indexOf(EU)+1};
+  S.circuitos.forEach(c=>{ o[c.id] = ordena(T[c.id]).indexOf(EU)+1 });
+  return o;
+}
+
+/* 06/08: trocar de esporte troca a lente inteira — nível, divisão, quadro e pontos.
+   Nada é convertido; são dois trilhos paralelos. */
+function trocarEsporte(e){
+  if(S.esporte===e) return;
+  const saindo = S.esporte;
+  S.esporte = e;
+  // cada esporte tem sua quadra: beach = areia, tênis = as outras. E cada um
+  // lembra a última cena escolhida (a vitrine é própria de cada esporte).
+  const eu = S.jogadores[EU];
+  eu.cenas = eu.cenas || {};
+  if(eu.cena) eu.cenas[saindo] = eu.cena;             // guarda a do esporte que saiu
+  const mom = (eu.cena && eu.cena.momento) || 'noite';
+  eu.cena = eu.cenas[e] || (e==='beach' ? {quadra:'areia',momento:mom} : {quadra:'saibro',momento:mom});
+  eu.cenas[e] = eu.cena;
+  pilha=[]; salvar(); render();
+  toast(e==='beach' ? 'Beach Tennis — quadra de areia' : 'Tênis — quadra de saibro');
+}
+
+/* =========================================================================
+   NAVEGAÇÃO
+   ========================================================================= */
+let aba='inicio', pilha=[];
+
+function ir(rota, params){ pilha.push({rota,params}); render() }
+function voltar(){ pilha.pop(); render() }
+function trocarAba(t){ aba=t; pilha=[]; if(t==='comunidade') S.novidades=0;
+  // sair do provador fecha a categoria E descarta o que estava sendo provado:
+  // sair sem vestir é a forma de desistir, então o rascunho não pode sobreviver.
+  if(t!=='vestiario'){ vestAba=null; vestDraft=null }
+  salvar(); render() }
+// o quadro virou aba interna da Comunidade (05/08: "a comunidade é aba, não o app inteiro")
+function verQuadro(){ trocarAba('comunidade'); ir('quadro') }
+
+const $=(s)=>document.querySelector(s);
+
+function render(){
+  const atual = pilha.length ? pilha[pilha.length-1] : {rota:aba};
+  const v = VISTAS[atual.rota](atual.params||{});
+  $('#titulo').textContent = v.titulo;
+  $('#dir').innerHTML = v.dir||'';
+  // a home abre imersiva: sem barra de topo (a HUD dela já faz esse papel)
+  const naInicio = atual.rota==='inicio';
+  const naVest = atual.rota==='vestiario';
+  $('#topo').style.display = (naInicio||naVest) ? 'none' : 'flex';
+  // ambiente noturno (quadra por baixo) vale nas telas internas; home e vestiário têm cena própria
+  $('#fone').classList.toggle('noturno', !naInicio && !naVest);
+  // o cenário escolhido no vestiário vira o fundo da home e o ambiente das telas internas
+  const _c = S.jogadores[EU].cena||{quadra:'saibro',momento:'noite'};
+  $('#fone').style.setProperty('--cena-url', `url('../quadras/${_c.quadra}-${_c.momento}.jpg')`);
+  $('#topo').classList.toggle('temvoltar', pilha.length>0);
+  $('#marca').style.display = pilha.length? 'none':'flex';
+  $('#tela').innerHTML = v.html;
+  $('#tela').scrollTop = 0;
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.t===aba));
+  const bp = document.querySelector('#nav button[data-t="comunidade"]');
+  if(bp) bp.innerHTML = '<i>▣</i>Comunidade' + (S.novidades? ` <span class="badge">${S.novidades}</span>`:'');
+  pintarBonecos();
+  posicionarVest();
+}
+
+function toast(msg){
+  const t=$('#toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove('on'),3200);
+}
+
+/* =========================================================================
+   VISTAS
+   ========================================================================= */
+const nome=(id)=>S.jogadores[id].nome;
+const ap=(id)=>S.jogadores[id].ap;
+// avatar: boneco recortado + aro na cor da camisa. classe extra: '', 'g' (52) ou 'gg' (76)
+function avatar(id, tam){
+  const j=S.jogadores[id];
+  const cls = 'av'+(tam?' '+tam:'')+(id===EU?' eu':'');
+  const aro = j.cor ? `style="--camisa:${j.cor}"` : '';
+  // `bonecos/` só tem pose "parado" de m1–m4 e f1–f3; m5 e f4 nasceram no elenco
+  // de 06/08 e nunca ganharam essa pose. Cai pro sprite do elenco em vez de furo.
+  const img = j.bon ? `<img src="bonecos/${j.bon}-parado.png" onerror="this.onerror=null;this.src='../bonecos-t/${j.bon}.png'" alt="">` : '';
+  return `<div class="${cls}" ${aro}>${img || j.ap}</div>`;
+}
+const CTX_NOME={amistoso:'Amistoso',copa_panela:'Copa da comunidade',copa_circuito:'Copa de circuito',publico:'Circuito aberto',oficial:'Open'};
+
+function movimento(atual, antes){
+  if(!antes||atual===antes) return '<div class="mv eq">—</div>';
+  const d = antes-atual;
+  return d>0 ? `<div class="mv up">▲${d}</div>` : `<div class="mv dn">▼${-d}</div>`;
+}
+
+const VISTAS = {
+
+/* ---------------- INÍCIO (home vitrine) ---------------- */
+inicio(){
+  const eu=S.jogadores[EU], pos=posicoes();
+  const cena=eu.cena||{quadra:'saibro',momento:'noite'};
+
+  // degrau: onde estou dentro da divisão e quanto falta pra subir
+  const TETO={D:1250,C:1500,B:1750,A:null};      // Nível que promove
+  const PISO={D:1000,C:1250,B:1500,A:1750};      // base da faixa (visual)
+  const ACIMA={D:'C',C:'B',B:'A',A:null};
+  const teto=TETO[divDe(eu)], piso=PISO[divDe(eu)], acima=ACIMA[divDe(eu)];
+  const prog = teto ? Math.max(4,Math.min(100,Math.round((nivelDe(eu)-piso)/(teto-piso)*100))) : 100;
+  const faltam = teto ? Math.max(0,teto-nivelDe(eu)) : 0;
+
+  /* 07/08: a barra passa a medir a CATEGORIA, não a classe inteira. A classe
+     leva meses pra encher e a barra não anda — a categoria anda toda semana, e
+     é isso que faz ela existir. A classe continua sendo o que pareia. */
+  const cat = categoriaDe(nivelDe(eu), divDe(eu));
+  const [cPiso,cTeto] = CLASSE_FAIXA[divDe(eu)];
+  const largCat = (cTeto-cPiso)/4;
+  const catPiso = cPiso + (4-cat)*largCat;
+  const progCat = Math.max(4, Math.min(100, Math.round((nivelDe(eu)-catPiso)/largCat*100)));
+  const faltamCat = Math.max(0, Math.ceil(catPiso + largCat - nivelDe(eu)));
+  // degrau seguinte: a categoria de cima, ou a base da classe de cima
+  const proxDegrau = cat>1 ? divDe(eu)+(cat-1) : (acima ? acima+'4' : null);
+
+  // botão gigante = a ação do ciclo agora (o "JOGAR", mas honesto)
+  let bt;
+  if(S.aguardando)          bt={cls:'',        t:'Placar enviado',   s:nome(S.aguardando.adv).split(' ')[0]+' confirma no app dele', go:"trocarAba('registrar')"};
+  // conta só o que REALMENTE espera placar — proposta ainda não foi aceita
+  else if(pendEsperando().length){ const _n=pendEsperando().length;
+                            bt={cls:'up',      t:'Lançar placar',    s:'Você tem '+_n+' partida'+(_n>1?'s':'')+' esperando o placar', go:"trocarAba('registrar')"}; }
+  else                      bt={cls:'',        t:'Marcar jogo',      s:'Abre o radar de quem está livre na sua faixa', go:"trocarAba('radar')"};
+
+  /* Ações secundárias: marcar jogo e buscar oponente existiam só dentro de
+     abas. Ficam abaixo do botão grande, discretas — o registro continua sendo
+     a única ação com peso visual, porque é o elo frágil do ciclo. */
+  const secundarias = `<div class="acoes-sec">
+      ${bt.t!=='Marcar jogo' ? `<button onclick="trocarAba('radar')">◎ Marcar jogo</button>` : ''}
+      <button onclick="_net.abrirBusca&&_net.abrirBusca()">⌕ Buscar oponente</button>
+      <button onclick="trocarAba('comunidade')">▣ Minha comunidade</button>
+    </div>`;
+
+  // faixa "o que mexeu na comunidade" — o feed real, não loot
+  const strip = S.feed.map(f=>`
+    <div class="mcard">
+      <div class="mic">${f.ic}</div>
+      <div class="mtx"><b>${f.t}</b><small>${f.d}</small></div>
+      ${f.v?`<div class="mv">${f.v}</div>`:''}
+    </div>`).join('') || `<div class="mcard"><div class="mtx"><b>Tudo quieto</b><small>marque um jogo pra começar a mexer</small></div></div>`;
+
+  return {titulo:'Início', dir:'', html:`
+    <div class="ini" style="--camisa:${eu.cor}">
+      <div class="cena" style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"></div>
+      <div class="scrim"></div>
+
+      <div class="hud">
+        <div class="linha1">
+          <div class="temp"><span class="dot"></span>${S.semana>0?`Temporada · <b>Semana ${S.semana}/12</b>`:`<b>Pré-temporada</b> · o app ainda não lançou`}</div>
+          <div class="ic" onclick="netAbrirInbox()">✉${S.novidades?`<span class="badge">${S.novidades}</span>`:''}</div>
+          <!-- 07/08: escolher a quadra virou ícone aqui. O cenário é da VITRINE
+               (é o que aparece atrás de você na home), então mora na home — não
+               no armário junto com a roupa. -->
+          <div class="ic vitrine" onclick="abrirCena()" title="Trocar o cenário"
+               style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"><i>◈</i></div>
+          <div class="ic" onclick="trocarAba('ficha')">◷</div>
+        </div>
+        <div class="esp-sw">
+          <button class="${S.esporte==='tenis'?'on':''}" onclick="trocarEsporte('tenis')">Tênis</button>
+          <button class="${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach</button>
+        </div>
+        <div class="degrau">
+          <div class="top"><span>Classe <b>${divDe(eu)}${cat}</b>${proxDegrau?` → <b>${proxDegrau}</b>`:''}</span><span>${proxDegrau?'faltam '+faltamCat+' pts':'topo da escada'}</span></div>
+          <div class="bar"><i style="width:${progCat}%"></i></div>
+          <div class="fim">${cat>1
+            ? `Sobe pra <b>${proxDegrau}</b> com mais ${faltamCat} de Nível. Você joga contra a classe <b>${divDe(eu)}</b> inteira — categoria é progressão, não pareamento.`
+            : (teto ? `Você está no topo da <b>${divDe(eu)}</b>. Passando de ${teto} entra na <b>${acima}</b>.`
+                    : 'Você está na Classe A1 — o topo da escada.')}</div>
+        </div>
+      </div>
+
+      <div class="palco">
+        <div class="sombra"></div>
+        <div class="glow"></div>
+        <!-- a home é a vitrine: escudo e patrocinador aparecem aqui também -->
+        <div class="boneco" onclick="trocarAba('vestiario')">${bonecoImg(eu, true)}<span class="edit-hint">❖ Vestiário</span></div>
+        <div class="placa">
+          <div class="nm">${eu.nome}</div>
+          <div class="meta"><b>${nivelDe(eu)}</b> Nível · Classe ${classeDe(eu)}${S.comunidade.membros.length>1?` <span class="pil2">${pos.comunidade}º na comunidade</span>`:''}</div>
+        </div>
+      </div>
+
+      <div class="acao">
+        <button class="big ${bt.cls}" onclick="${bt.go}">${bt.t}<small>${bt.s}</small></button>
+        ${secundarias}
+      </div>
+
+      <!-- 06/08: uma faixa só. A versão anterior tinha um carrossel de atalhos
+           que repetia a nav fixa de baixo (Radar, Panela, Ficha, Vestiário).
+           Atalho quem dá é a nav; aqui vive ESTADO — o que corre e o que mudou. -->
+      <div class="strip-wrap">
+        <div class="strip-rot"><span>Sua temporada</span><a onclick="verQuadro()">ver quadro ›</a></div>
+        <div class="strip">
+          <!-- 09/08: sozinho na comunidade, "1º de 1" lê como classificação e não é
+               nenhuma: é o vazio se disfarçando de estado. A primeira home
+               nasce assim, porque a comunidade só entra depois do cadastro. Card
+               vira convite, e o convite aponta pra ação. -->
+          ${S.comunidade.membros.length > 1 ? `<div class="mcard viv" onclick="verQuadro()">
+            <div class="mic">▤</div>
+            <div class="mtx"><b>${pos.comunidade}º de ${S.comunidade.membros.length} na comunidade</b><small>${tabelaPontos().comunidade[EU]||0} pontos de temporada</small></div>
+          </div>` : `<div class="mcard viv" onclick="trocarAba('comunidade')">
+            <div class="mic">▤</div>
+            <div class="mtx"><b>Você ainda não tem turma</b><small>A comunidade é onde o ranking e o cinturão acontecem</small></div>
+          </div>`}
+          ${(S.comunidade.cinturao && S.jogadores[S.comunidade.cinturao.dono]) ? `<div class="mcard" onclick="trocarAba('comunidade')">
+            <div class="mic">♦</div>
+            <div class="mtx"><b>Cinturão · ${nome(S.comunidade.cinturao.dono)}</b><small>defende em ${S.comunidade.cinturao.prazoDias} dias</small></div>
+          </div>` : ''}
+          <div class="mcard">
+            <div class="mic">✦</div>
+            <div class="mtx"><b>${S.open.nome}</b><small>faltam ${S.open.dias} dias</small></div>
+          </div>
+          ${strip}
+        </div>
+      </div>
+    </div>`};
+},
+
+/* ---------------- VESTIÁRIO ---------------- */
+vestiario(){
+  // `eu` é o que está vestido de verdade; `look` inclui o que está sendo provado.
+  // A tela inteira mostra o LOOK — é o provador. Só o VESTIR passa um pro outro.
+  const eu=lookAtual();
+  const vst=fundoDe(eu);
+  return {titulo:'Vestiário', html:`
+    <div class="vest" style="--vest-url:url('../vestiario/${vst}.jpg')">
+      <div class="cena"></div>
+      <div class="scrim"></div>
+      ${cadVest?`<button class="vest-concluir" onclick="voltarVestCad()">Concluir ✓</button>`:''}
+
+      <!-- 06/08: o personagem É o preview. A camisa 2D que ficava ao lado saiu.
+           07/08: o palco é faixa fixa e o painel rola abaixo dele, não por baixo.
+           Escudo e patrocinador vêm desenhados dentro do canvas (comLogos=true),
+           nas coordenadas medidas pra ESTE sprite. -->
+      <div class="vpalco" style="--camisa:${eu.cor}" onclick="vestFechar()">
+        <i class="vglow"></i><i class="vsombra"></i>
+        ${bonecoImg(eu, true, true)}
+      </div>
+
+      <!-- 07/08: trilho de categorias. O rótulo é curto e o ícone pré-visualiza a
+           escolha atual, então dá pra saber onde mexer sem abrir nada.
+           Escudo e patrocinador NÃO estão aqui: o escudo é do clube e o
+           patrocinador é da temporada — nenhum dos dois é escolha cosmética. -->
+      <div class="vrail">
+        ${VEST_ABAS.map(([k,ic,rot])=>`
+          <button class="${vestAba===k?'on':''}" onclick="vestAbrir('${k}')">
+            <span class="vi">${
+              k==='cor'    ? `<i class="sw" style="background:${eu.cor}"></i>`
+            : k==='pessoa' ? `<i class="mn" style="${estiloRosto(eu.bon)}"></i>`
+            : ic}</span>
+            <span class="vl">${rot}</span>
+          </button>`).join('')}
+      </div>
+
+      ${(()=>{ const bt = vestPendente() ? `<button class="vestir" onclick="vestir()">Vestir</button>` : '';
+        if(vestAba) return `<div class="vtray">${bandejaVest(eu, vst, BONECOS, PALETA)}${bt}</div>`;
+        // fechou a categoria mas não vestiu: o botão não pode sumir junto
+        return bt ? `<div class="vtray so-vestir">${bt}</div>` : '';
+      })()}
+    </div>`};
+},
+
+/* ---------------- QUADRO ---------------- */
+quadro(){
+  const eu=S.jogadores[EU], pos=posicoes();
+  const ordem=ordena(tabelaPontos().comunidade);
+  const linhas = ordem.map((id,i)=>`
+    <div class="ln ${id===EU?'eu':''}" onclick="ir('jogador',{id:'${id}'})">
+      <div class="pos">${i+1}</div>
+      ${avatar(id)}
+      <div class="nm">${id===EU?'Você':nome(id)}
+        <small>${S.comunidade.cinturao.dono===id?'Cinturão · ':''}Nível ${nivelDe(S.jogadores[id])}</small></div>
+      ${movimento(i+1, id===EU?S.ant.comunidade[EU]:null)}
+      <div class="pt">${tabelaPontos().comunidade[id]}</div>
+    </div>`).join('');
+
+  const circuitos = S.circuitos.map(c=>{
+    const p = ordena(tabelaPontos()[c.id]).indexOf(EU)+1;
+    const mv = S.ant[c.id]? (S.ant[c.id][EU]-p) : 0;
+    return `<div class="card clic" onclick="ir('circuito',{id:'${c.id}'})">
+      <div class="linha-item">
+        <div class="txt"><b>${c.nome}</b><small>${c.membros} jogadores · ${p}º lugar${c.principal?' · principal':''}</small></div>
+        ${mv>0?`<span class="pil up">▲ ${mv}</span>`:mv<0?`<span class="pil dn">▼ ${-mv}</span>`:`<span class="pil gh">${tabelaPontos()[c.id][EU]} pts</span>`}
+      </div></div>`}).join('');
+
+  const feed = S.feed.map(f=>`
+    <div class="card"><div class="linha-item">
+      <div class="av">${f.ic}</div>
+      <div class="txt"><b>${f.t}</b><small>${f.d}</small></div>
+      ${f.v?`<span class="pil up">${f.v}</span>`:''}
+    </div></div>`).join('');
+
+  return {titulo:'Quadro', dir:`Semana ${S.semana} de 12`, html:`
+    <div class="hero">
+      <div class="cab-hero">
+        ${avatar(EU,'gg')}
+        <div class="txt">
+          <div class="nm">${eu.nome}</div>
+          <div class="sub">${eu.clube} · Salvador/BA</div>
+        </div>
+      </div>
+      <div class="linha-nivel">
+        <div class="n">${nivelDe(eu)}</div>
+        <div class="lb">Nível · Classe ${divDe(eu)}</div>
+      </div>
+      <div class="stats">
+        <div><div class="v">${pos.comunidade}º</div><div class="k">Na comunidade</div></div>
+        <div><div class="v">${pos.c_clube}º</div><div class="k">No clube</div></div>
+        <div><div class="v">${S.historico.length}</div><div class="k">Jogos</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Quadro da comunidade <span>somente leitura</span></div>
+      <div class="tab">
+        <div class="cab"><div class="r">#</div><div></div><div>Jogador</div><div class="c">Mov</div><div class="r">Pts</div></div>
+        ${linhas}
+      </div>
+      <p class="nota" style="margin-top:9px">Não existe botão de desafiar aqui — é o que mata a fila no topo. Pra jogar, o caminho é o Radar.</p>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Seus circuitos <span>${S.circuitos.length} de 5</span></div>
+      ${circuitos}
+      <div class="card clic" onclick="toast('O Ace Open é um Open — chave aberta, não gera circuito próprio.')">
+        <div class="linha-item">
+          <div class="txt"><b>${S.open.nome}</b><small>Chave de 32 · começa em ${S.open.dias} dias</small></div>
+          <span class="pil gold">Inscrito</span>
+        </div></div>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Agora na comunidade</div>
+      ${feed}
+    </div>`};
+},
+
+/* ---------------- RADAR ---------------- */
+radar(){
+  const eu=S.jogadores[EU];
+  const ordemDiv=['A','B','C','D'];
+  const i=ordemDiv.indexOf(divDe(eu));
+  const permitidas=[ordemDiv[i-1],divDe(eu),ordemDiv[i+1]].filter(Boolean);
+  // Jogadores REAIS cadastrados, na faixa de ±1 divisão. Sem elenco fake.
+  const disp = Object.keys(S.jogadores)
+    .filter(id=> id!==EU && S.jogadores[id])
+    .map(id=> ({id, j:S.jogadores[id]}))
+    .filter(x=> permitidas.includes(divDe(x.j)));
+
+  return {titulo:'Radar', dir:`±1 classe`, html:`
+    <div class="sec">
+      <div class="card clic" onclick="netAbrirBusca()">
+        <div class="linha-item">
+          <div class="av">🔍</div>
+          <div class="txt"><b>Buscar amigos</b><small>Por nome, email ou ID — amigo você desafia em qualquer classe</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="rot">Quem tá no app <span>divisões ${permitidas.join(' · ')}</span></div>
+      ${disp.length ? disp.map(x=>`
+        <div class="card clic" onclick="netDesafiar('${x.id}')">
+          <div class="linha-item">
+            ${avatar(x.id)}
+            <div class="txt"><b>${nome(x.id)}</b><small>Classe ${divDe(x.j)} · Nível ${nivelDe(x.j)}</small></div>
+            <div class="seta">›</div>
+          </div></div>`).join('')
+        : `<div class="card"><p class="nota">Ninguém na sua faixa ainda. Quando outra pessoa se cadastrar (dentro de ±1 classe de você), ela aparece aqui pra você lançar o placar.</p></div>`}
+      <p class="nota" style="margin-top:10px">O radar é <b>puxado</b>: ele nunca te notifica sugerindo jogo. Você abre quando quer jogar.</p>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Fora do alcance</div>
+      <div class="card"><p class="nota">Jogadores a mais de uma classe de distância não aparecem aqui — nem pela busca por nome. É a mesma trava que faz o quadro ser somente leitura.</p></div>
+    </div>`};
+},
+
+/* ---------------- DESAFIO ---------------- */
+desafio(p){
+  const j=S.jogadores[p.id];
+  return {titulo:'Card do desafio', html:`
+    <div class="pad">
+      <div class="card" style="border-color:var(--acc)">
+        <div class="linha-item" style="margin-bottom:14px">
+          ${avatar(p.id,'g')}
+          <div class="txt"><b style="font-size:16px">${j.nome}</b><small>Classe ${divDe(j)} · Nível ${nivelDe(j)}</small></div>
+        </div>
+        <div class="stats" style="margin-top:0">
+          <div><div class="v" style="font-size:14px">${p.quando.split(',')[0]}</div><div class="k">Dia</div></div>
+          <div><div class="v" style="font-size:14px">${p.quando.split(',')[1]||''}</div><div class="k">Hora</div></div>
+          <div><div class="v" style="font-size:14px">Md 3</div><div class="k">Formato</div></div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn" onclick="marcarJogo('${p.id}')">Aceitar e marcar</button>
+          <button class="btn sec" onclick="ir('propor',{id:'${p.id}'})">Propor outro horário</button>
+        </div>
+        <p class="nota" style="text-align:center;margin-top:8px">Recusar não custa nada — não tira ponto, não sai no quadro, ninguém é avisado.</p>
+      </div>
+      <div class="card">
+        <div class="rot" style="margin-bottom:8px">O que está em jogo</div>
+        <p class="nota">Vitória: <b style="color:var(--up)">${calcular(nivelDe(S.jogadores[EU]),nivelDe(j),true,'amistoso','md3',false,S.jogadores[EU].calibrando,S.jogadores[EU].cal).dNivel>0?'+':''}${calcular(nivelDe(S.jogadores[EU]),nivelDe(j),true,'amistoso','md3',false,S.jogadores[EU].calibrando,S.jogadores[EU].cal).dNivel}</b> de Nível ·
+        Derrota: <b style="color:var(--dn)">${calcular(nivelDe(S.jogadores[EU]),nivelDe(j),false,'amistoso','md3',false,S.jogadores[EU].calibrando,S.jogadores[EU].cal).dNivel}</b>.
+        Amistoso rende 6 pontos de temporada; derrota rende 20% disso.</p>
+      </div>
+    </div>`};
+},
+
+/* ---------------- PROPOR HORÁRIO ---------------- */
+propor(p){
+  const j=S.jogadores[p.id];
+  const dias=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const horas=['7h','8h','9h','15h','18h','19h','20h','21h'];
+  return {titulo:'Propor horário', html:`
+    <div class="pad">
+      <div class="linha-item" style="margin-bottom:16px">
+        ${avatar(p.id)}
+        <div class="txt"><b>${j.nome}</b><small>Classe ${divDe(j)} · Nível ${nivelDe(j)}</small></div>
+      </div>
+      <div class="rot">Dia</div>
+      <div class="grade" id="grade-dia">${dias.map(d=>`<button class="chip" onclick="escolher('dia','${d}')">${d}</button>`).join('')}</div>
+      <div class="rot" style="margin-top:16px">Hora</div>
+      <div class="grade" id="grade-hora">${horas.map(h=>`<button class="chip" onclick="escolher('hora','${h}')">${h}</button>`).join('')}</div>
+      <button class="btn" id="btn-propor" style="margin-top:20px" disabled onclick="enviarProposta('${p.id}')">Enviar proposta</button>
+      <button class="btn sec" onclick="voltar()">Cancelar</button>
+      <p class="nota" style="text-align:center">${j.nome.split(' ')[0]} recebe a proposta e responde quando puder. Recusar não custa nada pra nenhum dos dois.</p>
+    </div>`};
+},
+
+/* ---------------- REGISTRAR ---------------- */
+registrar(){
+  if(S.aguardando){
+    const a=S.aguardando;
+    return {titulo:'Registrar', html:`
+      <div class="pad">
+        <div class="card">
+          <div class="rot" style="margin-bottom:9px">Esperando confirmação</div>
+          <div class="linha-item">
+            ${avatar(a.adv)}
+            <div class="txt"><b>${nome(a.adv)}</b><small>${a.placar} · enviado agora</small></div>
+            <span class="pil gh">Pendente</span>
+          </div>
+          <p class="nota" style="margin-top:11px">${nome(a.adv).split(' ')[0]} confirma no app dele. Se não responder em 72h, o placar vale metade; se ele contestar, resolve por concessão — quem concede encerra.</p>
+        </div>
+        <p class="nota" style="text-align:center">Nada mexeu ainda. O ciclo só fecha quando o placar é confirmado.</p>
+      </div>`};
+  }
+  const _esp=pendEsperando(), _prop=pendPropostas();
+  if(!S.pendentes.length){
+    return {titulo:'Registrar', html:`
+      <div class="vazio"><span class="ic">✚</span>
+        Nenhuma partida esperando placar.<br>Marque um jogo pelo Radar — quando ele nascer no app, o placar já vem pré-preenchido.
+      </div>`};
+  }
+  // proposta é jogo pedido, não jogo marcado — lista própria, sem caminho pro placar
+  const propostasH = _prop.length ? `<div class="sec">
+      <div class="rot">Propostas enviadas</div>
+      <p class="nota" style="margin-bottom:12px">Você propôs o horário. Enquanto não aceitarem, não há placar pra lançar.</p>
+      ${_prop.map(p=>`
+        <div class="card">
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+            <span class="pil gh">Aguardando resposta</span>
+            <span class="pil gh">${p.quando}</span>
+          </div>
+          <div class="linha-item">
+            ${avatar(p.adv)}
+            <div class="txt"><b>${nome(p.adv)}</b><small>${p.local}</small></div>
+          </div>
+          <button class="btn sec" style="margin-top:10px" onclick="cancelarProposta('${p.id}')">Retirar proposta</button>
+        </div>`).join('')}
+    </div>` : '';
+  if(!_esp.length){
+    return {titulo:'Registrar', dir:`${_prop.length} proposta${_prop.length>1?'s':''}`, html:`${propostasH}
+      <div class="vazio"><span class="ic">✚</span>
+        Nenhuma partida esperando placar ainda.<br>Assim que aceitarem seu horário, ela nasce aqui.
+      </div>`};
+  }
+  return {titulo:'Registrar', dir:`${_esp.length} pendente${_esp.length>1?'s':''}`, html:`${propostasH}
+    <div class="sec">
+      <div class="rot">Esperando placar</div>
+      <p class="nota" style="margin-bottom:12px">Elas nasceram no app, então já sabemos quem, quando, onde, o formato e o contexto — <b>falta só o placar</b>.</p>
+      ${_esp.map(p=>`
+        <div class="card clic" onclick="ir('placar',{id:'${p.id}'})">
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+            <span class="pil up">Nasceu no app</span>
+            <span class="pil gh">${p.dupla?'Duplas':'Simples'}</span>
+            <span class="pil gh">${p.formato==='set'?'Set único':'Melhor de 3'}</span>
+          </div>
+          <div class="linha-item">
+            ${avatar(p.adv)}
+            <div class="txt"><b>${nome(p.adv)}</b><small>${p.local} · ${p.quando}</small></div>
+            <div class="seta">›</div>
+          </div>
+          <p class="nota" style="margin-top:9px">${CTX_NOME[p.contexto]}</p>
+        </div>`).join('')}
+      <button class="btn gh" onclick="toast('Partida lançada na mão não conta em circuito aberto — só nas fechadas.')">+ Jogou fora do app? Lançar na mão</button>
+    </div>`};
+},
+
+/* ---------------- PLACAR ---------------- */
+placar(p){
+  const par=S.pendentes.find(x=>x.id===p.id);
+  const nSets = par.formato==='set'?1:3;
+  if(!par.sets) par.sets = Array.from({length:nSets},()=>[null,null]);
+  const j=S.jogadores[par.adv];
+
+  const col=(i,lado)=>{
+    const v=par.sets[i][lado];
+    const outro=par.sets[i][1-lado];
+    const ganhou = v!=null && outro!=null && v>outro;
+    return `<b class="${ganhou?'g':''} ${v==null?'vazio':''}" onclick="mexerSet('${par.id}',${i},${lado})">${v==null?'–':v}</b>`;
+  };
+
+  return {titulo:'Placar', dir:par.formato==='set'?'Set único':'Melhor de 3', html:`
+    <div class="pad">
+      <p class="nota" style="margin-bottom:12px">Toque nos números pra montar o placar. ${par.formato==='set'?'Set único vale metade no Nível — por tempo de quadra, não por ruído.':'Melhor de 3 sets.'}</p>
+      <div class="placar">
+        <div class="pl-lado">
+          <div class="q">${avatar(EU)}<span>Você</span></div>
+          <div class="sets">${par.sets.map((_,i)=>col(i,0)).join('')}</div>
+        </div>
+        <div class="pl-lado">
+          <div class="q">${avatar(par.adv)}<span>${j.nome}</span></div>
+          <div class="sets">${par.sets.map((_,i)=>col(i,1)).join('')}</div>
+        </div>
+      </div>
+      ${previa(par)}
+      <button class="btn" id="btnEnviar" onclick="enviarPlacar('${par.id}')" ${resultado(par)===null?'disabled':''}>Enviar pra confirmação</button>
+      <button class="btn sec" onclick="voltar()">Voltar</button>
+      <p class="nota" style="text-align:center">${j.nome.split(' ')[0]} confirma no app dele. Placar divergente resolve por concessão.</p>
+    </div>`};
+},
+
+/* ---------------- O QUE MEXEU ---------------- */
+mexeu(){
+  const u=S.ultimo, eu=S.jogadores[EU];
+  const linhaPos=(rot,antes,depois,extra)=>{
+    const d=antes-depois;
+    return `<div class="l">
+      <div class="i"><div class="t">${rot}</div><div class="d">${antes}º → ${depois}º${extra?' · '+extra:''}</div></div>
+      <div class="v" style="color:${d>0?'var(--up)':d<0?'var(--dn)':'var(--ink3)'}">${d>0?'▲'+d:d<0?'▼'+(-d):'—'}</div>
+    </div>`;
+  };
+  return {titulo:'O que mexeu', html:`
+    <div class="celebra">
+      <img class="reacao" src="bonecos/${S.jogadores[EU].bon==='m1'?(u.venceu?'m1-comemorando':'m1-cabisbaixo'):S.jogadores[EU].bon+'-parado'}.png" alt="">
+      <h2>${u.venceu?'Você venceu':'Você perdeu'}</h2>
+      <p>${nome(u.adv)} · ${u.placar}${u.zebra?' · <b style="color:var(--up)">zebra</b>':''}</p>
+      <div class="big" style="color:${u.dNivel>=0?'var(--up)':'var(--dn)'}">${u.dNivel>0?'+':''}${u.dNivel}</div>
+      <p style="margin-top:4px">Nível ${u.nivel} · Classe ${u.div}</p>
+    </div>
+    <div class="sec">
+      <div class="rot">Um placar, ${S.circuitos.length+1} quadros</div>
+      <div class="mexeu">
+        <div class="l">
+          <div class="i"><div class="t">Pontos de temporada</div><div class="d">${CTX_NOME[u.contexto]}${u.zebra?' · multiplicador de zebra':''}</div></div>
+          <div class="v" style="color:var(--up)">+${u.dPts}</div>
+        </div>
+        ${linhaPos('Quadro da comunidade', u.posAntes.comunidade, u.posDepois.comunidade)}
+        ${S.circuitos.map(c=>linhaPos(c.nome, u.posAntes[c.id], u.posDepois[c.id], c.membros+' jogadores')).join('')}
+      </div>
+      ${u.subiuDiv?`<div class="card" style="border-color:var(--up)"><div class="linha-item">
+        <div class="av" style="background:var(--up-bg);color:var(--up)">▲</div>
+        <div class="txt"><b>Você subiu pra Classe ${u.div}</b><small>Novo pool de adversários no radar</small></div></div></div>`:''}
+      ${u.caiuDiv?`<div class="card" style="border-color:var(--dn)"><div class="linha-item">
+        <div class="av" style="background:var(--dn-bg);color:var(--dn)">▼</div>
+        <div class="txt"><b>Você caiu pra Classe ${u.div}</b><small>O radar muda junto</small></div></div></div>`:''}
+      <p class="nota" style="margin-top:10px">É isso que um registro faz: um placar move a comunidade e todos os seus circuitos de uma vez. Foi por isso que valeu a pena digitar.</p>
+      <button class="btn" style="margin-top:14px" onclick="verQuadro()">Ver o quadro</button>
+    </div>`};
+},
+
+/* ---------------- PANELA ---------------- */
+comunidade(){
+  const c=S.comunidade.cinturao;
+  const ordem=ordena(tabelaPontos().comunidade);
+  return {titulo:S.comunidade.nome, dir:`${S.comunidade.membros.length} membros`, html:`
+    <div class="sec">
+      <div class="card clic" onclick="netAbrirGrupos()">
+        <div class="linha-item">
+          <div class="av">▣</div>
+          <div class="txt"><b>Comunidades</b><small>Crie a sua, mande o link pros amigos ou peça pra entrar numa aberta</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+      <div class="card clic" onclick="netAbrirTorneios()">
+        <div class="linha-item">
+          <div class="av">🏆</div>
+          <div class="txt"><b>Torneios</b><small>Mata-mata · crie um, convide a galera ou entre num aberto</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+      <div class="card clic" onclick="ir('quadro')">
+        <div class="linha-item">
+          <div class="av">◈</div>
+          <div class="txt"><b>Quadro & circuitos</b><small>A tabela completa da comunidade e seus ${S.circuitos.length} circuitos</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Cinturão</div>
+      ${(c && S.jogadores[c.dono]) ? `<div class="card" style="border-color:var(--gold)">
+        <div class="linha-item">
+          ${avatar(c.dono,'g')}
+          <div class="txt"><b>${nome(c.dono)}</b><small>♦ Campeão há ${c.desde} dias</small></div>
+          <span class="pil gold">Dono</span>
+        </div>
+        <div class="stats" style="margin-top:13px">
+          <div><div class="v" style="font-size:14px">${ap(c.aspirante)}</div><div class="k">Aspirante</div></div>
+          <div><div class="v" style="font-size:14px">${c.prazoDias}d</div><div class="k">Prazo</div></div>
+          <div><div class="v" style="font-size:14px">Md 3</div><div class="k">Formato</div></div>
+        </div>
+        <p class="nota" style="margin-top:11px">Um aspirante por ciclo de 30 dias, escolhido por preferência de ranking. Não existe botão de desafiar — o campeão vê um nome, uma vez por mês.</p>
+      </div>` : `<div class="card"><p class="nota">O cinturão ainda não tem dono. Quando a comunidade tiver disputa rolando, o primeiro campeão aparece aqui.</p></div>`}
+    </div>
+
+    <div class="sec">
+      <div class="rot">Os ${S.comunidade.membros.length} da comunidade</div>
+      ${ordem.map((id,i)=>`
+        <div class="card clic" onclick="ir('jogador',{id:'${id}'})">
+          <div class="linha-item">
+            ${avatar(id)}
+            <div class="txt"><b>${id===EU?'Você':nome(id)}</b><small>${i+1}º · ${tabelaPontos().comunidade[id]} pts · Nível ${nivelDe(S.jogadores[id])}</small></div>
+            ${(c && c.dono===id)?'<span class="pil gold">♦</span>':''}
+          </div></div>`).join('')}
+    </div>
+
+    <div class="sec">
+      <div class="rot">Patches <span>pertencimento, não mérito</span></div>
+      ${S.comunidade.patches.map(p=>`
+        <div class="card"><div class="linha-item">
+          <div class="av">◈</div>
+          <div class="txt"><b>${p.t}</b><small>criado por ${nome(p.de)}</small></div>
+        </div></div>`).join('')}
+      <button class="btn gh" onclick="toast('Patch novo passa por filtro de 3 camadas e custa por criação, não por envio.')">+ Criar patch</button>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Copa interna</div>
+      <div class="card clic" onclick="toast('A copa organiza partidas — não cria outro ranking. Cada resultado derrama nos circuitos de quem jogou.')">
+        <div class="linha-item">
+          <div class="txt"><b>Copa do Sábado</b><small>Chave de 8 · eliminatória simples</small></div>
+          <div class="seta">›</div>
+        </div></div>
+    </div>`};
+},
+
+/* ---------------- FICHA ---------------- */
+ficha(){
+  const eu=S.jogadores[EU];
+  const v=S.historico.filter(h=>h.venceu).length;
+  return {titulo:'Ficha', html:`
+    <div class="hero">
+      <div class="cab-hero">
+        ${avatar(EU,'gg')}
+        <div class="txt">
+          <div class="nm">${eu.nome}</div>
+          <div class="sub">${eu.clube?eu.clube+' · ':''}${(window.netId&&window._net)?netId(_net.uid()):''}</div>
+        </div>
+      </div>
+      <div class="linha-nivel">
+        <div class="n">${nivelDe(eu)}</div>
+        <div class="lb">Nível · Classe ${divDe(eu)} <b style="color:var(--acc)">${ESPORTE_NOME[S.esporte]}</b></div>
+      </div>
+
+      <!-- 06/08: os dois esportes convivem na ficha. Ser C no tênis e A no beach
+           são as duas verdades ao mesmo tempo — nenhuma converte na outra. -->
+      <div class="dois-esp">
+        ${[['tenis','Tênis','◍'],['beach','Beach','◒']].map(([e,n,ic])=>{
+          const nv = e==='beach' ? (eu.nivelB ?? 1200) : eu.nivel;
+          const dv = e==='beach' ? (eu.divB ?? 'D')    : eu.div;
+          return `<button class="de ${S.esporte===e?'on':''}" onclick="trocarEsporte('${e}')">
+            <div class="de-ic">${ic}</div>
+            <div class="de-tx"><b>${n}</b><small>Nível ${nv} · Classe ${dv}</small></div>
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="stats">
+        <div><div class="v">${S.historico.length}</div><div class="k">Jogos</div></div>
+        <div><div class="v">${v}</div><div class="k">Vitórias</div></div>
+        <div><div class="v">${S.historico.length?Math.round(v/S.historico.length*100):0}%</div><div class="k">Aprov.</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Conquistas</div>
+      <div class="card clic" onclick="abrirTrofeus()">
+        <div class="linha-item">
+          <div class="av">🏆</div>
+          <div class="txt"><b>Sala de conquistas</b><small>Troféus, selos e patches · os bloqueados dizem como pegar</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Selos <span>permanentes</span></div>
+      <div class="selos">
+        ${S.selos.map(s=>`<div class="selo ${s.tem?'':'off'}"><i>${s.tem?s.ic:'?'}</i><b>${s.tem?s.n:'—'}</b></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Títulos <span>expiram</span></div>
+      ${S.titulos.map(t=>`<div class="card"><div class="linha-item">
+        <div class="txt"><b>${t.t}</b><small>${t.d}</small></div>
+        <span class="pil acc">Ativo</span></div></div>`).join('')}
+    </div>
+
+    <div class="sec">
+      <div class="rot">Histórico</div>
+      ${S.historico.map(h=>`
+        <div class="card"><div class="linha-item">
+          ${avatar(h.adv)}
+          <div class="txt"><b>${h.venceu?'Vitória':'Derrota'} · ${nome(h.adv)}</b><small>${h.placar} · ${h.quando}</small></div>
+          <div style="text-align:right">
+            <div style="font-family:var(--f-disp);font-size:16px;font-weight:700;color:${h.dnivel>=0?'var(--up)':'var(--dn)'}">${h.dnivel>0?'+':''}${h.dnivel}</div>
+            <div style="font-size:9px;color:var(--ink3);letter-spacing:.1em">NÍVEL</div>
+          </div>
+        </div></div>`).join('') || '<div class="card"><p class="nota">Nenhuma partida ainda. Marque um jogo pra começar.</p></div>'}
+    </div>
+
+    <div class="sec">
+      <button class="btn sec" onclick="sairDaConta()">Sair da conta</button>
+    </div>`};
+},
+
+/* ---------------- CIRCUITO ---------------- */
+circuito(p){
+  const c=S.circuitos.find(x=>x.id===p.id);
+  const ordem=ordena(tabelaPontos()[c.id]);
+  return {titulo:c.nome, dir:`${c.membros} jogadores`, html:`
+    <div class="sec">
+      <div class="rot">Quadro do circuito <span>por Pontos de Temporada</span></div>
+      <div class="tab">
+        <div class="cab"><div class="r">#</div><div></div><div>Jogador</div><div class="c">Mov</div><div class="r">Pts</div></div>
+        ${ordem.map((id,i)=>`
+          <div class="ln ${id===EU?'eu':''}">
+            <div class="pos">${i+1}</div>
+            ${avatar(id)}
+            <div class="nm">${id===EU?'Você':nome(id)}<small>Classe ${divDe(S.jogadores[id])}</small></div>
+            ${movimento(i+1, id===EU?S.ant[c.id][EU]:null)}
+            <div class="pt">${tabelaPontos()[c.id][id]}</div>
+          </div>`).join('')}
+      </div>
+      <p class="nota" style="margin-top:9px">Circuito é <b>lente, não recorte</b>: qualquer partida sua alimenta ele, mesmo contra quem não é membro. E é plano — classe não entra aqui dentro.</p>
+    </div>`};
+},
+
+/* ---------------- JOGADOR ---------------- */
+jogador(p){
+  const j=S.jogadores[p.id];
+  if(p.id===EU) return VISTAS.ficha();
+  const h=S.historico.filter(x=>x.adv===p.id);
+  return {titulo:j.nome, html:`
+    <div class="hero">
+      <div class="cab-hero">
+        ${avatar(p.id,'gg')}
+        <div class="txt">
+          <div class="nm">${j.nome}</div>
+          <div class="sub">Classe ${divDe(j)}</div>
+        </div>
+      </div>
+      <div class="linha-nivel"><div class="n">${nivelDe(j)}</div><div class="lb">Nível</div></div>
+    </div>
+    <div class="sec">
+      <div class="rot">Confronto direto</div>
+      ${h.length? h.map(x=>`<div class="card"><div class="linha-item">
+        <div class="txt"><b>${x.venceu?'Você venceu':'Você perdeu'}</b><small>${x.placar} · ${x.quando}</small></div></div></div>`).join('')
+        : '<div class="card"><p class="nota">Vocês ainda não se enfrentaram no app.</p></div>'}
+    </div>
+    <div class="sec">
+      <div class="rot">Atributos</div>
+      <div class="card"><p class="nota">Só atributo positivo e objetivo aparece na ficha de outro jogador. Nunca nota de opinião — o app não deixa ninguém avaliar ninguém.</p></div>
+    </div>`};
+},
+};
+
+/* =========================================================================
+   AÇÕES
+   ========================================================================= */
+function previa(par){
+  const r=resultado(par);
+  if(r===null) return `<p class="nota" style="text-align:center;margin:12px 0">Monte o placar pra ver o que está em jogo.</p>`;
+  const c=calcular(nivelDe(S.jogadores[EU]), nivelDe(S.jogadores[par.adv]), r, par.contexto, par.formato, par.dupla, S.jogadores[EU].calibrando, S.jogadores[EU].cal);
+  return `<div class="stats" style="margin:12px 0">
+    <div><div class="v" style="color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div class="k">Nível</div></div>
+    <div><div class="v" style="color:var(--up)">+${c.dPts}</div><div class="k">Pontos</div></div>
+    <div><div class="v">${S.circuitos.length+1}</div><div class="k">Quadros</div></div>
+  </div>${c.zebra?`<p class="nota" style="text-align:center;color:var(--up)">Zebra — multiplicador aplicado nos pontos de temporada.</p>`:''}`;
+}
+
+function resultado(par){
+  let eu=0, adv=0, completos=0;
+  par.sets.forEach(([a,b])=>{
+    if(a==null||b==null) return;
+    completos++;
+    if(a>b) eu++; else if(b>a) adv++;
+  });
+  if(par.formato==='set') return completos===1 ? eu>adv : null;
+  if(eu>=2) return true;
+  if(adv>=2) return false;
+  return null;
+}
+
+function mexerSet(id,i,lado){
+  const par=S.pendentes.find(x=>x.id===id);
+  const v=par.sets[i][lado];
+  par.sets[i][lado] = v==null?0 : v>=7?null : v+1;
+  render();
+}
+
+function enviarPlacar(id){
+  const par=S.pendentes.find(x=>x.id===id);
+  const r=resultado(par);
+  if(r===null) return;
+  const placar=par.sets.filter(([a,b])=>a!=null&&b!=null).map(([a,b])=>`${a}-${b}`).join(' ');
+  S.aguardando={...par, venceu:r, placar};
+  S.pendentes=S.pendentes.filter(x=>x.id!==id);
+  pilha=[]; salvar(); render();
+  toast('Enviado. <b>Nada mexeu ainda</b> — o ciclo fecha quando '+nome(par.adv).split(' ')[0]+' confirmar.');
+  setTimeout(()=>{ if(S.aguardando) toast('Dica: use o ⚙ no topo pra simular a confirmação dele.') }, 4200);
+}
+
+function simularConfirmacao(){
+  if(!S.aguardando){ toast('Não tem placar esperando confirmação.'); return }
+  const a=S.aguardando; S.aguardando=null;
+  aplicar(a);
+  fecharGaveta();
+  aba='inicio'; pilha=[{rota:'mexeu'}];
+  render();
+}
+
+/* personalização (vestiário) — cosmético, reflete na home e no ambiente */
+function setBoneco(b){ vestMudar('bon', b) }
+
+/* =========================================================================
+   VESTIÁRIO — trilho de categorias (07/08, 2ª volta)
+   Uma categoria aberta por vez. Fechada é o estado padrão, porque a tela do
+   provador serve pra olhar o personagem, não pra olhar controle.
+   ========================================================================= */
+const VEST_ABAS = [
+  ['esporte','◐','Esporte'],
+  ['pessoa','' ,'Pessoa'],    // ícone = rosto de quem está vestido
+  ['peca',   '❑','Peça'],
+  ['cor',    '' ,'Cor'],      // ícone = a cor escolhida
+  ['clube',  '♦','Clube'],
+  ['patroc', '★','Marca'],
+  ['quadra', '◈','Quadra'],
+  ['fundo',  '▦','Fundo'],
+];
+const CLUBES  = [['bahiano','Bahiano'],['none','Sem clube']];
+const PATROCS = [['stella','Stella'],['qpc','QPC'],['aceopen','Ace Open'],['none','Sem']];
+let vestAba = null;
+function vestAbrir(k){ vestAba = (vestAba===k ? null : k); render() }
+function vestFechar(){ if(vestAba){ vestAba=null; render() } }
+
+/* -------------------------------------------------------------------------
+   RASCUNHO — o que você escolhe só vira seu depois do VESTIR.
+   Trocar de roupa é experimentar: sem um passo de confirmação, cada toque já
+   é definitivo e não existe "provar e desistir". O rascunho guarda só o que é
+   do PERSONAGEM (quem, peça, cor). O fundo da sala e o esporte aplicam na hora
+   — não são roupa, e o esporte ainda mexe em Nível e divisão do app inteiro.
+   ------------------------------------------------------------------------- */
+let vestDraft = null;
+const lookAtual = ()=> Object.assign({}, S.jogadores[EU], vestDraft||{});
+function vestMudar(campo, valor){
+  const eu = S.jogadores[EU];
+  vestDraft = Object.assign({}, vestDraft||{}, {[campo]:valor});
+  // vestido só existe no elenco feminino — trocar pra um homem tem que puxar a peça junto
+  if(campo==='bon' && lookAtual().roupa==='vestido' && valor[0]!=='f') vestDraft.roupa='camiseta';
+  // voltou sozinho pro que já estava salvo? então não há nada pendente
+  if(['bon','roupa','cor'].every(c=> (vestDraft[c] ?? eu[c]) === eu[c])) vestDraft = null;
+  render();
+}
+const vestPendente = ()=>{
+  if(!vestDraft) return false;
+  const eu = S.jogadores[EU];
+  return ['bon','roupa','cor'].some(c=> vestDraft[c]!==undefined && vestDraft[c]!==eu[c]);
+};
+function vestir(){
+  if(!vestPendente()) return;
+  Object.assign(S.jogadores[EU], vestDraft);
+  vestDraft = null; vestAba = null;
+  salvar(); render(); toast('Uniforme vestido.');
+}
+
+/* ---- o rosto no círculo ---------------------------------------------------
+   Retângulo do rosto DENTRO de cada sprite, medido em `_rostos.html`: a
+   ferramenta acha o pescoço varrendo o alpha (a linha mais estreita da faixa
+   alta — acima é cabeça, abaixo é ombro) e centra um quadrado na cabeça.
+
+   Por que isso existe: antes o círculo usava o sprite `-mini` (52x150, corpo
+   inteiro) esticado a 220% com UM deslocamento fixo pros nove. Dava rosto
+   borrado (ampliava ~27px de fonte) e descentralizado, porque cada sprite
+   enquadra o corpo num lugar diferente do quadro. É a mesma lei do escudo e do
+   patrocinador: proporção medida dentro do próprio objeto, nunca coordenada
+   fixa pra todos.
+
+   Sempre do sprite `-camiseta`: o rosto não muda com a roupa. De quebra some o
+   404 do `m2-vestido-mini`, que abria buraco no seletor.
+   Recalibrar: abrir `_rostos.html`, ajustar, "Copiar o JSON medido", colar aqui. */
+const ROSTO = {
+  m1:{x: 18,y:-44,w:168,h:168,sw:201,sh:660}, m2:{x: 12,y:-48,w:183,h:183,sw:204,sh:660},
+  m3:{x: 23,y:-45,w:170,h:170,sw:215,sh:660}, m4:{x: 27,y:-41,w:158,h:158,sw:211,sh:660},
+  m5:{x: 29,y:-38,w:147,h:147,sw:204,sh:660}, f1:{x: 45,y:-48,w:183,h:183,sw:229,sh:660},
+  f2:{x: 21,y:-54,w:206,h:206,sw:219,sh:660}, f3:{x: 12,y:-65,w:250,h:250,sw:227,sh:660},
+  f4:{x:-11,y:-73,w:277,h:277,sw:216,sh:660}
+};
+
+/* Devolve o style que encaixa o retângulo medido em QUALQUER círculo.
+   A porcentagem do `background-position` alinha o ponto P% da imagem com o
+   ponto P% do elemento, o que resolve pra P = x/(sw-w) — sem o tamanho do
+   círculo na conta. Por isso o mesmo style serve no ícone de 23px da aba e na
+   grade grande, e não quebra quando a tela muda de tamanho. */
+const estiloRosto = b=>{
+  const r = ROSTO[b];
+  if(!r) return `background-image:url(../bonecos-t/${b}-camiseta.png);background-size:cover`;
+  const px = (r.sw - r.w) ? r.x/(r.sw - r.w)*100 : 50;
+  const py = (r.sh - r.h) ? r.y/(r.sh - r.h)*100 : 50;
+  return `background-image:url(../bonecos-t/${b}-camiseta.png)`
+       + `;background-size:${(r.sw/r.w*100).toFixed(2)}% ${(r.sh/r.h*100).toFixed(2)}%`
+       + `;background-position:${px.toFixed(2)}% ${py.toFixed(2)}%`;
+};
+
+function bandejaVest(eu, vst, BONECOS, PALETA){
+  const cab=(t,d)=>`<div class="tt"><b>${t}</b><span>${d||''}</span></div>`;
+  switch(vestAba){
+    case 'esporte': return cab('Esporte','cada um tem seu próprio Nível')+`
+      <div class="seg2">
+        <button class="${S.esporte==='tenis'?'on':''}" onclick="trocarEsporte('tenis')">Tênis</button>
+        <button class="${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach Tennis</button>
+      </div>`;
+    case 'pessoa': return cab('Pessoa','')+`
+      <div class="vgrid">
+        ${BONECOS.map(b=>`<button class="vopt ${b===eu.bon?'on':''}" onclick="setBoneco('${b}')"
+          style="${estiloRosto(b)}" aria-label="${b}"></button>`).join('')}
+      </div>`;
+    case 'peca': return cab('Peça', ehBeach()?'no beach é sempre regata':'muda a silhueta')+`
+      <div class="seg2">
+        ${ehBeach() ? `<button class="on" disabled>Regata</button>`
+          : ROUPAS_TENIS.filter(([v])=> v!=='vestido' || eu.bon[0]==='f')
+              .map(([v,n])=>`<button class="${roupaAtual(eu)===v?'on':''}" onclick="setRoupa('${v}')">${n}</button>`).join('')}
+      </div>`;
+    case 'cor': return cab('Cor da camisa','é ela que vira o aro do seu avatar')+`
+      <div class="vgrid">
+        ${PALETA.map(h=>`<button class="vopt cor ${h.toLowerCase()===(eu.cor||'').toLowerCase()?'on':''}" style="background:${h}" onclick="setCor('${h}')"></button>`).join('')}
+      </div>`;
+    case 'clube': return cab('Clube','o escudo no peito e o nome na sua ficha')+`
+      <div class="seg2">
+        ${CLUBES.map(([v,n])=>`<button class="${(eu.escudo||'none')===v?'on':''}" onclick="setClube('${v}')">${n}</button>`).join('')}
+      </div>`;
+    case 'patroc': return cab('Patrocinador','a marca na camisa')+`
+      <div class="seg2" style="flex-wrap:wrap">
+        ${PATROCS.map(([v,n])=>`<button class="${(eu.patroc||'none')===v?'on':''}" onclick="setPatroc('${v}')">${n}</button>`).join('')}
+      </div>`;
+    case 'quadra': {
+      const cur = eu.cena||{quadra:'saibro',momento:'noite'};
+      const qs = ehBeach() ? [['areia','Areia']] : [['saibro','Saibro'],['grama','Grama'],['cimento','Cimento']];
+      return cab('Quadra', ehBeach()?'no beach é sempre areia':'onde você aparece na home')+`
+        <div class="vgrid">
+          ${qs.map(([v,n])=>`<button class="vopt ${cur.quadra===v?'on':''}" onclick="setCena('quadra','${v}')" style="padding:0;overflow:hidden">
+            <img loading="lazy" src="../quadras/${v}-${cur.momento}.jpg" alt="" style="width:100%;height:100%;object-fit:cover"></button>`).join('')}
+        </div>
+        <div class="seg2" style="margin-top:10px">
+          ${[['noite','Noite'],['dia','Dia']].map(([v,n])=>`<button class="${cur.momento===v?'on':''}" onclick="setCena('momento','${v}')">${n}</button>`).join('')}
+        </div>`;
+    }
+    case 'fundo': return cab('Fundo','só desta tela — a quadra fica na aba Quadra')+`
+      <div class="seg2">
+        ${FUNDOS.map(([v,n])=>`<button class="${vst===v?'on':''}" onclick="setVestiario('${v}')">${n}</button>`).join('')}
+      </div>`;
+  }
+  return '';
+}
+// 07/08: os três viraram rascunho — só entram no estado quando o Nuno veste.
+function setCor(h){ vestMudar('cor', h) }
+function setRoupa(v){ vestMudar('roupa', v) }
+function setCena(campo,v){ const eu=S.jogadores[EU]; eu.cena=Object.assign({quadra:'saibro',momento:'noite'},eu.cena||{},{[campo]:v}); eu.cenas=eu.cenas||{}; eu.cenas[S.esporte]=eu.cena; salvar(); render(); desenharCenas() }
+/* Clube e patrocinador voltaram a ser escolha do jogador, no vestiário (Bloco 2).
+   Clube define o escudo no peito E o nome que aparece na ficha. */
+const CLUBE_NOME = {bahiano:'Clube Bahiano de Tênis'};
+function setClube(v){ const eu=S.jogadores[EU]; eu.escudo=v; eu.clube=CLUBE_NOME[v]||''; salvar(); render() }
+function setEscudo(v){ S.jogadores[EU].escudo=v; salvar(); render() }
+function setPatroc(v){ S.jogadores[EU].patroc=v; salvar(); render() }
+function setVestiario(v){ S.jogadores[EU].vestiario=v; salvar(); render() }
+
+/* ---- cenário da vitrine (ícone ◈ da home) ---- */
+const QUADRAS = [['saibro','Saibro'],['grama','Grama'],['cimento','Cimento'],['areia','Areia']];
+
+/* ---- os dois fundos do vestiário -----------------------------------------
+   Renomeados em 10/08. Chamavam-se `escuro` e `saibro`, e os dois nomes eram
+   ruins por motivos diferentes:
+
+     · `saibro` COLIDIA com a opção de quadra, que também se chama saibro — dois
+       objetos distintos com o mesmo nome na mesma tela.
+     · `escuro` descrevia a iluminação, e nome de clima não escala: o terceiro
+       fundo não teria como se chamar.
+
+   Agora nomeiam o LUGAR: Túnel é o corredor simétrico que sai pra quadra, Clube
+   é a sala de madeira com luz quente. O próximo fundo já tem onde se encaixar.
+
+   ALIAS: `vestiario` é gravado no banco (net.js:68), então conta antiga tem
+   'escuro'/'saibro' salvo. Sem a tradução abaixo essas contas pedem um arquivo
+   que não existe mais e abrem o vestiário sem fundo nenhum. Não remover. */
+const FUNDOS = [['tunel','Túnel'],['clube','Clube']];
+const FUNDO_ANTIGO = {escuro:'tunel', saibro:'clube'};
+const fundoDe = (j)=>{
+  const v = j && j.vestiario;
+  return FUNDO_ANTIGO[v] || (FUNDOS.some(([k])=>k===v) ? v : 'tunel');
+};
+const MOMENTOS = [['noite','Noite'],['dia','Dia']];
+function desenharCenas(){
+  const cx=$('#cenas-cx'); if(!cx || !$('#cenas').classList.contains('on')) return;
+  const c = S.jogadores[EU].cena||{quadra:'saibro',momento:'noite'};
+  cx.innerHTML = `
+    <h3>Sua vitrine</h3>
+    <div class="sub">O cenário que aparece atrás de você na home.</div>
+    <div class="qgrade">
+      ${QUADRAS.map(([v,n])=>`
+        <button class="qcard ${c.quadra===v?'on':''}" onclick="setCena('quadra','${v}')">
+          <img loading="lazy" src="../quadras/${v}-${c.momento}.jpg" alt="">
+          <span>${n}</span>
+        </button>`).join('')}
+    </div>
+    <div class="seg2" style="margin-top:12px">
+      ${MOMENTOS.map(([v,n])=>`<button class="${c.momento===v?'on':''}" onclick="setCena('momento','${v}')">${n}</button>`).join('')}
+    </div>
+    <button class="btn gh" style="margin-top:14px" onclick="fecharCena()">Fechar</button>`;
+}
+function abrirCena(){ $('#cenas').classList.add('on'); desenharCenas() }
+function fecharCena(){ $('#cenas').classList.remove('on') }
+
+/* =========================================================================
+   SALA DE CONQUISTAS — portada da sala-trofeus.html, calibrada.
+   As prateleiras são as da PRÓPRIA foto (linhas medidas), não CSS. A foto é
+   uma só; as ABAS trocam o que está nas prateleiras — um cômodo por objeto
+   da taxonomia (29/07): Troféus (disputa vencida: campeonatos; cinturão no
+   topo em toda aba, é a coroa da sala) · Selos (o passado permanente, as 12
+   peças derivadas do histórico) · Patches (pertencimento, recebidos da comunidade).
+   Conquistado = nítido; bloqueado = vulto que diz como conquistar. Abre da Ficha.
+   ========================================================================= */
+const TR_SALA = {arq:'../trofeus/sala.png', W:768, H:1376};
+const TR_PRATELEIRAS = [0.422, 0.460, 0.499, 0.536, 0.576];
+const TR_FAIXA = {x0:0.34, x1:0.66};
+const TR_ZOOM=1.6, TR_CY=50, TR_ALT=64, TR_OFF=0;   // calibragem fechada no editor
+const TR_PECAS = [
+  {id:'primeira',  arq:'t9',  n:'1ª partida',      c:'Registre seu primeiro placar'},
+  {id:'dez',       arq:'t3',  n:'Dez partidas',    c:'Registre 10 placares'},
+  {id:'cinco',     arq:'t6',  n:'5 adversários',   c:'Jogue com 5 pessoas diferentes'},
+  {id:'semana',    arq:'t2',  n:'Semana cheia',    c:'Jogue em todas as semanas de uma temporada'},
+  {id:'cinquenta', arq:'t4',  n:'Cinquenta',       c:'Registre 50 placares'},
+  {id:'rapido',    arq:'t5',  n:'Confirmou já',    c:'Confirme o placar do adversário em menos de 1 hora'},
+  {id:'estreante', arq:'t8',  n:'Estreante',       c:'Seja a primeira partida de alguém no app'},
+  {id:'limpo',     arq:'t10', n:'Nada pendente',   c:'Termine uma temporada sem nenhum placar em aberto'},
+  {id:'temporada', arq:'t11', n:'Temporada',       c:'Chegue ao fim de uma temporada jogando'},
+  {id:'zebra',     arq:'t7',  n:'Zebra',           c:'Vença alguém 150 pontos de Nível acima de você'},
+  {id:'subiu',     arq:'t12', n:'Subiu de classe', c:'Passe para a classe de cima'},
+  {id:'defendeu',  arq:'t1',  n:'Defendeu',        c:'Defenda o cinturão da sua comunidade'},
+];
+let trSel=null, trAba='trofeus';   // trofeus | selos | patches
+function selAba(a){ trAba=a; trSel=null; desenharTrofeus() }
+// campeonatos vencidos (4d) — derivados do banco via netMeusCampeonatos(), não
+// de tabela própria; carregam ao abrir a sala e viram as taças da aba Troféus
+let _camps=[];
+// mês/ano direto da string ISO — new Date('2026-08-01') nasce UTC e Salvador
+// (UTC-3) puxaria 01/08 pra "jul/2026"
+const _mesAno=d=>{ try{ const [a,m]=String(d).slice(0,10).split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m-1]+'/'+a }catch(e){ return '' } };
+
+// quais troféus o jogador já conquistou, derivado do histórico real
+function trofeusConquistados(){
+  const h=S.historico||[]; const advs=new Set(h.map(x=>x.adv)); const g=new Set();
+  if(h.length>=1)  g.add('primeira');
+  if(h.length>=10) g.add('dez');
+  if(h.length>=50) g.add('cinquenta');
+  if(advs.size>=5) g.add('cinco');
+  if(h.some(x=>x.venceu && x.dpts>=x.dnivel && x.dnivel>0 && x.dpts> x.dnivel*1.5)) {} // zebra: sinal não guardado ainda
+  return g;
+}
+
+// recorte por objeto (o fundo das peças não veio chapado) — igual folha-trofeus
+const _trN=new Map();
+function trNormalizar(src){
+  if(_trN.has(src)) return _trN.get(src);
+  const LIM=34;
+  const p=new Promise(ok=>{
+    const im=new Image(); im.onerror=()=>ok(null);
+    im.onload=()=>{
+      const W=im.naturalWidth,H=im.naturalHeight;
+      const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});
+      c.width=W;c.height=H;x.drawImage(im,0,0);
+      const dd=x.getImageData(0,0,W,H),d=dd.data;
+      const lum=k=>d[k*4]*.299+d[k*4+1]*.587+d[k*4+2]*.114;
+      let x0=W,x1=-1,y0=H,y1=-1;
+      for(let py=0;py<H;py++)for(let px=0;px<W;px++){ if(lum(py*W+px)<LIM)continue;
+        if(px<x0)x0=px; if(px>x1)x1=px; if(py<y0)y0=py; if(py>y1)y1=py; }
+      if(x1<0) return ok(null);
+      const cx=(x0+x1)/2,cy=(y0+y1)/2,rx=(x1-x0)/2,ry=(y1-y0)/2;
+      for(let py=0;py<H;py++)for(let px=0;px<W;px++){
+        const k=py*W+px,ex=(px-cx)/(rx*1.06),ey=(py-cy)/(ry*1.06),r=Math.sqrt(ex*ex+ey*ey);
+        let a=r>1?0:(r>0.9?(1-r)/0.1:1); const l=lum(k); if(l<LIM)a*=Math.max(0,l/LIM);
+        d[k*4+3]=Math.round(d[k*4+3]*a); }
+      x.putImageData(dd,0,0);
+      const w=x1-x0+1,hh=y1-y0+1;
+      const o=document.createElement('canvas'); o.width=w;o.height=hh;
+      o.getContext('2d').drawImage(c,x0,y0,w,hh,0,0,w,hh);
+      ok(o.toDataURL('image/png'));
+    }; im.src=src;
+  });
+  _trN.set(src,p); return p;
+}
+
+function abrirTrofeus(){ trSel=null; let el=$('#trofeus'); if(el) el.classList.add('on'); desenharTrofeus();
+  // busca os campeonatos no banco e redesenha quando chegarem (sala abre na hora)
+  if(window._net && _net.uid && _net.uid() && _net.meusCampeonatos)
+    _net.meusCampeonatos().then(l=>{ _camps=l||[]; desenharTrofeus() }).catch(()=>{});
+}
+function fecharTrofeus(){ const el=$('#trofeus'); if(el) el.classList.remove('on') }
+function selTrofeu(id){ trSel = trSel===id?null:id; desenharTrofeus() }
+
+function desenharTrofeus(){
+  let el=$('#trofeus');
+  if(!el){ el=document.createElement('div'); el.id='trofeus';
+    el.innerHTML=`<div class="tr-cena"></div><div class="tr-veu"></div>
+      <div class="tr-topo"><h2>Sala de Conquistas</h2><div class="tr-cnt" id="tr-cnt"></div>
+        <button class="tr-x" onclick="fecharTrofeus()">×</button></div>
+      <div class="tr-abas" id="tr-abas"></div>
+      <div class="tr-camadas" id="tr-camadas"></div>
+      <div class="tr-det" id="tr-det"></div>`;
+    ($('#fone')||document.body).appendChild(el); el.classList.add('on');
+  }
+  const fone=$('#fone'); const Tw=fone.clientWidth, Th=fone.clientHeight;
+  const larguraFaixa=(TR_FAIXA.x1-TR_FAIXA.x0)*TR_SALA.W;
+  const escala=(Tw/larguraFaixa)*(TR_ZOOM/1.6);
+  const altoNaTela=TR_SALA.H*escala, largNaTela=TR_SALA.W*escala;
+  const topo=Th*(TR_CY/100)-altoNaTela*0.499;
+  const yDe=f=> topo + f*altoNaTela + TR_OFF;
+
+  const cena=el.querySelector('.tr-cena');
+  cena.style.backgroundImage=`url('${TR_SALA.arq}')`;
+  cena.style.backgroundSize=`${largNaTela}px ${altoNaTela}px`;
+  cena.style.backgroundPosition=`${(Tw-largNaTela)/2}px ${topo}px`;
+
+  const got=trofeusConquistados();
+  const patches=(S.comunidade&&S.comunidade.patches)||[];
+
+  // abas + contador do objeto ativo
+  const chip=(a,n)=>`<button class="tr-aba ${trAba===a?'on':''}" onclick="selAba('${a}')">${n}</button>`;
+  $('#tr-abas').innerHTML=chip('trofeus','Troféus')+chip('selos','Selos')+chip('patches','Patches');
+  $('#tr-cnt').innerHTML = trAba==='selos' ? `<b>${got.size}</b> de ${TR_PECAS.length}`
+    : trAba==='patches' ? `<b>${patches.length}</b> ◈`
+    : `<b>${_camps.length}</b> 🏆`;
+
+  const temCint=false;   // cinturão só quando o jogador for dono na comunidade
+  const camadas=[];
+  // cinturão sozinho no topo, em TODA aba — é a coroa da sala (Título em disputa)
+  const yC=yDe(TR_PRATELEIRAS[0]);
+  camadas.push(`<div class="tr-prat" style="bottom:${Th-yC}px">
+    <button class="tr-peca ${temCint?'tem':'nao'} ${trSel==='cint'?'sel':''}" onclick="selTrofeu('cint')">
+      <img data-src="../trofeus/cinturao.png" style="height:78px" alt=""><em>${temCint?'Cinturão da Comunidade':'Sem dono na sua comunidade'}</em></button>
+  </div>`);
+
+  // as 4 prateleiras (12 vagas) mostram o objeto da aba ativa
+  const peca=(sel,cls,img,label)=>`<button class="tr-peca ${cls} ${trSel===sel?'sel':''}" onclick="selTrofeu('${sel}')">
+      <img data-src="${img}" style="height:${TR_ALT}px" alt=""><em>${label}</em></button>`;
+  let itens=[];
+  if(trAba==='trofeus'){
+    // uma taça por campeonato vencido; passou de 12, o último slot vira "+N"
+    itens=_camps.slice(0,12).map((c,i)=>peca('camp:'+i,'tem','../trofeus/trofeu-circuito.png',c.cat||c.nome));
+    if(_camps.length>12) itens[11]=peca('camp:mais','tem','../trofeus/trofeu-circuito.png','+'+(_camps.length-11)+' mais');
+  } else if(trAba==='selos'){
+    itens=TR_PECAS.map(p=>peca(p.id,got.has(p.id)?'tem':'nao','../trofeus-v1/'+p.arq+'.png',p.n));
+  } else {
+    itens=patches.slice(0,12).map((p,i)=>peca('patch:'+i,'tem','../patches-v1/p'+((i%9)+1)+'.png',p.t));
+  }
+  for(let i=0;i<4;i++){
+    const y=yDe(TR_PRATELEIRAS[i+1]);
+    camadas.push(`<div class="tr-prat" style="bottom:${Th-y}px">${itens.slice(i*3,i*3+3).join('')}</div>`);
+  }
+  $('#tr-camadas').innerHTML=camadas.join('');
+  // detalhe: a etiqueta do troféu de campeonato carrega de onde veio na própria
+  // cara (torneio, categoria, esporte, chave, quando) — decisão de 07/08
+  let det=null;
+  if(trSel==='camp:mais'){
+    det=`<b>🏆 Todos os campeonatos <span class="tr-pill tem">${_camps.length}</span></b>
+      <p>${_camps.map(c=>c.nome+(c.cat?' · '+c.cat:'')).join(' — ')}</p>`;
+  } else if(trSel && trSel.startsWith('camp:')){
+    const c=_camps[+trSel.slice(5)];
+    if(c) det=`<b>🏆 Campeão · ${c.nome}${c.cat?' · '+c.cat:''} <span class="tr-pill tem">pra sempre</span></b>
+      <p>${c.esporte==='beach'?'Beach Tennis':'Tênis'} · chave de ${c.chave} · ${_mesAno(c.quando)}</p>`;
+  } else if(trSel && trSel.startsWith('patch:')){
+    const p=patches[+trSel.slice(6)];
+    if(p) det=`<b>◈ ${p.t} <span class="tr-pill tem">pertencimento</span></b>
+      <p>Criado por ${typeof nome==='function'?nome(p.de):p.de} na sua comunidade. Patch não se ganha — se recebe.</p>`;
+  } else if(trSel==='cint'){
+    det=`<b>Cinturão da Comunidade <span class="tr-pill ${temCint?'tem':'nao'}">${temCint?'com você':'sem dono'}</span></b>
+      <p>${temCint?'Defenda jogando — quem te vencer na comunidade leva.':'Vença o dono do cinturão numa partida da comunidade pra tomar.'}</p>`;
+  } else {
+    const p=TR_PECAS.find(x=>x.id===trSel);
+    if(p) det=`<b>${p.n} <span class="tr-pill ${got.has(p.id)?'tem':'nao'}">${got.has(p.id)?'conquistado':'bloqueado'}</span></b><p>${p.c}</p>`;
+  }
+  // texto de descanso por aba — cada objeto explica a própria natureza
+  const vazio = trAba==='trofeus'
+    ? `<b>Troféus</b><p>Vença um campeonato e a taça entra na prateleira — torneio, chave e data na etiqueta. Pra sempre.</p>`
+    : trAba==='patches'
+    ? `<b>Patches</b><p>Patch vem da comunidade: quando alguém te mandar um, aparece aqui. É pertencimento, não mérito.</p>`
+    : `<b>Toque numa peça</b><p>Bloqueada, ela fica de vulto e diz o que fazer pra conquistar.</p>`;
+  $('#tr-det').innerHTML = det || vazio;
+  el.querySelectorAll('[data-src]').forEach(x=>{ trNormalizar(x.dataset.src).then(u=>{ if(u) x.src=u }) });
+}
+
+/* =========================================================================
+   TELA DE DESAFIO — VS (estilo Cartola, adaptado: personagem vs personagem).
+   Aparece quando alguém te desafia. Os dois bonecos na quadra, "quem ganha?",
+   dados do adversário e Aceitar/Recusar.
+   ========================================================================= */
+function mostrarDesafioVS(m){
+  const eu=S.jogadores[EU];
+  const advKey=m.criador_id;                      // quem desafiou (você é o adversário)
+  const j=S.jogadores[advKey] || {nome:'Jogador', cor:'#5C2E3C', bon:'m1', nivel:1200};
+  const advId=window.netId?netId(advKey):'';
+  const amigo=window.netEhAmigo?netEhAmigo(advKey):false;
+  const div=divisaoDe(j.nivel||1200);
+  const q=(eu.cena&&eu.cena.quadra)||'saibro', mo=(eu.cena&&eu.cena.momento)||'noite';
+  let el=document.getElementById('vs');
+  if(!el){ el=document.createElement('div'); el.id='vs'; document.body.appendChild(el); }
+  el.innerHTML=`
+    <div class="vs-bg" style="background-image:url('../quadras/${q}-${mo}.jpg')"></div>
+    <div class="vs-scrim"></div>
+    <div class="vs-top"><div class="vs-kick">Quem vai ganhar esse confronto?</div></div>
+    <div class="vs-arena">
+      <div class="vs-lado" style="--camisa:${eu.cor}">${bonecoImg(eu,true)}<div class="vs-nome">Você</div></div>
+      <div class="vs-x">VS</div>
+      <div class="vs-lado" style="--camisa:${j.cor||'#5C2E3C'}">${bonecoImg(j,true)}<div class="vs-nome">${(j.nome||'').split(' ')[0]}</div></div>
+    </div>
+    <div class="vs-card">
+      <div class="vs-adv"><b>${j.nome}</b> <span class="vs-id">${advId}</span>
+        <div class="vs-meta">Classe ${div} · ${amigo?'<span style="color:var(--up)">✔ seu amigo</span>':'não é seu amigo'}</div></div>
+      <div class="vs-acoes">
+        <button class="vs-no" onclick="fecharVS();_net.recusar('${m.id}')">Recusar</button>
+        <button class="vs-ok" onclick="fecharVS();_net.aceitar('${m.id}')">Aceitar desafio</button>
+      </div>
+    </div>`;
+  el.classList.add('on');
+  pintarBonecos();
+}
+function fecharVS(){ const el=document.getElementById('vs'); if(el) el.classList.remove('on') }
+window.mostrarDesafioVS = mostrarDesafioVS;
+
+function marcarJogo(id){
+  const novo={id:'p'+Date.now(), adv:id, dupla:false, contexto:'amistoso', formato:'md3',
+    local:'Clube Bahiano · Quadra 2', quando:'marcado agora'};
+  S.pendentes.push(novo);
+  aba='inicio'; pilha=[{rota:'registrar'}]; salvar(); render();
+  toast('Jogo marcado. Ele já nasceu no app — depois é <b>só o placar</b>.');
+}
+
+/* Proposta ainda não é jogo marcado: separa as duas listas em todo lugar que
+   conta pendência, senão o botão da home manda lançar placar de uma partida
+   que o outro nem aceitou. */
+const pendEsperando = ()=> S.pendentes.filter(p=>p.estado!=='proposto');
+const pendPropostas = ()=> S.pendentes.filter(p=>p.estado==='proposto');
+
+let proposta={dia:null,hora:null};
+function escolher(campo,valor){
+  proposta[campo]=valor;
+  document.querySelectorAll('#grade-'+campo+' .chip').forEach(b=>b.classList.toggle('on', b.textContent===valor));
+  document.getElementById('btn-propor').disabled = !(proposta.dia && proposta.hora);
+}
+/* 09/08: até aqui a proposta era DESCARTADA — a função montava o texto, zerava
+   o estado e só o toast dizia que tinha sido enviada. Nada era gravado e o
+   outro jogador nunca via nada.
+   Agora ela nasce em `S.pendentes` com estado `proposto`: fica visível pra quem
+   propôs, com o horário escolhido, e só vira jogo marcado quando o outro
+   aceita. Toast que afirma o que não aconteceu é pior que botão que não faz
+   nada — o botão morto você percebe na hora. */
+function enviarProposta(id){
+  if(!(proposta.dia && proposta.hora)) return;
+  const quando = proposta.dia+', '+proposta.hora;
+  proposta={dia:null,hora:null};
+  S.pendentes.push({ id:'p'+Date.now(), adv:id, dupla:false, contexto:'amistoso',
+    formato:'md3', local:'a combinar', quando, estado:'proposto' });
+  aba='inicio'; pilha=[{rota:'registrar'}]; salvar(); render();
+  toast('Proposta de <b>'+quando+'</b> enviada. '+nome(id).split(' ')[0]+' responde quando puder.');
+}
+function cancelarProposta(id){
+  S.pendentes = S.pendentes.filter(x=>x.id!==id);
+  salvar(); render();
+  toast('Proposta retirada. Ninguém é avisado.');
+}
+
+function avancarSemana(){
+  S.semana=Math.min(12,S.semana+1); S.open.dias=Math.max(0,S.open.dias-7);
+  S.comunidade.cinturao.prazoDias=Math.max(0,S.comunidade.cinturao.prazoDias-7);
+  S.comunidade.cinturao.desde+=7;
+  S.ant.comunidade[EU]=posicoes().comunidade;
+  S.circuitos.forEach(c=>{ S.ant[c.id][EU]=posicoes()[c.id] });
+  // os outros também jogam
+  Object.keys(tabelaPontos().comunidade).forEach(id=>{ if(id!==EU) tabelaPontos().comunidade[id]+=Math.round(Math.abs(Math.sin(S.semana*id.charCodeAt(2))*34)) });
+  fecharGaveta(); salvar(); render();
+  toast('Semana '+S.semana+' de 12. A comunidade jogou também.');
+}
+
+function resetar(){ guarda.removeItem('appTenis'); S=estadoInicial(); pilha=[]; aba='inicio'; render(); fecharGaveta(); toast('Recomeçado.') }
+function fecharGaveta(){ $('#gaveta').classList.remove('on') }
+
+/* =========================================================================
+   CADASTRO / ONBOARDING — o primeiro login → cria o personagem
+   ========================================================================= */
+let onb=null;
+const NIVEIS=[
+  {d:'D', t:'Estou começando', s:'jogo há pouco, ainda pegando ritmo'},
+  {d:'C', t:'Jogo social',     s:'bato bola toda semana, seguro um rali'},
+  {d:'B', t:'Jogo forte',      s:'pego torneio amador, tenho tática'},
+  {d:'A', t:'Nível alto',      s:'competitivo, disputo as chaves de cima'},
+];
+const NIVEL_PTS={D:1150,C:1375,B:1625,A:1850};   // 31/07: entra no meio da faixa
+const QUIZ=[
+  {q:'Há quanto tempo você joga?', o:[['Menos de 1 ano','D'],['1 a 3 anos','C'],['Mais de 3 anos','B']]},
+  {q:'Você joga torneio?',         o:[['Nunca','D'],['Amador, às vezes','C'],['Sim, com chave','B']]},
+  {q:'Num set contra um bom jogador…', o:[['Perco fácil','D'],['Brigo de igual','C'],['Costumo ganhar','A']]},
+];
+
+function abrirCadastro(){ onb={step:0, nome:'', email:'', senha:'', esporte:'tenis', bon:'m1', cor:'#C9663C', div:null, quiz:false, qidx:0, qskor:{D:0,C:0,B:0,A:0}}; document.getElementById('onb').classList.add('on'); renderOnb() }
+function onbEsporte(v){ onb.esporte=v; renderOnb() }
+function fecharCadastro(){ onb=null; document.getElementById('onb').classList.remove('on') }
+function onbSet(k,v){ onb[k]=v; renderOnb() }
+function onbNome(v){ onb.nome=v }                 // sem re-render pra não perder o foco do input
+function onbEmail(v){ onb.email=v }
+function onbSenha(v){ onb.senha=v }
+// cria a conta (email+senha) e só então avança pro personagem
+async function onbCriarConta(){
+  if(!onb.nome || !onb.nome.trim()){ alert('Digite seu nome.'); return; }
+  if(!onb.email || !/@/.test(onb.email)){ alert('Digite um email válido.'); return; }
+  if(!onb.senha || onb.senha.length<6){ alert('A senha precisa de pelo menos 6 caracteres.'); return; }
+  if(window.netSignUp){
+    const r = await netSignUp(onb.email, onb.senha);
+    if(r.erro){ alert(r.erro.includes('registered')?'Esse email já tem conta. Use "Já tenho conta" pra entrar.':('Não deu pra criar: '+r.erro)); return; }
+  }
+  onbNext();
+}
+function onbNext(){ onb.step++; renderOnb() }
+function onbBack(){ if(onb.step===0){ fecharCadastro(); return } onb.step--; renderOnb() }
+
+// Personalizar no cadastro = abrir o vestiário de verdade. Ele edita S direto;
+// o botão "Concluir" volta pro cadastro no passo do nível.
+let cadVest=false;
+function irVestCad(){ cadVest=true; document.getElementById('onb').classList.remove('on'); trocarAba('vestiario'); }
+function voltarVestCad(){
+  if(typeof vestPendente==='function' && vestPendente()) vestir();   // aplica o que estava sendo provado
+  cadVest=false;
+  document.getElementById('onb').classList.add('on');
+  if(typeof onb!=='undefined' && onb){ onb.step=3; renderOnb(); }
+}
+function onbAbrirQuiz(){ onb.quiz=true; onb.qidx=0; onb.qskor={D:0,C:0,B:0,A:0}; renderOnb() }
+function onbQuiz(div){
+  onb.qskor[div]++;
+  if(onb.qidx < QUIZ.length-1){ onb.qidx++ }
+  else { onb.div = Object.entries(onb.qskor).sort((a,b)=>b[1]-a[1])[0][0]; onb.quiz=false }
+  renderOnb();
+}
+function completarCadastro(){
+  const eu=S.jogadores[EU];
+  // esporte escolhido no início: define o esporte ativo E o cenário (quadra).
+  S.esporte = onb.esporte || 'tenis';
+  eu.cena = S.esporte==='beach' ? {quadra:'areia',momento:'noite'} : {quadra:'saibro',momento:'noite'};
+  eu.cenas = { [S.esporte]: eu.cena };
+  if(onb.nome.trim()){ eu.nome=onb.nome.trim(); eu.ap=onb.nome.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase() }
+  // personagem (bon/cor/roupa/clube/etc) já vem do vestiário aberto no passo 2 — não sobrescreve.
+  // 06/08: a calibragem declara a divisão do esporte em que o cadastro rodou.
+  // O outro esporte nasce em calibragem própria, no meio da tabela — nunca herda.
+  if(onb.div){
+    if(ehBeach()){ eu.divB=onb.div; eu.nivelB=NIVEL_PTS[onb.div]; eu.div='C'; eu.nivel=NIVEL_PTS.C }
+    else         { eu.div =onb.div; eu.nivel =NIVEL_PTS[onb.div]; eu.divB='C'; eu.nivelB=NIVEL_PTS.C }
+  }
+  if(onb.email && onb.email.trim()) eu.email = onb.email.trim();
+  eu.calibrando=true; eu.cal=0;
+  S.cadastroFeito=true;
+  fecharCadastro(); aba='inicio'; pilha=[]; salvar(); render();
+  // Sobe o jogador pro banco e faz a carga pós-login (roster, tempo-real, inbox),
+  // já que a conta acabou de ser criada com email+senha nesta sessão.
+  (async()=>{
+    if(window.netSyncJogador){ try{ await netSyncJogador(eu); }catch(e){} }
+    if(window.netBoot){ try{ await netBoot(S.jogadores[EU]); }catch(e){} }
+  })();
+  toast('Bem-vindo, '+eu.nome.split(' ')[0]+'! Você entra em <b>calibragem</b> — as 8 primeiras partidas ajustam seu Nível.');
+}
+
+function renderOnb(){
+  const el=document.getElementById('onb');
+  const dots=(n)=>`<div class="onb-dots">${[0,1,2,3,4].map(i=>`<span class="${i===n?'on':''}"></span>`).join('')}</div>`;
+  let body='';
+
+  if(onb.step===0){
+    body=`
+      <div class="onb-brand">
+        <div class="onb-mark">P</div>
+        <h1>Marque · Jogue · Suba</h1>
+        <p>O app onde cada jogo mexe no seu ranking — e o que mexeu vira o motivo do próximo.</p>
+      </div>
+      <div class="onb-acts">
+        <button class="big" onclick="onbNext()">Criar minha conta</button>
+        <button class="big alt" onclick="netAbrirLogin()">Já tenho conta — acessar</button>
+        <p class="onb-fine">Só para maiores de 18. Ao continuar, você concorda com os termos.</p>
+      </div>`;
+  } else if(onb.step===1){
+    body=`
+      <div class="onb-head"><div class="onb-kick">Passo 1 de 3</div><h2>Que esporte você joga?</h2></div>
+      <div class="seg2" style="margin-bottom:8px">
+        <button class="${onb.esporte==='tenis'?'on':''}" onclick="onbEsporte('tenis')">Tênis</button>
+        <button class="${onb.esporte==='beach'?'on':''}" onclick="onbEsporte('beach')">Beach Tennis</button>
+      </div>
+      <p class="nota">Define seu Nível principal e o cenário — quadra de saibro no tênis, areia no beach. O outro esporte você libera depois.</p>
+      <input id="onb-nome" class="onb-input" placeholder="Seu nome" value="${(onb.nome||'').replace(/"/g,'&quot;')}" oninput="onbNome(this.value)" maxlength="28" style="margin-top:14px">
+      <p class="nota">É esse nome que a comunidade vê na lista e no quadro. Dá pra mudar depois.</p>
+      <input id="onb-email" class="onb-input" type="email" placeholder="Seu email" value="${(onb.email||'').replace(/"/g,'&quot;')}" oninput="onbEmail(this.value)" style="margin-top:14px" autocomplete="email" inputmode="email">
+      <input id="onb-senha" class="onb-input" type="password" placeholder="Crie uma senha (mín. 6)" value="${(onb.senha||'').replace(/"/g,'&quot;')}" oninput="onbSenha(this.value)" style="margin-top:10px" autocomplete="new-password">
+      <p class="nota">Email e senha são seu login — é assim que você entra em qualquer aparelho depois.</p>
+      <div class="onb-nav"><button class="onb-prim" onclick="onbCriarConta()">Continuar</button></div>`;
+  } else if(onb.step===2){
+    const eu2=S.jogadores[EU];
+    body=`
+      <div class="onb-head"><div class="onb-kick">Passo 2 de 3</div><h2>Monte seu personagem</h2></div>
+      <div class="onb-preview" style="--camisa:${eu2.cor}">
+        <div class="glow"></div>
+        <div class="boneco"><img src="../bonecos-t/${eu2.bon}.png" alt=""></div>
+      </div>
+      <p class="nota center" style="margin:8px 0 18px">Abra o vestiário pra escolher personagem, uniforme, cor, clube, patrocinador e a sua quadra — tudo mudando ao vivo.</p>
+      <div class="onb-nav">
+        <button class="onb-prim" onclick="irVestCad()">Abrir vestiário</button>
+        <button class="onb-link" onclick="onbNext()" style="margin-top:12px">Deixar como está</button>
+      </div>`;
+  } else if(onb.step===3){
+    if(onb.quiz){
+      const Q=QUIZ[onb.qidx];
+      body=`
+        <div class="onb-head"><div class="onb-kick">Não sei meu nível · ${onb.qidx+1} de ${QUIZ.length}</div><h2>${Q.q}</h2></div>
+        <div class="onb-cards">${Q.o.map(([t,d])=>`<button class="onb-card" onclick="onbQuiz('${d}')"><b>${t}</b></button>`).join('')}</div>`;
+    } else {
+      body=`
+        <div class="onb-head"><div class="onb-kick">Passo 3 de 3</div><h2>Qual seu nível hoje?</h2></div>
+        <p class="nota" style="margin-bottom:14px">Você se declara e já entra jogando. As 8 primeiras partidas ajustam de verdade — se você se diz C e ganha dos B, sobe rápido.</p>
+        <div class="onb-cards">${NIVEIS.map(n=>`<button class="onb-card ${onb.div===n.d?'on':''}" onclick="onbSet('div','${n.d}')"><div class="dv">${n.d}</div><div class="tx"><b>${n.t}</b><small>${n.s}</small></div></button>`).join('')}</div>
+        <button class="onb-link" onclick="onbAbrirQuiz()">Não sei meu nível — me ajuda a escolher</button>
+        <div class="onb-nav"><button class="onb-prim" onclick="onbNext()" ${onb.div?'':'disabled'}>Continuar</button></div>`;
+    }
+  } else {
+    body=`
+      <div class="onb-preview tall" style="--camisa:${onb.cor}">
+        <div class="glow"></div>
+        <div class="boneco"><img src="../bonecos-t/${onb.bon}.png" alt=""></div>
+      </div>
+      <div class="onb-head center"><div class="onb-kick">Tudo pronto</div><h2>${onb.nome||'Jogador'}, você está no jogo</h2></div>
+      <p class="nota center">Entra na Classe ${onb.div||'C'}, em calibragem. Marque seu primeiro jogo pelo Radar — o ciclo começa aí.</p>
+      <div class="onb-nav"><button class="onb-prim lime" onclick="completarCadastro()">Entrar no app</button></div>`;
+  }
+
+  el.innerHTML = `<div class="onb-bg"></div><div class="onb-wrap">
+      <div class="onb-top">${(onb.step>0 && !onb.quiz)?`<button class="onb-voltar" onclick="onbBack()">‹</button>`:'<span></span>'}${dots(onb.step)}</div>
+      ${body}
+    </div>`;
+  const inp=document.getElementById('onb-nome');
+  if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length) }
+}
+
+/* =========================================================================
+   BOOT
+   ========================================================================= */
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>trocarAba(b.dataset.t));
+$('#voltar').onclick=voltar;
+$('#eng').onclick=()=>$('#gaveta').classList.add('on');
+$('#gaveta').onclick=(e)=>{ if(e.target.id==='gaveta') fecharGaveta() };
+$('#cenas').onclick=(e)=>{ if(e.target.id==='cenas') fecharCena() };
+// (o relógio falso saiu junto com a barra de status — sem isso, este setInterval
+//  quebrava a cada segundo tentando escrever num #hora que não existe mais)
+render();
+// A decisão de cadastro espera o netBoot conectar e checar se já existe conta no
+// banco (hidrata e pula o cadastro). Sem rede, cai no cadastro local.
+if(!window.netBoot && !S.cadastroFeito) abrirCadastro();
+
+/* Hidrata o jogador local a partir da linha do banco (login em outro aparelho ou
+   sessão que já tem conta). Copia tudo e marca cadastro feito — sem recriar nada. */
+function hidratarJogador(row){
+  const eu = S.jogadores[EU];
+  eu.nome=row.nome; eu.ap=row.ap||eu.ap; eu.email=row.email||eu.email;
+  eu.clube=row.clube||''; eu.nivel=row.nivel??1200; eu.nivelB=row.nivelb??1200;
+  eu.calibrando=!!row.calibrando; eu.cal=row.cal||0;
+  if(row.bon) eu.bon=row.bon; if(row.roupa) eu.roupa=row.roupa; if(row.cor) eu.cor=row.cor;
+  if(row.cena) eu.cena=row.cena; if(row.escudo) eu.escudo=row.escudo;
+  if(row.patroc) eu.patroc=row.patroc; if(row.vestiario) eu.vestiario=row.vestiario;
+  S.cadastroFeito=true;
+  if(typeof onb!=='undefined' && onb) fecharCadastro();
+  salvar(); render();
+}
+window.hidratarJogador = hidratarJogador;
+
+/* Sair da conta: desloga, limpa o estado local e volta pra tela de entrar. */
+async function sairDaConta(){
+  if(window.netLogout){ try{ await netLogout(); }catch(e){} }
+  try{ localStorage.removeItem('appTenis'); }catch(e){}
+  location.reload();
+}
+window.sairDaConta = sairDaConta;
+
+/* Injeta os jogadores REAIS do banco no estado (chamado pelo netBoot ao conectar).
+   Some qualquer elenco fake que tenha sobrado no localStorage: reconstrói o mundo
+   só com você (EU) + quem se cadastrou de verdade. */
+function aplicarJogadoresReais(lista){
+  const eu = S.jogadores[EU];
+  const novo = { [EU]: eu };
+  (lista||[]).forEach(a=>{
+    if(!a || !a.id || a.id===EU) return;
+    novo[a.id] = {
+      nome:a.nome, ap:a.ap || (a.nome||'?').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase(),
+      nivel:a.nivel ?? 1200, div:divisaoDe(a.nivel ?? 1200),
+      nivelB:a.nivelb ?? 1200, divB:divisaoDe(a.nivelb ?? 1200),
+      bon:a.bon || 'm1', cor:a.cor || '#5C2E3C',
+    };
+  });
+  S.jogadores = novo;
+  const ids = Object.keys(novo);
+  S.comunidade.membros = ids.slice();
+  const soReais = (tab)=>{ const o={}; ids.forEach(id=> o[id] = (tab && tab[id]) || 0); return o; };
+  S.pontos.comunidade  = soReais(S.pontos.comunidade);  S.pontos.c_clube  = soReais(S.pontos.c_clube);
+  S.pontosB.comunidade = soReais(S.pontosB.comunidade); S.pontosB.c_clube = soReais(S.pontosB.c_clube);
+  S.circuitos.forEach(c=> c.membros = ids.length);
+  // qualquer referência a jogador que não é real some (lixo de localStorage antigo)
+  S.historico = (S.historico||[]).filter(h=> novo[h.adv]);
+  S.pendentes = (S.pendentes||[]).filter(p=> novo[p.adv]);
+  if(S.aguardando && !novo[S.aguardando.adv]) S.aguardando = null;
+  if(S.comunidade.cinturao && !novo[S.comunidade.cinturao.dono]) S.comunidade.cinturao = null;
+  S.comunidade.patches = (S.comunidade.patches||[]).filter(p=> novo[p.de]);
+  S.feed = [];
+  S.semana = 0;   // pré-lançamento: temporada ainda não começou
+  // começa zerado: nenhum selo conquistado, nenhum título — vêm do jogo real
+  (S.selos||[]).forEach(s=> s.tem=false);
+  S.titulos = [];
+  salvar();
+}
+window.aplicarJogadoresReais = aplicarJogadoresReais;
+
+/* Passo 3 do backend: conecta no Supabase e espelha meu jogador no banco.
+   Não bloqueia — se cair, o protótipo roda offline igual. */
+if(window.netBoot) netBoot(S.jogadores[EU]);
+
+/* Os números do escudo e do patrocinador são medidos por sprite e vivem fora do
+   código (atleta-numeros.json), gerados a partir da calibragem no editor.
+   O app renderiza antes deles chegarem — sem eles o boneco aparece pintado e sem
+   logo, e ao chegar repinta. Nunca segurar a primeira tela esperando arquivo. */
+fetch('atleta-numeros.json')
+  .then(r=> r.ok ? r.json() : null)
+  .then(j=>{ if(!j) return;
+    NUMEROS = j;
+    // limpar só o cache não basta: cada <img> guarda em data-pronto a chave que
+    // já desenhou, e sem zerar isso o repintar acha que está tudo em dia e o
+    // boneco fica sem logo até a próxima navegação.
+    _pintado.clear();
+    document.querySelectorAll('img.bcv').forEach(el=> delete el.dataset.pronto);
+    pintarBonecos();
+  })
+  .catch(()=>{});
+</script>
+</body>
+</html>
