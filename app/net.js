@@ -961,9 +961,15 @@ async function _cinturaoEstado(g, membros){
 
 /* Chamado depois de toda confirmação de placar. Não pergunta nada antes: a
    função do banco valida comunidade, membros, dono atual e calibragem no WHERE —
-   se não for pra passar, não passa. */
+   se não for pra passar, não passa.
+
+   Passa a PARTIDA, não quem ganhou (migração 17). A versão antiga mandava
+   `vencedor` e `perdedor` soltos e o banco acreditava: qualquer membro tomava
+   o cinturão pelo console, sem ter jogado. Agora o banco deriva os dois da
+   partida — parâmetro que não existe não se forja — e só aceita partida
+   posterior ao início do reinado atual. Daí o `m.id` ser obrigatório aqui. */
 async function _cinturaoTentarPassar(m){
-  if(!m || !m.esporte) return;
+  if(!m || !m.id || !m.esporte) return;
   const vc = !!m.venceu_criador;
   const vencedor = vc ? m.criador_id : m.adversario_id;
   const perdedor = vc ? m.adversario_id : m.criador_id;
@@ -972,7 +978,7 @@ async function _cinturaoTentarPassar(m){
       .eq('cinturao', true).eq('esporte', m.esporte)
       .eq('cinturao_dono_id', perdedor)).data || [];
     for(const g of gs){
-      const r = await sb.rpc('cinturao_passar', { g:g.id, vencedor, perdedor });
+      const r = await sb.rpc('cinturao_passar', { g:g.id, mid:m.id });
       if(r && r.data === true && window.toast){
         toast(vencedor === MEU_UID
           ? `🏆 O cinturão do <b>${g.nome}</b> é seu.`
@@ -1565,7 +1571,13 @@ async function _onEnviarOrg(){
     netFecharOnline();
     if(window.toast) toast('Placar do organizador valeu — o Nível mexe nos dois quando abrirem o app.');
     await netCreditarPontos(mid);
-    await _cinturaoTentarPassar({ esporte:o.esporte, criador_id:o.a.id, adversario_id:o.b.id, venceu_criador:venceuA });
+    /* O `id` da partida virou obrigatório (migração 17). RESSALVA: aqui quem
+       lança é o ORGANIZADOR, que não é nenhum dos dois jogadores — o banco
+       exige `auth.uid() in (criador, adversario)` e devolve false. O cinturão
+       NÃO passa em placar lançado pelo organizador. Já era assim antes da 17
+       (a versão velha exigia o mesmo); fica anotado como decisão pendente, não
+       como regressão. */
+    await _cinturaoTentarPassar({ id:mid, esporte:o.esporte, criador_id:o.a.id, adversario_id:o.b.id, venceu_criador:venceuA });
     netVerTorneio(o.tid);
   }catch(e){ alert('Não deu: '+(e.message||e)); }
 }
