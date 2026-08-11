@@ -66,6 +66,14 @@ async function netSyncJogador(eu){
     bon: eu.bon ?? null, roupa: eu.roupa ?? null, cor: eu.cor ?? null,
     cena: eu.cena ?? null, escudo: eu.escudo ?? null,
     patroc: eu.patroc ?? null, vestiario: eu.vestiario ?? null,
+    // 11/08: idade. Vai como `undefined` (e some do upsert) quando não houver
+    // — as contas criadas antes da migração 15 não têm declaração, e inventar
+    // uma retroativa seria registrar como fato algo que ninguém perguntou.
+    ...(eu.nascimento ? {
+      nascimento: eu.nascimento,
+      maior_de_18: !!eu.maiorDe18,
+      idade_declarada_em: eu.idadeDeclaradaEm ?? null,
+    } : {}),
   };
   const { error } = await sb.from('players').upsert(row);
   if(error){ console.error('[net] sync falhou', error); throw error; }

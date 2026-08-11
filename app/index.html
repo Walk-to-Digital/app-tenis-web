@@ -738,7 +738,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=26"></script>
+<script src="net.js?v=27"></script>
 
 <script>
 /* =========================================================================
@@ -2506,11 +2506,36 @@ function onbSet(k,v){ onb[k]=v; renderOnb() }
 function onbNome(v){ onb.nome=v }                 // sem re-render pra não perder o foco do input
 function onbEmail(v){ onb.email=v }
 function onbSenha(v){ onb.senha=v }
+function onbNasc(v){ onb.nasc=v }
+
+/* Idade completa na data de referência. Conta por ano/mês/dia em vez de
+   dividir milissegundos: ano bissexto e fuso fazem a divisão errar por um dia
+   justamente em quem faz aniversário hoje — que é o caso que mais importa. */
+function idadeEm(nascISO, ref){
+  if(!nascISO) return null;
+  const [a,m,d] = nascISO.split('-').map(Number);
+  if(!a || !m || !d) return null;
+  let idade = ref.getFullYear() - a;
+  const fezAniver = (ref.getMonth()+1 > m) || (ref.getMonth()+1 === m && ref.getDate() >= d);
+  if(!fezAniver) idade--;
+  return idade;
+}
 // cria a conta (email+senha) e só então avança pro personagem
 async function onbCriarConta(){
   if(!onb.nome || !onb.nome.trim()){ alert('Digite seu nome.'); return; }
   if(!onb.email || !/@/.test(onb.email)){ alert('Digite um email válido.'); return; }
   if(!onb.senha || onb.senha.length<6){ alert('A senha precisa de pelo menos 6 caracteres.'); return; }
+  // A trava de idade vem ANTES do signUp: conta criada e depois barrada deixa
+  // um usuário órfão no auth que ninguém consegue apagar pela tela.
+  const idade = idadeEm(onb.nasc, new Date());
+  if(idade === null){ alert('Preencha sua data de nascimento.'); return; }
+  if(idade < 18){
+    alert('O Ranket é só para maiores de 18 anos.\n\nO app marca jogo presencial entre pessoas que não se conhecem, e por isso a conta é restrita. Guarde o convite — a gente se vê quando você fizer 18.');
+    return;
+  }
+  if(idade > 120){ alert('Confira a data de nascimento.'); return; }
+  onb.maiorDe18 = true;
+  onb.idadeDeclaradaEm = new Date().toISOString();
   if(window.netSignUp){
     const r = await netSignUp(onb.email, onb.senha);
     if(r.erro){ alert(r.erro.includes('registered')?'Esse email já tem conta. Use "Já tenho conta" pra entrar.':('Não deu pra criar: '+r.erro)); return; }
@@ -2552,6 +2577,10 @@ function completarCadastro(){
     else         { eu.div =onb.div; eu.nivel =NIVEL_PTS[onb.div]; eu.divB='C'; eu.nivelB=NIVEL_PTS.C }
   }
   if(onb.email && onb.email.trim()) eu.email = onb.email.trim();
+  // 11/08: a data é o dado, a declaração é o fato histórico. Guarda os dois —
+  // um responde "que idade tem", o outro responde "o que a pessoa afirmou, e
+  // quando", que é o que importa se alguém cobrar.
+  if(onb.nasc){ eu.nascimento = onb.nasc; eu.maiorDe18 = !!onb.maiorDe18; eu.idadeDeclaradaEm = onb.idadeDeclaradaEm || null; }
   eu.calibrando=true; eu.cal=0;
   S.cadastroFeito=true;
   fecharCadastro(); aba='inicio'; pilha=[]; salvar(); render();
@@ -2594,6 +2623,11 @@ function renderOnb(){
       <input id="onb-email" class="onb-input" type="email" placeholder="Seu email" value="${(onb.email||'').replace(/"/g,'&quot;')}" oninput="onbEmail(this.value)" style="margin-top:14px" autocomplete="email" inputmode="email">
       <input id="onb-senha" class="onb-input" type="password" placeholder="Crie uma senha (mín. 6)" value="${(onb.senha||'').replace(/"/g,'&quot;')}" oninput="onbSenha(this.value)" style="margin-top:10px" autocomplete="new-password">
       <p class="nota">Email e senha são seu login — é assim que você entra em qualquer aparelho depois.</p>
+      <!-- 11/08: a abertura sempre disse "só para maiores de 18" e nada
+           sustentava. O app marca encontro PRESENCIAL entre desconhecidos;
+           idade aqui é arquitetura, não campo de formulário. -->
+      <input id="onb-nasc" class="onb-input" type="date" value="${onb.nasc||''}" oninput="onbNasc(this.value)" style="margin-top:14px" max="${new Date().toISOString().slice(0,10)}">
+      <p class="nota">Sua data de nascimento. O Ranket é só para maiores de 18 — ela não aparece pra ninguém, nem no seu perfil.</p>
       <div class="onb-nav"><button class="onb-prim" onclick="onbCriarConta()">Continuar</button></div>`;
   } else if(onb.step===2){
     const eu2=S.jogadores[EU];
