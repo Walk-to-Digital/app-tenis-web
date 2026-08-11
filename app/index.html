@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0A1100">
 <title>Ranket — protótipo navegável</title>
+<!-- 11/08: o app não tinha ícone nem manifest — na tela de início do celular
+     ele aparecia como um retângulo em branco. O ícone usa o símbolo COM fundo
+     porque o iOS não respeita transparência aqui: PNG transparente vira um
+     quadrado preto com o desenho perdido dentro.
+     Isto também é o primeiro degrau pra notificação: web push só existe pra
+     app instalado na tela de início. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icones/ranket-192.png">
+<link rel="apple-touch-icon" href="icones/ranket-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ranket">
 <style>
 /* 11/08: paleta RANKET. Quatro cores da marca, medidas dos arquivos oficiais:
    preto #0A1100 (tem viés verde, não é neutro) · laranja #FF6A00 · off-white
@@ -738,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=27"></script>
+<script src="net.js?v=29"></script>
 
 <script>
 /* =========================================================================
@@ -1890,10 +1902,12 @@ ficha(){
       ${S.historico.map(h=>`
         <div class="card"><div class="linha-item">
           ${avatar(h.adv)}
-          <div class="txt"><b>${h.venceu?'Vitória':'Derrota'} · ${nome(h.adv)}</b><small>${h.placar} · ${h.quando}</small></div>
+          <div class="txt"><b>${h.venceu?'Vitória':'Derrota'} · ${nome(h.adv)}</b><small>${h.placar} · ${h.quando}${h.porPrazo?' · <span style="color:var(--gold)">valeu metade</span>':''}</small></div>
           <div style="text-align:right">
             <div style="font-family:var(--f-disp);font-size:16px;font-weight:700;color:${h.dnivel>=0?'var(--up)':'var(--dn)'}">${h.dnivel>0?'+':''}${h.dnivel}</div>
-            <div style="font-size:9px;color:var(--ink3);letter-spacing:.1em">NÍVEL</div>
+            <!-- 11/08: quando fechou por prazo, o rótulo troca. "NÍVEL" ao lado
+                 de um número reduzido, sem explicação, lê como erro do motor. -->
+            <div style="font-size:9px;color:${h.porPrazo?'var(--gold)':'var(--ink3)'};letter-spacing:.1em">${h.porPrazo?'½ NÍVEL':'NÍVEL'}</div>
           </div>
         </div></div>`).join('') || '<div class="card"><p class="nota">Nenhuma partida ainda. Marque um jogo pra começar.</p></div>'}
     </div>

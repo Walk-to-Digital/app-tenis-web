@@ -172,23 +172,40 @@ function _meusAmigos(){ const eu=S.jogadores[EU]; if(!eu.amigos) eu.amigos=[]; r
 const netEhAmigo = (uid)=> _meusAmigos().includes(uid);
 window.netEhAmigo = netEhAmigo;
 
+/* 11/08: a amizade era um array na MINHA linha, então era mão única por
+   construção — a RLS só me deixa escrever em mim, e eu nunca tive como me pôr
+   na lista do outro. Agora é uma linha por par, na tabela `amizades`, com
+   `a < b` garantindo ordem canônica: o mesmo par não gera duas linhas nem
+   depende de quem chegou primeiro.
+   O par ordenado é calculado aqui e no banco do mesmo jeito — se divergirem,
+   a chave primária rejeita, que é o lugar certo pra descobrir. */
+const _par = (x, y)=> (x < y ? [x, y] : [y, x]);
+
 // carrega meus amigos do banco pro estado local (chamado no boot)
 async function netCarregarAmigos(){
   if(!MEU_UID) return;
-  const { data } = await sb.from('players').select('amigos').eq('id',MEU_UID).single();
-  S.jogadores[EU].amigos = (data && data.amigos) || [];
+  const { data, error } = await sb.from('amizades').select('a,b')
+    .or(`a.eq.${MEU_UID},b.eq.${MEU_UID}`);
+  if(error){ console.error('[net] carregar amigos', error); return; }
+  // o amigo é o outro lado do par, qualquer que seja a coluna em que ele caiu
+  S.jogadores[EU].amigos = (data||[]).map(r=> r.a === MEU_UID ? r.b : r.a);
   salvar();
 }
 
 async function netAddAmigo(uid){
-  const a=_meusAmigos();
-  if(!a.includes(uid)){ a.push(uid); salvar();
-    const { error } = await sb.from('players').update({amigos:a}).eq('id',MEU_UID);
-    if(error){ console.error('[net] add amigo', error); }
+  if(!MEU_UID || uid === MEU_UID) return;
+  const [a, b] = _par(MEU_UID, uid);
+  const { error } = await sb.from('amizades')
+    .upsert({ a, b, criada_por: MEU_UID }, { onConflict: 'a,b', ignoreDuplicates: true });
+  if(error){
+    console.error('[net] add amigo', error);
+    if(window.toast) toast('Não deu pra adicionar agora. Tente de novo.');
+    return;                      // não mexe no estado local se o banco recusou
   }
+  const meus=_meusAmigos(); if(!meus.includes(uid)){ meus.push(uid); salvar(); }
   if(window.render) render();
   if(window.netRenderBusca) netRenderBusca();
-  if(window.toast) toast('Amigo adicionado. Agora vocês podem jogar mesmo em divisões diferentes.');
+  if(window.toast) toast('Amigos. Agora <b>os dois</b> podem se desafiar em qualquer classe.');
 }
 window.netAddAmigo = netAddAmigo;
 
@@ -290,11 +307,19 @@ function netAplicarConfirmadas(list){
     const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
     const meuPlacar = _souCriador(m) ? m.placar : _inverter(m.placar);
     if(!S.historico) S.historico=[];
+    // 11/08: `porPrazo` viaja junto com a partida. Sem ele o jogador vê meio
+    // ponto na ficha e não tem como saber por quê — estado invisível vira bug
+    // fantasma, e ele vai achar que o motor errou.
     S.historico.unshift({ adv:_advId(m), venceu:euVenci, placar:meuPlacar,
-      dnivel:meu.dNivel||0, dpts:meu.dPts||0, quando:'agora' });
+      dnivel:meu.dNivel||0, dpts:meu.dPts||0, quando:'agora',
+      porPrazo: !!m.fechada_por_prazo });
     S.deltasAplicados.push(m.id); mexeu=true;
     const nome0 = _nomeDe(_advId(m)).split(' ')[0];
-    if(window.toast) toast(`Partida com ${nome0} confirmada · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`);
+    if(window.toast){
+      toast(m.fechada_por_prazo
+        ? `${nome0} não confirmou em 72h — o placar fechou sozinho valendo <b>metade</b> · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`
+        : `Partida com ${nome0} confirmada · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`);
+    }
   });
   if(mexeu){ salvar(); if(window.render) render(); netSyncJogador(S.jogadores[EU]).catch(()=>{}); }
 }
@@ -472,6 +497,48 @@ async function _fecharPorPrazo(m){
   return true;
 }
 
+/* O relógio precisa aparecer nos DOIS lados, e dizendo coisas diferentes.
+   Pra quem tem que confirmar, o prazo é cobrança: se não responder, o placar
+   fecha sem você. Pra quem lançou e espera, é garantia: não vai ficar parado
+   pra sempre. A mesma regra, lida de dois jeitos — e nenhum dos dois pode
+   descobrir a existência do prazo só depois que ele venceu. */
+function _horasRestantes(m){
+  if(!m.placar_em) return null;
+  const passou = (Date.now() - new Date(m.placar_em).getTime()) / 3600e3;
+  return Math.max(0, PRAZO_HORAS - passou);
+}
+/* Mostra o PRAZO, não a contagem regressiva. Contagem tem erro de borda que
+   não dá pra esconder: 71,9h restantes viram "2 dias" no floor e "3 dias" no
+   ceil, e as duas leituras estão erradas de um jeito diferente. Data e hora
+   não têm ambiguidade — e é o que a pessoa precisa pra se organizar.
+   A contagem volta só na reta final, quando "faltam 3h" é mais útil que
+   "quinta, 14h". */
+const _DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+function _quandoVence(m){
+  if(!m.placar_em) return null;
+  return new Date(new Date(m.placar_em).getTime() + PRAZO_HORAS*3600e3);
+}
+function _avisoPrazo(m, lado){
+  const h = _horasRestantes(m); if(h === null) return '';
+  const venceEm = _quandoVence(m);
+  const hoje = new Date();
+  const mesmoDia = venceEm.toDateString() === hoje.toDateString();
+  const amanha = venceEm.toDateString() === new Date(hoje.getTime()+864e5).toDateString();
+  const quando = mesmoDia ? `hoje às ${venceEm.getHours()}h`
+               : amanha   ? `amanhã às ${venceEm.getHours()}h`
+               : `${_DIAS[venceEm.getDay()]} às ${venceEm.getHours()}h`;
+  const resta = h < 12 ? (h < 1 ? 'menos de 1h' : `${Math.round(h)}h`) : null;
+
+  const txt = lado === 'confirmar'
+    ? (h <= 0 ? 'O prazo venceu — este placar vale metade.'
+       : resta ? `Faltam <b>${resta}</b> pra confirmar. Depois disso ele fecha sozinho valendo metade.`
+               : `Confirme até <b>${quando}</b>. Depois disso ele fecha sozinho valendo metade.`)
+    : (h <= 0 ? 'O prazo venceu — fecha valendo metade assim que alguém abrir o app.'
+       : resta ? `Faltam <b>${resta}</b>. Sem resposta, fecha valendo metade.`
+               : `Se não responder até <b>${quando}</b>, fecha sozinho valendo metade.`);
+  return `<div style="font-size:11.5px;color:${h<=12?'var(--gold)':'var(--ink3)'};margin-top:7px">${txt}</div>`;
+}
+
 async function netApurarPrazos(lista){
   let fechou = 0;
   for(const m of (lista||[])){
@@ -544,10 +611,11 @@ function netRenderInbox(){
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
       const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
-      txt=`<b>${outro}</b> lançou o placar: você <b style="color:${euVenci?'var(--up)':'var(--dn)'}">${euVenci?'venceu':'perdeu'}</b> ${meuPl}`;
+      txt=`<b>${outro}</b> lançou o placar: você <b style="color:${euVenci?'var(--up)':'var(--dn)'}">${euVenci?'venceu':'perdeu'}</b> ${meuPl}`
+         + _avisoPrazo(m, 'confirmar');
       acoes=`${_btn('Contestar',`_net.contestar('${m.id}')`,'no')}${_btn('Confirmar',`_net.confirmar('${m.id}')`,'ok')}`;
     } else if(m.status==='pendente'){
-      txt=`Aguardando <b>${outro}</b> confirmar o placar`;
+      txt=`Aguardando <b>${outro}</b> confirmar o placar` + _avisoPrazo(m, 'esperar');
     }
     return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
       <div style="font-size:14px;margin-bottom:${acoes?'12px':'0'}">${txt}</div>
