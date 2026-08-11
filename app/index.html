@@ -3,24 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#15100D">
-<title>App de Tênis — protótipo navegável</title>
+<meta name="theme-color" content="#0A1100">
+<title>Ranket — protótipo navegável</title>
 <style>
+/* 11/08: paleta RANKET. Quatro cores da marca, medidas dos arquivos oficiais:
+   preto #0A1100 (tem viés verde, não é neutro) · laranja #FF6A00 · off-white
+   #FFFEFD · lime da bola #83E000. As demais são degraus derivados delas.
+
+   DUAS DECISÕES QUE NÃO SÃO ÓBVIAS:
+   · O laranja é a marca, então ele NÃO pode significar "caiu de nível" — quem
+     desce virou vermelho (--dn), que antes era um terracota vizinho do saibro.
+   · `--clay` virou `--marca`: a variável guardava o saibro e agora guarda o
+     laranja da raquetada. Nome que descreve a cor antiga mente sobre a nova. */
 :root{
-  --bg:#15100D; --sup:#1E1714; --sup2:#241C18; --linha:#312720; --linha2:#443830;
-  --ink:#E8DED2; --ink2:#BCAC9E; --ink3:#8A7B6F;
-  --acc:#FBF6EE; --acc-ink:#15100D;          /* giz age */
-  --up:#C6FF3D; --up-bg:#232B10;             /* lime premia */
-  --dn:#D0724A; --dn-bg:#2E1A12; --clay:#C9663C;  /* saibro é o chão */
-  --gold:#E0C48A; --gold-bg:#2A2114;
+  --bg:#0A1100; --sup:#0F1806; --sup2:#15200B; --linha:#20301A; --linha2:#2F4227;
+  --ink:#FFFEFD; --ink2:#BFC6B6; --ink3:#8A9280;
+  --acc:#FFFEFD; --acc-ink:#0A1100;          /* giz age */
+  --up:#83E000; --up-bg:#1B2A00;             /* o lime da bola premia */
+  --dn:#E8433C; --dn-bg:#2B0F0C;             /* vermelho, não laranja */
+  --marca:#FF6A00;                           /* a raquetada = você */
+  --gold:#E0C48A; --gold-bg:#26220F;
   --r:6px;
-  --f-disp:"Bodoni 72","Didot",Georgia,"Times New Roman",serif;
+  /* 11/08: era Bodoni/Didot. A serifada clássica brigava com o lettering
+     geométrico da RANKET — pareciam duas marcas na mesma tela. Avenir Next é
+     a mais próxima do logo entre as que já existem no aparelho: geométrica,
+     sem serifa, com o mesmo desenho aberto de 'a' e 'e'. Sem webfont: o app
+     não carrega fonte externa e não vai começar agora. */
+  --f-disp:"Avenir Next","Avenir",Futura,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
   --f-ui:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{
-  background:#0B0806;color:var(--ink);font:14px/1.5 var(--f-ui);
+  background:#060A00;color:var(--ink);font:14px/1.5 var(--f-ui);
   display:flex;align-items:center;justify-content:center;
   -webkit-font-smoothing:antialiased;
 }
@@ -30,7 +45,7 @@ button,input,select{font:inherit;color:inherit}
 #fone{
   width:400px;height:860px;max-height:100vh;background:var(--bg);position:relative;
   overflow:hidden;display:flex;flex-direction:column;
-  border-radius:38px;box-shadow:0 30px 90px rgba(0,0,0,.65);border:1px solid #241C18;
+  border-radius:38px;box-shadow:0 30px 90px rgba(0,0,0,.65);border:1px solid #20301A;
 }
 @media(max-width:640px){
   body{align-items:stretch}
@@ -64,11 +79,14 @@ button,input,select{font:inherit;color:inherit}
   letter-spacing:.07em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .topo .dir{font-size:11px;color:var(--ink3);white-space:nowrap}
+/* 11/08: o outro "P" de placeholder — este ficou de fora da primeira troca.
+   O círculo virou o preto da marca porque o símbolo é laranja e laranja sobre
+   laranja some, igual ao do onboarding. */
 .topo .marca{
-  width:28px;height:28px;border-radius:50%;background:var(--clay);border:1.5px solid var(--acc);
-  display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);
-  font-size:13px;font-weight:700;color:#FDF6EE;flex:0 0 28px;
+  width:28px;height:28px;border-radius:50%;background:var(--bg);border:1.5px solid var(--acc);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 28px;
 }
+.topo .marca img{width:74%;height:74%;object-fit:contain}
 
 /* ---------- corpo ---------- */
 #tela{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;z-index:1;padding-bottom:16px}
@@ -103,7 +121,7 @@ button,input,select{font:inherit;color:inherit}
 .av img{position:absolute;left:50%;top:-14%;transform:translateX(-50%);width:250%;display:block}
 .av.g{width:52px;height:52px;flex:0 0 52px;font-size:16px;box-shadow:0 0 0 2.5px var(--camisa,var(--linha2))}
 .av.gg{width:76px;height:76px;flex:0 0 76px;box-shadow:0 0 0 3px var(--camisa,var(--linha2))}
-.av.eu{background:var(--clay);color:#FDF6EE}
+.av.eu{background:var(--marca);color:#FFFEFD}
 
 .pil{
   display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;
@@ -211,7 +229,7 @@ button,input,select{font:inherit;color:inherit}
 .nav button.on i{opacity:1}
 .nav button .badge{
   display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:99px;
-  background:var(--up);color:#12180B;font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
+  background:var(--up);color:#0A1100;font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
 }
 
 /* efeitos / o que mexeu */
@@ -308,7 +326,7 @@ button,input,select{font:inherit;color:inherit}
 .ini .ic.vitrine i{position:relative;z-index:1;font-style:normal;font-size:15px;
   color:var(--acc);text-shadow:0 1px 3px rgba(0,0,0,.85)}
 .ini .ic .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;line-height:17px;
-  border-radius:99px;background:var(--up);color:#12180B;font-size:10px;font-weight:800;text-align:center;padding:0 4px}
+  border-radius:99px;background:var(--up);color:#0A1100;font-size:10px;font-weight:800;text-align:center;padding:0 4px}
 .ini .degrau{margin-top:11px;background:rgba(30,23,20,.72);border:1px solid var(--linha);border-radius:10px;padding:11px 14px;backdrop-filter:blur(6px)}
 .ini .degrau .top{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--ink3)}
 .ini .degrau .top b{font-family:var(--f-disp);font-size:14px;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
@@ -327,7 +345,7 @@ button,input,select{font:inherit;color:inherit}
 .ini .placa .nm{font-family:var(--f-disp);font-size:21px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-shadow:0 2px 10px rgba(0,0,0,.7)}
 .ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
 .ini .placa .meta b{font-family:var(--f-disp);font-size:14px;color:var(--ink)}
-.ini .placa .meta .pil2{background:var(--clay);color:#FDF6EE;font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
+.ini .placa .meta .pil2{background:var(--marca);color:#FFFEFD;font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
 .ini .acao{position:relative;z-index:2;padding:0 16px 8px}
 .ini .acao .big{width:100%;border:0;border-radius:14px;padding:16px;background:var(--acc);color:var(--acc-ink);font-weight:800;font-size:16px;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 8px 24px rgba(251,246,238,.14);cursor:pointer;font-family:var(--f-ui)}
 .ini .acao .big small{display:block;font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.62;margin-top:3px}
@@ -558,7 +576,7 @@ button,input,select{font:inherit;color:inherit}
 .seg2 button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 
 /* ===== CADASTRO / ONBOARDING ===== */
-#onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:#0B0806;overflow:hidden}
+#onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:#060A00;overflow:hidden}
 #onb.on{display:flex}
 #onb .onb-bg{position:absolute;inset:0;z-index:0;background:var(--cena-url,url('../quadras/saibro-noite.jpg')) center/cover}
 #onb .onb-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,8,6,.74),rgba(11,8,6,.88) 52%,rgba(11,8,6,.97))}
@@ -570,7 +588,11 @@ button,input,select{font:inherit;color:inherit}
 #onb .onb-dots span{width:6px;height:6px;border-radius:99px;background:var(--linha2);transition:.2s}
 #onb .onb-dots span.on{background:var(--acc);width:18px}
 #onb .onb-brand{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:20px}
-#onb .onb-mark{width:64px;height:64px;border-radius:50%;background:var(--clay);border:2px solid var(--acc);display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-size:30px;font-weight:700;color:#FDF6EE}
+/* 10/08: o "P" de placeholder virou o símbolo da marca. Sem o círculo laranja
+   por baixo: o R já é laranja, e laranja sobre laranja some. Sobre o preto da
+   marca o símbolo lê sozinho — é o que o próprio logo vertical faz. */
+#onb .onb-mark{width:78px;height:78px;display:flex;align-items:center;justify-content:center}
+#onb .onb-mark img{width:100%;height:100%;object-fit:contain}
 #onb .onb-brand h1{font-family:var(--f-disp);font-size:29px;text-transform:uppercase;letter-spacing:.03em}
 #onb .onb-brand p{font-size:13px;color:var(--ink2);max-width:290px;line-height:1.5}
 #onb .onb-acts{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
@@ -661,11 +683,11 @@ button,input,select{font:inherit;color:inherit}
 #vs .vs-acoes{display:flex;gap:10px}
 #vs .vs-acoes button{flex:1;padding:15px;border-radius:13px;border:none;font:700 15px var(--f-ui);cursor:pointer}
 #vs .vs-no{background:#2a1a16;color:var(--ink);border:1px solid var(--linha2)}
-#vs .vs-ok{background:var(--up);color:#12180B}
+#vs .vs-ok{background:var(--up);color:#0A1100}
 
 /* botão Concluir do vestiário quando ele é aberto durante o cadastro */
 .vest-concluir{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:20;
-  padding:11px 22px;border-radius:999px;border:none;background:var(--up);color:#12180B;
+  padding:11px 22px;border-radius:999px;border:none;background:var(--up);color:#0A1100;
   font:700 14px var(--f-ui);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 </style>
 </head>
@@ -680,7 +702,7 @@ button,input,select{font:inherit;color:inherit}
 
   <div class="topo" id="topo">
     <button class="voltar" id="voltar">‹</button>
-    <div class="marca" id="marca">P</div>
+    <div class="marca" id="marca"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
     <h1 id="titulo">Quadro</h1>
     <div class="dir" id="dir"></div>
   </div>
@@ -716,7 +738,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=24"></script>
+<script src="net.js?v=26"></script>
 
 <script>
 /* =========================================================================
@@ -1499,7 +1521,9 @@ radar(){
       </div>
     </div>
     <div class="sec">
-      <div class="rot">Quem tá no app <span>divisões ${permitidas.join(' · ')}</span></div>
+      <!-- 11/08: era "divisões" aqui e "±1 classe" onze linhas acima, na mesma
+           tela. O app chama de classe; o vocabulário antigo era divisão. -->
+      <div class="rot">Quem tá no app <span>classes ${permitidas.join(' · ')}</span></div>
       ${disp.length ? disp.map(x=>`
         <div class="card clic" onclick="netDesafiar('${x.id}')">
           <div class="linha-item">
@@ -1634,7 +1658,12 @@ registrar(){
           </div>
           <p class="nota" style="margin-top:9px">${CTX_NOME[p.contexto]}</p>
         </div>`).join('')}
-      <button class="btn gh" onclick="toast('Partida lançada na mão não conta em circuito aberto — só nas fechadas.')">+ Jogou fora do app? Lançar na mão</button>
+      <!-- 11/08: era um botão "+ Lançar na mão" cuja única ação era mostrar um
+           toast com a regra. Prometia criar e entregava aula. Fica desabilitado
+           e explícito até o formulário existir — a regra vira nota, no futuro,
+           porque ela só passa a valer quando houver o que lançar. -->
+      <button class="btn gh" disabled>Jogou fora do app? Lançar na mão — em breve</button>
+      <p class="nota" style="margin-top:9px">Quando existir, partida lançada na mão não vai contar em circuito aberto — só nas fechadas.</p>
     </div>`};
 },
 
@@ -1775,7 +1804,12 @@ comunidade(){
           <div class="av">◈</div>
           <div class="txt"><b>${p.t}</b><small>criado por ${nome(p.de)}</small></div>
         </div></div>`).join('')}
-      <button class="btn gh" onclick="toast('Patch novo passa por filtro de 3 camadas e custa por criação, não por envio.')">+ Criar patch</button>
+      <!-- 11/08: mesmo caso do "lançar na mão" — o botão só explicava a regra.
+           Aqui é pior, porque depende do backend de patches, que não existe:
+           hoje S.comunidade.patches vive no aparelho e patch não atravessa
+           conta nenhuma. Desabilitado até o backend chegar. -->
+      <button class="btn gh" disabled>Criar patch — em breve</button>
+      <p class="nota" style="margin-top:9px">Vai passar por filtro de 3 camadas, com até 24 caracteres, e vai custar por criação — não por envio.</p>
     </div>
 
     <div class="sec">
@@ -2538,7 +2572,7 @@ function renderOnb(){
   if(onb.step===0){
     body=`
       <div class="onb-brand">
-        <div class="onb-mark">P</div>
+        <div class="onb-mark"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
         <h1>Marque · Jogue · Suba</h1>
         <p>O app onde cada jogo mexe no seu ranking — e o que mexeu vira o motivo do próximo.</p>
       </div>

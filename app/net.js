@@ -93,7 +93,7 @@ function netBadge(estado, txt){
       + 'border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none;transition:background .3s;opacity:.85';
     document.body.appendChild(el);
   }
-  const cor = { conectando:'#B8862B', on:'#2E7D46', off:'#9B2C2C' }[estado] || '#555';
+  const cor = { conectando:'var(--gold)', on:'var(--up)', off:'var(--dn)' }[estado] || '#555';
   el.style.background = cor;
   el.title = txt;   // pontinho discreto; o texto vive no tooltip
 }
@@ -234,6 +234,11 @@ async function netAtualizarInbox(){
     .in('status',['desafiado','aceito','pendente','confirmada'])
     .order('created_at',{ascending:false});
   if(error){ console.error('[net] inbox', error); return; }
+  // 11/08: apura o prazo de 72h ANTES de ler o resto. Se fechou alguma, a
+  // lista em mãos envelheceu na hora — recarrega em vez de renderizar dado
+  // morto. Não recursa infinito: partida fechada sai de 'pendente' e o
+  // `_prazoVencido` para de vê-la na segunda passada.
+  if(await netApurarPrazos(data)) return netAtualizarInbox();
   // se apareceu alguém que ainda não está no meu elenco (desafiou recém-cadastrado),
   // recarrega os jogadores pra o nome aparecer certo em vez de "Jogador".
   const desconhecido = data.some(m=> !S.jogadores[_chaveLocal(_advId(m))]);
@@ -347,6 +352,7 @@ async function _onEnviar(){
   try{
     const { error } = await sb.from('matches').update({
       sets:setsC, placar:placarC, venceu_criador:venceuCriador, placar_por:MEU_UID, status:'pendente',
+      placar_em:new Date().toISOString(),   // 11/08: o relógio das 72h começa aqui
     }).eq('id',_on.matchId);
     if(error) throw error;
     netFecharOnline();
@@ -381,19 +387,39 @@ function _ctxDoTorneio(t){
 }
 
 /* ---- 2b: confirmar / contestar (do lado de quem recebeu o placar) ----- */
+
+/* O cálculo dos deltas saiu de dentro do netConfirmar (11/08) porque agora
+   tem dois caminhos que fecham partida: a confirmação do adversário (fator 1)
+   e o vencimento do prazo de 72h (fator 0,5). O cálculo tem que ser o MESMO
+   nos dois — duas cópias divergem no primeiro ajuste do motor. */
+async function _deltasDaPartida(m, fator){
+  // nível dos dois, direto do banco (autoridade), pelo esporte da partida
+  const { data:ps } = await sb.from('players').select('id,nivel,nivelb,calibrando,cal').in('id',[m.criador_id,m.adversario_id]);
+  const byId={}; (ps||[]).forEach(p=>byId[p.id]=p);
+  const nv = (uid)=> m.esporte==='beach' ? (byId[uid]?.nivelb ?? 1200) : (byId[uid]?.nivel ?? 1200);
+  const nC=nv(m.criador_id), nA=nv(m.adversario_id);
+  // formato/dupla vinham hardcoded — a partida sempre contou como melhor de 3
+  // e simples, mesmo com os valores reais gravados na própria linha
+  const ctx = _ctxDoTorneio(await _torneioDe(m.torneio_id));
+  const dC = calcular(nC, nA,  m.venceu_criador, ctx, m.formato, m.dupla, byId[m.criador_id]?.calibrando,     byId[m.criador_id]?.cal);
+  const dA = calcular(nA, nC, !m.venceu_criador, ctx, m.formato, m.dupla, byId[m.adversario_id]?.calibrando, byId[m.adversario_id]?.cal);
+  return [_aplicarFator(dC,fator), _aplicarFator(dA,fator)];
+}
+
+/* Um fator só derruba Nível e Pontos juntos: o `pontos_creditar` no banco lê
+   `delta_*->>'dPts'` DESTA linha, então não há um segundo lugar pra esquecer.
+   O piso de 1 é decisão de produto: a partida aconteceu, e metade virar zero
+   faria o prazo apagar o jogo em vez de reduzi-lo. */
+function _aplicarFator(d, fator){
+  if(fator === 1) return d;
+  const meio = (v)=> v===0 ? 0 : (v>0 ? Math.max(1, Math.round(v*fator)) : Math.min(-1, Math.round(v*fator)));
+  return { ...d, dNivel: meio(d.dNivel), dPts: meio(d.dPts) };
+}
+
 async function netConfirmar(matchId){
   const m = _inbox.find(x=>x.id===matchId); if(!m) return;
   try{
-    // nível dos dois, direto do banco (autoridade), pelo esporte da partida
-    const { data:ps } = await sb.from('players').select('id,nivel,nivelb,calibrando,cal').in('id',[m.criador_id,m.adversario_id]);
-    const byId={}; (ps||[]).forEach(p=>byId[p.id]=p);
-    const nv = (uid)=> m.esporte==='beach' ? (byId[uid]?.nivelb ?? 1200) : (byId[uid]?.nivel ?? 1200);
-    const nC=nv(m.criador_id), nA=nv(m.adversario_id);
-    // formato/dupla vinham hardcoded — a partida sempre contou como melhor de 3
-    // e simples, mesmo com os valores reais gravados na própria linha
-    const ctx = _ctxDoTorneio(await _torneioDe(m.torneio_id));
-    const dC = calcular(nC, nA,  m.venceu_criador, ctx, m.formato, m.dupla, byId[m.criador_id]?.calibrando,     byId[m.criador_id]?.cal);
-    const dA = calcular(nA, nC, !m.venceu_criador, ctx, m.formato, m.dupla, byId[m.adversario_id]?.calibrando, byId[m.adversario_id]?.cal);
+    const [dC,dA] = await _deltasDaPartida(m, 1);
     const { error } = await sb.from('matches').update({
       status:'confirmada', delta_criador:dC, delta_adversario:dA, confirmed_at:new Date().toISOString(),
     }).eq('id',matchId);
@@ -403,6 +429,53 @@ async function netConfirmar(matchId){
     await _cinturaoTentarPassar(m);
     netAtualizarInbox();   // aplica meu delta e re-renderiza
   }catch(e){ alert('Erro ao confirmar: '+(e.message||e)); }
+}
+
+/* ---- 2c: o prazo de 72h (11/08) ---------------------------------------
+   A tela promete "se não responder em 72h, o placar vale metade" desde o
+   começo e nada cumpria — `pendente` só saía de lá pela mão do adversário.
+   Partida parada é quem lançou o placar sem receber nada, no elo mais frágil
+   do ciclo.
+
+   Resolve na LEITURA, como o vencimento do cinturão logo abaixo: quem abrir
+   o app primeiro apura. Sem agendador, sem função nova no banco, e testável
+   antes de entregar — complexidade que não dá pra testar é risco puro.       */
+const PRAZO_HORAS = 72;
+const _vencendo = {};   // guarda de reentrada, igual ao _expirando do cinturão
+
+function _prazoVencido(m){
+  if(m.status !== 'pendente' || !m.placar_em) return false;
+  return (Date.now() - new Date(m.placar_em).getTime()) > PRAZO_HORAS*3600e3;
+}
+
+async function _fecharPorPrazo(m){
+  const [dC,dA] = await _deltasDaPartida(m, 0.5);
+  // `.eq('status','pendente')` é a trava contra corrida: se o adversário
+  // confirmou no meio do caminho, ou o outro aparelho apurou primeiro, esta
+  // escrita não encontra linha — e o `select` devolve vazio em vez de erro.
+  const { data, error } = await sb.from('matches').update({
+    status:'confirmada', delta_criador:dC, delta_adversario:dA,
+    confirmed_at:new Date().toISOString(), fechada_por_prazo:true,
+  }).eq('id', m.id).eq('status','pendente').select('id');
+  if(error) throw error;
+  if(!data || !data.length) return false;   // alguém chegou antes: nada a fazer
+  await netCreditarPontos(m.id);
+  await _cinturaoTentarPassar(m);
+  return true;
+}
+
+async function netApurarPrazos(lista){
+  let fechou = 0;
+  for(const m of (lista||[])){
+    if(!_prazoVencido(m) || _vencendo[m.id]) continue;
+    _vencendo[m.id] = 1;
+    try{ if(await _fecharPorPrazo(m)) fechou++; }
+    catch(e){ console.error('[net] prazo', e); delete _vencendo[m.id]; }
+  }
+  if(fechou && window.toast){
+    toast(`${fechou===1?'Uma partida passou':'Partidas passaram'} das ${PRAZO_HORAS}h sem confirmação — o placar valeu metade.`);
+  }
+  return fechou;
 }
 async function netContestar(matchId){
   const { error } = await sb.from('matches').update({ status:'contestada' }).eq('id',matchId);
@@ -415,12 +488,12 @@ async function netContestar(matchId){
 function netFecharOnline(){ _on=null; const el=document.getElementById('net-online'); if(el) el.remove(); }
 function netFecharInbox(){ const el=document.getElementById('net-inbox'); if(el) el.remove(); }
 
-const _wrap = (inner)=>`<div style="width:100%;max-width:460px;background:#1E1714;border:1px solid #312720;
-    border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));color:#EDE4DA;
+const _wrap = (inner)=>`<div style="width:100%;max-width:460px;background:var(--sup);border:1px solid var(--linha);
+    border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));color:var(--ink);
     font-family:system-ui,sans-serif;max-height:82vh;overflow:auto">${inner}</div>`;
 const _btn = (txt,onclick,tipo)=>`<button onclick="${onclick}" style="flex:1;padding:13px;border-radius:12px;
-    border:1px solid #443830;font:600 14px system-ui;cursor:pointer;
-    background:${tipo==='ok'?'#2E7D46':tipo==='no'?'#3a2420':'#241C18'};color:#fff">${txt}</button>`;
+    border:1px solid var(--linha2);font:600 14px system-ui;cursor:pointer;
+    background:${tipo==='ok'?'#2C5A00':tipo==='no'?'var(--dn-bg)':'var(--sup2)'};color:#fff">${txt}</button>`;
 const _sheet = (id, inner)=>{
   let el=document.getElementById(id);
   if(!el){ el=document.createElement('div'); el.id=id;
@@ -444,11 +517,16 @@ function netRenderInbox(){
       txt=`<div style="display:flex;align-items:center;gap:11px;margin-bottom:8px">
         ${window.avatar?avatar(uid):''}
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700">${j.nome} <span style="font-weight:400;color:#7f7060;font-size:11px">${netId(uid)}</span></div>
-          <div style="font-size:11px;color:#9c8b7c">${divTxt}${divTxt?' · ':''}${amigo?'<span style="color:#7BB98C">✔ seu amigo</span>':'não é seu amigo'}</div>
+          <div style="font-weight:700">${j.nome} <span style="font-weight:400;color:var(--ink3);font-size:11px">${netId(uid)}</span></div>
+          <div style="font-size:11px;color:var(--ink2)">${divTxt}${divTxt?' · ':''}${amigo?'<span style="color:var(--up)">✔ seu amigo</span>':'não é seu amigo'}</div>
         </div>
       </div>
-      <div style="font-size:14px"><b>${j.nome.split(' ')[0]}</b> te desafiou pra uma partida</div>`;
+      <div style="font-size:14px"><b>${j.nome.split(' ')[0]}</b> te desafiou pra uma partida</div>
+      <!-- 11/08: regra que só existe no documento não muda comportamento. A
+           decisão "recusar não custa fair play" existia desde o protótipo do
+           radar e nunca chegou à tela — e quem não sabe que é de graça acaba
+           aceitando jogo que não quer, ou some sem responder. -->
+      <div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Recusar não custa nada — não mexe no seu nível nem na sua reputação.</div>`;
       acoes=`${_btn('Recusar',`_net.recusar('${m.id}')`,'no')}${_btn('Aceitar',`_net.aceitar('${m.id}')`,'ok')}`;
     } else if(m.status==='desafiado'){
       txt=`Aguardando <b>${outro}</b> aceitar seu desafio`;
@@ -458,18 +536,18 @@ function netRenderInbox(){
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
       const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
-      txt=`<b>${outro}</b> lançou o placar: você <b style="color:${euVenci?'#7BB98C':'#D08B7A'}">${euVenci?'venceu':'perdeu'}</b> ${meuPl}`;
+      txt=`<b>${outro}</b> lançou o placar: você <b style="color:${euVenci?'var(--up)':'var(--dn)'}">${euVenci?'venceu':'perdeu'}</b> ${meuPl}`;
       acoes=`${_btn('Contestar',`_net.contestar('${m.id}')`,'no')}${_btn('Confirmar',`_net.confirmar('${m.id}')`,'ok')}`;
     } else if(m.status==='pendente'){
       txt=`Aguardando <b>${outro}</b> confirmar o placar`;
     }
-    return `<div style="border:1px solid #312720;border-radius:14px;padding:14px;margin-top:10px">
+    return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
       <div style="font-size:14px;margin-bottom:${acoes?'12px':'0'}">${txt}</div>
       ${acoes?`<div style="display:flex;gap:8px">${acoes}</div>`:''}</div>`;
-  }).join('') || `<p style="color:#9c8b7c;font-size:13px;margin-top:8px">Nenhuma partida rolando. Vá no Radar e desafie alguém.</p>`;
+  }).join('') || `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Nenhuma partida rolando. Vá no Radar e desafie alguém.</p>`;
   _sheet('net-inbox', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Suas partidas</div>
-      <button onclick="_net.fecharInbox()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button>
+      <button onclick="_net.fecharInbox()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
     </div>${linhas}`);
 }
 
@@ -479,9 +557,9 @@ function netRenderOnline(){
   let body='';
   if(_on.step==='desafio'){
     body = `<div style="font:700 17px system-ui;margin-bottom:2px">Desafiar ${_on.adv.nome}</div>
-      <div style="font-size:12px;color:#9c8b7c;margin-bottom:14px">Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.</div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.</div>
       <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${_btn('Desafiar','_net.confirmarDesafio()','ok')}</div>
-      <div style="font-size:11px;color:#6f6154;margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`;
+      <div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`;
   }
   else if(_on.step==='placar'){
     const eu=S.jogadores[EU]; const sets=_on.sets; let previa='';
@@ -491,15 +569,15 @@ function netRenderOnline(){
       const advNivel=(S.esporte==='beach')?(_on.adv.nivelb??1200):(_on.adv.nivel??1200);
       const c=calcular(nivelDe(eu), advNivel, venceu, _on.ctx||'amistoso', _on.fmt, !!_on.dupla, eu.calibrando, eu.cal);
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:14px 0">
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'#7BB98C':'#D08B7A'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:#9c8b7c">NÍVEL</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:#7BB98C">+${c.dPts}</div><div style="font-size:10px;color:#9c8b7c">PONTOS</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:#9c8b7c">RESULTADO</div></div>
-      </div>${c.zebra?'<p style="text-align:center;color:#7BB98C;font-size:12px">Zebra — multiplicador nos pontos.</p>':''}`;
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">NÍVEL</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:var(--up)">+${c.dPts}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
+      </div>${c.zebra?'<p style="text-align:center;color:var(--up);font-size:12px">Zebra — multiplicador nos pontos.</p>':''}`;
     }
     body=`<div style="font:700 17px system-ui;margin-bottom:2px">Placar vs ${_on.adv.nome}</div>
-      <div style="font-size:12px;color:#9c8b7c;margin-bottom:10px">Seus games primeiro. Ex: <b>6-3 6-4</b></div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Seus games primeiro. Ex: <b>6-3 6-4</b></div>
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
-        style="width:100%;padding:14px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+        style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
       ${previa}
       <div style="display:flex;gap:8px;margin-top:8px">${_btn('Voltar','_net.fechar()')}${sets?_btn('Enviar placar','_net.enviar()','ok'):''}</div>`;
   }
@@ -508,15 +586,15 @@ function netRenderOnline(){
     let previa='';
     if(sets){
       let g=0,p=0; sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
-      previa=`<div style="text-align:center;font:700 16px system-ui;margin:14px 0;color:${g===p?'#D08B7A':'#7BB98C'}">${g===p?'Placar empatado — confira':(g>p?nA:nB)+' venceu'}</div>`;
+      previa=`<div style="text-align:center;font:700 16px system-ui;margin:14px 0;color:${g===p?'var(--dn)':'var(--up)'}">${g===p?'Placar empatado — confira':(g>p?nA:nB)+' venceu'}</div>`;
     }
     body=`<div style="font:700 17px system-ui;margin-bottom:2px">Placar do organizador</div>
-      <div style="font-size:12px;color:#9c8b7c;margin-bottom:10px"><b>${nA}</b> × ${nB} — games de <b>${nA}</b> primeiro. Ex: <b>6-3 6-4</b></div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:10px"><b>${nA}</b> × ${nB} — games de <b>${nA}</b> primeiro. Ex: <b>6-3 6-4</b></div>
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
-        style="width:100%;padding:14px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+        style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
       ${previa}
       <div style="display:flex;gap:8px;margin-top:8px">${_btn('Voltar','_net.fechar()')}${sets?_btn('Confirmar placar','_net.orgEnviar()','ok'):''}</div>
-      <div style="font-size:11px;color:#7f7060;margin-top:10px;text-align:center">Vale na hora, sem confirmação dos jogadores. Fica registrado que o organizador lançou.</div>`;
+      <div style="font-size:11px;color:var(--ink3);margin-top:10px;text-align:center">Vale na hora, sem confirmação dos jogadores. Fica registrado que o organizador lançou.</div>`;
   }
   _sheet('net-online', body);
   const sc=document.getElementById('net-sc'); if(sc){ sc.focus(); sc.setSelectionRange(sc.value.length,sc.value.length); }
@@ -534,23 +612,23 @@ function netRenderBusca(){
     const amigo=netEhAmigo(p.id);
     const div=window.divisaoDe?divisaoDe(p.nivel):'';
     const nomeEsc=(p.nome||'').replace(/'/g,'’');
-    return `<div style="display:flex;align-items:center;gap:11px;padding:11px;border:1px solid #312720;border-radius:12px;margin-top:8px">
+    return `<div style="display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--linha);border-radius:12px;margin-top:8px">
       <div style="width:36px;height:36px;border-radius:50%;background:${p.cor||'#5C2E3C'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 36px">${p.ap||'?'}</div>
-      <div style="flex:1;min-width:0"><b>${p.nome}</b> <span style="color:#7f7060;font-size:11px">${netId(p.id)}</span>
-        <div style="font-size:11px;color:#9c8b7c">Classe ${div} · Nível ${p.nivel}${amigo?' · <span style="color:#7BB98C">✔ amigo</span>':''}</div></div>
+      <div style="flex:1;min-width:0"><b>${p.nome}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.id)}</span>
+        <div style="font-size:11px;color:var(--ink2)">Classe ${div} · Nível ${p.nivel}${amigo?' · <span style="color:var(--up)">✔ amigo</span>':''}</div></div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        ${amigo?'':`<button onclick="_net.addAmigo('${p.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid #443830;background:#241C18;color:#fff;font:600 12px system-ui;cursor:pointer">+ Amigo</button>`}
-        <button onclick="_net.desafiarUid('${p.id}','${nomeEsc}',${p.nivel},${p.nivelb||1200})" style="padding:7px 10px;border-radius:9px;border:none;background:#2E7D46;color:#fff;font:600 12px system-ui;cursor:pointer">Desafiar</button>
+        ${amigo?'':`<button onclick="_net.addAmigo('${p.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer">+ Amigo</button>`}
+        <button onclick="_net.desafiarUid('${p.id}','${nomeEsc}',${p.nivel},${p.nivelb||1200})" style="padding:7px 10px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Desafiar</button>
       </div></div>`;
-  }).join('') || (_busca.termo?`<p style="color:#9c8b7c;font-size:13px;margin-top:12px">Ninguém encontrado por “${_busca.termo}”.</p>`:'');
+  }).join('') || (_busca.termo?`<p style="color:var(--ink2);font-size:13px;margin-top:12px">Ninguém encontrado por “${_busca.termo}”.</p>`:'');
   _sheet('net-busca', `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font:700 17px system-ui">Buscar amigos</div>
-      <button onclick="_net.fecharBusca()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:#9c8b7c;margin-bottom:10px">Por nome, email ou ID (o seu é ${netId(MEU_UID)}). Amigo você desafia em qualquer classe.</div>
+      <button onclick="_net.fecharBusca()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Por nome, email ou ID (o seu é ${netId(MEU_UID)}). Amigo você desafia em qualquer classe.</div>
     <input id="net-bq" value="${_busca.termo}" oninput="_net.buscar(this.value)" placeholder="nome, email ou #ID"
-      style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui" autocomplete="off"/>
-    <button onclick="_net.convidarAmigo()" style="width:100%;padding:12px;border-radius:11px;border:1px dashed #57493c;background:#1a1512;color:#EDE4DA;font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Convidar amigo por link</button>
-    <div style="font-size:11px;color:#7f7060;text-align:center;margin-top:5px">Manda no WhatsApp — quem abrir vira seu amigo no app.</div>
+      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="off"/>
+    <button onclick="_net.convidarAmigo()" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Convidar amigo por link</button>
+    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:5px">Manda no WhatsApp — quem abrir vira seu amigo no app.</div>
     ${linhas}`);
   const bq=document.getElementById('net-bq'); if(bq){ bq.focus(); bq.setSelectionRange(bq.value.length,bq.value.length); }
 }
@@ -595,7 +673,7 @@ async function netMeusGrupos(){
 
 // linha "quem sou eu" — visível nas listas pra nunca mais testar às cegas
 function _quemSou(){
-  return `<div style="font-size:11px;color:#7f7060;margin-top:3px">Neste aparelho: <b style="color:#c9b8a6">${_nomeDe(MEU_UID)}</b> ${netId(MEU_UID)} · <span onclick="_net.trocarConta()" style="text-decoration:underline;cursor:pointer">trocar de conta</span></div>`;
+  return `<div style="font-size:11px;color:var(--ink3);margin-top:3px">Neste aparelho: <b style="color:var(--ink2)">${_nomeDe(MEU_UID)}</b> ${netId(MEU_UID)} · <span onclick="_net.trocarConta()" style="text-decoration:underline;cursor:pointer">trocar de conta</span></div>`;
 }
 async function netTrocarConta(){
   if(!confirm('Sair desta conta neste aparelho? O app volta pra tela inicial.')) return;
@@ -608,30 +686,30 @@ async function netAbrirGrupos(){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
   const {meus,abertos,pedido,cont}=await netMeusGrupos();
   const card=(g,fora)=>{
-    let acao='<span style="color:#9c8b7c">›</span>';
+    let acao='<span style="color:var(--ink2)">›</span>';
     if(fora){
       const st=pedido[g.id];
-      acao = st==='pendente' ? '<span style="color:#E0C48A;font-size:11px">pedido enviado</span>'
-        : st==='recusado' ? `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid #443830;background:#241C18;color:#fff;font:600 11px system-ui;cursor:pointer">Não rolou · pedir de novo</button>`
-        : `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2E7D46;color:#fff;font:600 12px system-ui;cursor:pointer">Pedir pra entrar</button>`;
+      acao = st==='pendente' ? '<span style="color:var(--gold);font-size:11px">pedido enviado</span>'
+        : st==='recusado' ? `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 11px system-ui;cursor:pointer">Não rolou · pedir de novo</button>`
+        : `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Pedir pra entrar</button>`;
     }
-    return `<div onclick="_net.verGrupo('${g.id}')" style="display:flex;align-items:center;gap:11px;padding:13px;border:1px solid #312720;border-radius:12px;margin-top:8px;cursor:pointer">
-      <div style="width:34px;height:34px;border-radius:9px;background:#241C18;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">▣</div>
+    return `<div onclick="_net.verGrupo('${g.id}')" style="display:flex;align-items:center;gap:11px;padding:13px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;cursor:pointer">
+      <div style="width:34px;height:34px;border-radius:9px;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">▣</div>
       <div style="flex:1;min-width:0"><b>${g.nome}</b>
-        <div style="font-size:11px;color:#9c8b7c">${g.esporte==='beach'?'Beach':'Tênis'} · ${cont[g.id]||0} membros · ${g.aberto?'aberto':'fechado'}</div></div>
+        <div style="font-size:11px;color:var(--ink2)">${g.esporte==='beach'?'Beach':'Tênis'} · ${cont[g.id]||0} membros · ${g.aberto?'aberto':'fechado'}</div></div>
       ${acao}</div>`;
   };
-  const meusH = meus.length? meus.map(g=>card(g,false)).join('') : `<p style="color:#9c8b7c;font-size:13px;margin-top:8px">Você ainda não está em nenhuma comunidade.</p>`;
-  const abH = abertos.length? `<div style="font:700 12px system-ui;color:#9c8b7c;margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Comunidades abertas</div>`+abertos.map(g=>card(g,true)).join('') : '';
+  const meusH = meus.length? meus.map(g=>card(g,false)).join('') : `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Você ainda não está em nenhuma comunidade.</p>`;
+  const abH = abertos.length? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Comunidades abertas</div>`+abertos.map(g=>card(g,true)).join('') : '';
   _sheet('net-comunidades', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Comunidades</div>
-      <button onclick="_net.fecharGrupos()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
+      <button onclick="_net.fecharGrupos()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     ${_quemSou()}
-    <button onclick="_net.criarGrupo()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed #57493c;background:#1a1512;color:#EDE4DA;font:700 14px system-ui;cursor:pointer;margin-top:10px">+ Criar comunidade</button>
+    <button onclick="_net.criarGrupo()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 14px system-ui;cursor:pointer;margin-top:10px">+ Criar comunidade</button>
     <input oninput="_net.buscarGrupos(this.value)" placeholder="Buscar comunidade pelo nome (achou, pede pra entrar)"
-      style="width:100%;padding:12px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 14px system-ui;margin-top:10px" autocomplete="off"/>
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:10px" autocomplete="off"/>
     <div id="gg-res"></div>
-    <div style="font:700 12px system-ui;color:#9c8b7c;margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Suas comunidades</div>
+    <div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Suas comunidades</div>
     ${meusH}${abH}`);
 }
 function netFecharGrupos(){ const el=document.getElementById('net-comunidades'); if(el) el.remove(); }
@@ -643,11 +721,11 @@ async function netBuscarGrupos(q){
   q=(q||'').trim();
   if(q.length<2){ box.innerHTML=''; return; }
   const { data } = await sb.from('grupos').select('*').ilike('nome','%'+q+'%').limit(12);
-  box.innerHTML = (data||[]).map(g=>`<div onclick="_net.verGrupo('${g.id}')" style="display:flex;align-items:center;gap:11px;padding:12px;border:1px solid #312720;border-radius:12px;margin-top:8px;cursor:pointer">
-      <div style="width:30px;height:30px;border-radius:9px;background:#241C18;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 30px">▣</div>
-      <div style="flex:1;min-width:0"><b>${g.nome}</b><div style="font-size:11px;color:#9c8b7c">${g.esporte==='beach'?'Beach':'Tênis'} · ${g.aberto?'aberto':'fechado'}</div></div>
-      <span style="color:#9c8b7c">›</span></div>`).join('')
-    || `<p style="color:#9c8b7c;font-size:12px;margin-top:8px">Nenhuma comunidade com “${q}”.</p>`;
+  box.innerHTML = (data||[]).map(g=>`<div onclick="_net.verGrupo('${g.id}')" style="display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;cursor:pointer">
+      <div style="width:30px;height:30px;border-radius:9px;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 30px">▣</div>
+      <div style="flex:1;min-width:0"><b>${g.nome}</b><div style="font-size:11px;color:var(--ink2)">${g.esporte==='beach'?'Beach':'Tênis'} · ${g.aberto?'aberto':'fechado'}</div></div>
+      <span style="color:var(--ink2)">›</span></div>`).join('')
+    || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhuma comunidade com “${q}”.</p>`;
 }
 
 /* ---- Pontos de Temporada (banco) ---------------------------------------
@@ -831,15 +909,15 @@ async function _cinturaoTentarPassar(m){
 // -- criar comunidade --
 function netCriarGrupoUI(){
   _gnew = _gnew || { nome:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', aberto:false };
-  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid #443830;font:600 13px system-ui;cursor:pointer;background:${_gnew[campo]==v?'#2E7D46':'#241C18'};color:#fff">${n}</button>`).join('');
+  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;background:${_gnew[campo]==v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
   _sheet('net-gnew', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Criar comunidade</div>
-      <button onclick="_net.fecharGnew()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <input id="gn-nome" value="${(_gnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.gset('nome',this.value)" placeholder="Nome da comunidade" style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
-    <div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
-    <div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Quem acha a comunidade</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (só convite)'],[true,'Aberto (aceita pedidos)']])}</div>
-    <div style="font-size:11px;color:#7f7060;margin-top:6px">Aberto = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Fechado = só entra pelo link de convite.</div>
-    <button onclick="_net.gcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D46;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">Criar comunidade</button>`);
+      <button onclick="_net.fecharGnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <input id="gn-nome" value="${(_gnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.gset('nome',this.value)" placeholder="Nome da comunidade" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
+    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
+    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem acha a comunidade</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (só convite)'],[true,'Aberto (aceita pedidos)']])}</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:6px">Aberto = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Fechado = só entra pelo link de convite.</div>
+    <button onclick="_net.gcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">Criar comunidade</button>`);
   const el=document.getElementById('gn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
 function _gset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; _gnew[campo]=v; if(campo!=='nome') netCriarGrupoUI(); }
@@ -889,16 +967,16 @@ async function netVerGrupo(gid){
     let acoes='';
     if(p.player_id!==MEU_UID && !ehDono){
       if(souDono) acoes += p.papel==='admin'
-        ? `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','membro')" style="padding:5px 8px;border-radius:8px;border:1px solid #443830;background:#241C18;color:#c9b8a6;font:600 10px system-ui;cursor:pointer">tirar admin</button>`
-        : `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','admin')" style="padding:5px 8px;border-radius:8px;border:1px solid #443830;background:#241C18;color:#c9b8a6;font:600 10px system-ui;cursor:pointer">virar admin</button>`;
-      if(souGestor && p.papel!=='admin') acoes += ` <button onclick="_net.removerMembro('${gid}','${p.player_id}')" style="padding:5px 8px;border-radius:8px;border:1px solid #3a2420;background:#2a1a16;color:#c9b8a6;font:600 10px system-ui;cursor:pointer">remover</button>`;
+        ? `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','membro')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px system-ui;cursor:pointer">tirar admin</button>`
+        : `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','admin')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px system-ui;cursor:pointer">virar admin</button>`;
+      if(souGestor && p.papel!=='admin') acoes += ` <button onclick="_net.removerMembro('${gid}','${p.player_id}')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink2);font:600 10px system-ui;cursor:pointer">remover</button>`;
     }
-    return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid #241c18">
-      <div style="width:22px;text-align:center;font:700 12px system-ui;color:${i===0?'#E0C48A':'#9c8b7c'};flex:0 0 22px">${i+1}º</div>
+    return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
+      <div style="width:22px;text-align:center;font:700 12px system-ui;color:${i===0?'var(--gold)':'var(--ink2)'};flex:0 0 22px">${i+1}º</div>
       <div style="width:28px;height:28px;border-radius:50%;background:${(S.jogadores[_chaveLocal(p.player_id)]||{}).cor||'#5C2E3C'};flex:0 0 28px"></div>
       <div style="flex:1;min-width:0"><b>${_nomeDe(p.player_id)}</b>
-        ${ehDono?'<span style="color:#E0C48A;font-size:11px"> dono</span>':p.papel==='admin'?'<span style="color:#7BB98C;font-size:11px"> admin</span>':''}
-        <div style="font-size:11px;color:#9c8b7c"><b style="color:#C6FF3D">${ptsG[p.player_id]||0}</b> pts · Nível ${nivelG[p.player_id]??'—'}</div></div>
+        ${ehDono?'<span style="color:var(--gold);font-size:11px"> dono</span>':p.papel==='admin'?'<span style="color:var(--up);font-size:11px"> admin</span>':''}
+        <div style="font-size:11px;color:var(--ink2)"><b style="color:var(--up)">${ptsG[p.player_id]||0}</b> pts · Nível ${nivelG[p.player_id]??'—'}</div></div>
       ${acoes}</div>`;
   };
   // pedidos pendentes — só o gestor vê
@@ -907,13 +985,13 @@ async function netVerGrupo(gid){
     const ps=(await sb.from('grupo_pedidos').select('player_id,estado').eq('grupo_id',gid).eq('estado','pendente')).data||[];
     if(ps.length){
       if(window.aplicarJogadoresReais && ps.some(p=>!S.jogadores[_chaveLocal(p.player_id)])){ try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){} }
-      pedidosH = `<div style="font:700 12px system-ui;color:#E0C48A;margin-top:14px;text-transform:uppercase;letter-spacing:.08em">Pedidos pra entrar</div>`
-        + ps.map(p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid #241c18">
-            <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:#7f7060;font-size:11px">${netId(p.player_id)}</span></div>
-            <button onclick="_net.aceitarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2E7D46;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>
-            <button onclick="_net.recusarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:1px solid #3a2420;background:#2a1a16;color:#fff;font:600 12px system-ui;cursor:pointer">Recusar</button>
+      pedidosH = `<div style="font:700 12px system-ui;color:var(--gold);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">Pedidos pra entrar</div>`
+        + ps.map(p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
+            <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.player_id)}</span></div>
+            <button onclick="_net.aceitarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>
+            <button onclick="_net.recusarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 12px system-ui;cursor:pointer">Recusar</button>
           </div>`).join('')
-        + `<div style="font-size:11px;color:#7f7060;margin-top:6px">Recusar não custa nada — quem pediu só vê que não rolou, sem aviso nem motivo.</div>`;
+        + `<div style="font-size:11px;color:var(--ink3);margin-top:6px">Recusar não custa nada — quem pediu só vê que não rolou, sem aviso nem motivo.</div>`;
     }
   }
   // não-membro: pedir pra entrar direto do detalhe (com o estado do pedido)
@@ -921,13 +999,13 @@ async function netVerGrupo(gid){
   if(!meu){
     const pd=(await sb.from('grupo_pedidos').select('estado').eq('grupo_id',gid).eq('player_id',MEU_UID).maybeSingle()).data;
     entrar = (pd&&pd.estado==='pendente')
-      ? `<div style="text-align:center;color:#E0C48A;font-size:13px;margin-top:14px">Pedido enviado — aguardando o gestor aprovar.</div>`
-      : `<button onclick="_net.pedirEntrar('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2E7D46;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">${(pd&&pd.estado==='recusado')?'Não rolou · pedir de novo':'Pedir pra entrar'}</button>`;
+      ? `<div style="text-align:center;color:var(--gold);font-size:13px;margin-top:14px">Pedido enviado — aguardando o gestor aprovar.</div>`
+      : `<button onclick="_net.pedirEntrar('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">${(pd&&pd.estado==='recusado')?'Não rolou · pedir de novo':'Pedir pra entrar'}</button>`;
   }
-  const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid #3a2420;background:#2a1a16;color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
-  const link = souGestor ? `<button onclick="_net.copiarLinkGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed #57493c;background:#1a1512;color:#EDE4DA;font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
-    <div style="font-size:11px;color:#7f7060;text-align:center;margin-top:6px">O link é o seu convite: quem abrir entra direto, sem pedido.</div>
-    ${souDono?`<button onclick="_net.revogarLink('${gid}')" style="width:100%;padding:10px;border-radius:11px;border:none;background:none;color:#9c8b7c;font:600 12px system-ui;cursor:pointer;margin-top:4px;text-decoration:underline">Revogar link (o antigo para de funcionar)</button>`:''}` : '';
+  const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
+  const link = souGestor ? `<button onclick="_net.copiarLinkGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
+    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">O link é o seu convite: quem abrir entra direto, sem pedido.</div>
+    ${souDono?`<button onclick="_net.revogarLink('${gid}')" style="width:100%;padding:10px;border-radius:11px;border:none;background:none;color:var(--ink2);font:600 12px system-ui;cursor:pointer;margin-top:4px;text-decoration:underline">Revogar link (o antigo para de funcionar)</button>`:''}` : '';
   /* ---- cinturão ----
      O reinado só significa alguma coisa se estiver na cara: quem tem, há
      quanto tempo e quantas defesas. Regra que só existe no documento não muda
@@ -944,38 +1022,38 @@ async function netVerGrupo(gid){
   }
   if(est){
     const souEu = est.dono === MEU_UID;
-    const selo = est.congelado ? '#8A7B6F' : '#E0C48A';
+    const selo = est.congelado ? 'var(--ink3)' : 'var(--gold)';
     const etiqueta = est.congelado
-      ? `<span style="color:#D0724A">reinado congelado</span> · ${est.parado} dias sem jogar`
+      ? `<span style="color:var(--dn)">reinado congelado</span> · ${est.parado} dias sem jogar`
       : `<b>${est.dias}</b> ${est.dias===1?'dia':'dias'} de reinado · <b>${est.defesas}</b> ${est.defesas===1?'defesa':'defesas'}`;
     cinturaoH = `<div style="display:flex;gap:11px;align-items:center;margin:12px 0 4px;padding:12px;
-        border-radius:12px;border:1px solid ${est.congelado?'#3a3128':'#5a4a2a'};background:${est.congelado?'#1c1714':'#241d12'}">
+        border-radius:12px;border:1px solid ${est.congelado?'var(--linha2)':'var(--gold-bg)'};background:${est.congelado?'var(--sup)':'var(--gold-bg)'}">
       <div style="font-size:26px;line-height:1;flex:0 0 auto;filter:${est.congelado?'grayscale(1) opacity(.6)':'none'}">🥇</div>
       <div style="flex:1;min-width:0">
         <div style="font:700 13px system-ui;color:${selo}">${souEu?'Você tem o cinturão':_nomeDe(est.dono)}</div>
-        <div style="font-size:11px;color:#9c8b7c;margin-top:2px">${etiqueta}</div>
+        <div style="font-size:11px;color:var(--ink2);margin-top:2px">${etiqueta}</div>
       </div></div>
-      <div style="font-size:11px;color:#7f7060;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">
         Passa pra quem vencer ${souEu?'você':'quem tem'} numa partida normal — sem desafio, sem marcar nada.
         ${est.congelado?'Aos 30 dias parado o cinturão vai pro 1º da comunidade.':'Parar 14 dias congela o reinado.'}</div>`;
   } else if(g.cinturao){
-    cinturaoH = `<div style="margin:12px 0;padding:12px;border-radius:12px;border:1px dashed #443830;background:#1a1512">
-      <div style="font:700 13px system-ui;color:#E0C48A">🥇 Cinturão vago</div>
-      <div style="font-size:11px;color:#9c8b7c;margin-top:3px">Ninguém tem. O gestor precisa entregar pra alguém.</div></div>`;
+    cinturaoH = `<div style="margin:12px 0;padding:12px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup)">
+      <div style="font:700 13px system-ui;color:var(--gold)">🥇 Cinturão vago</div>
+      <div style="font-size:11px;color:var(--ink2);margin-top:3px">Ninguém tem. O gestor precisa entregar pra alguém.</div></div>`;
   } else if(souGestor){
     cinturaoH = `<button onclick="_net.ligarCinturao('${gid}')" style="width:100%;padding:11px;border-radius:11px;
-        border:1px dashed #5a4a2a;background:#1a1512;color:#E0C48A;font:600 13px system-ui;cursor:pointer;margin:12px 0 4px">
+        border:1px dashed var(--gold-bg);background:var(--sup);color:var(--gold);font:600 13px system-ui;cursor:pointer;margin:12px 0 4px">
         🥇 Ligar o cinturão da comunidade</button>
-      <div style="font-size:11px;color:#7f7060;margin-bottom:8px">
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">
         Um por comunidade, no ${g.esporte==='beach'?'beach':'tênis'}. Nasce com você e passa pra quem te vencer.</div>`;
   }
 
   _sheet('net-gver', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">${g.nome}</div>
-      <button onclick="_net.fecharGver()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:#9c8b7c;margin:4px 0 12px">${g.esporte==='beach'?'Beach':'Tênis'} · ${ms.length} membros · ${g.aberto?'aberto':'fechado'}</div>
+      <button onclick="_net.fecharGver()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${g.esporte==='beach'?'Beach':'Tênis'} · ${ms.length} membros · ${g.aberto?'aberto':'fechado'}</div>
     ${cinturaoH}
-    ${ms.map(linha).join('')||'<p style="color:#9c8b7c;font-size:13px">Ninguém ainda.</p>'}
+    ${ms.map(linha).join('')||'<p style="color:var(--ink2);font-size:13px">Ninguém ainda.</p>'}
     ${pedidosH}${entrar}${sair}${link}`);
 }
 function netFecharGver(){ const el=document.getElementById('net-gver'); if(el) el.remove(); }
@@ -1151,16 +1229,16 @@ async function netEscolherCategoria(t){
                  : c.montada ? ' · chave já montada'
                  : n>=tam    ? ' · cheia' : '';
     const sub = (c.esporte==='beach'?'Beach':'Tênis')+' · '+((c.classes&&c.classes.length)?'divisões '+c.classes.join('/'):'todas as divisões')+' · '+n+'/'+tam;
-    return `<div style="display:flex;align-items:center;gap:11px;padding:12px;border:1px solid #312720;border-radius:12px;margin-top:8px;opacity:${ok?1:.45}">
-      <div style="flex:1;min-width:0"><b>${c.nome}</b><div style="font-size:11px;color:#9c8b7c">${sub}${motivo}</div></div>
-      ${ok?`<button onclick="_net.entrarTorneio('${t.id}','${c.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2E7D46;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:''}
+    return `<div style="display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;opacity:${ok?1:.45}">
+      <div style="flex:1;min-width:0"><b>${c.nome}</b><div style="font-size:11px;color:var(--ink2)">${sub}${motivo}</div></div>
+      ${ok?`<button onclick="_net.entrarTorneio('${t.id}','${c.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:''}
     </div>`;
   }).join('');
   _sheet('net-tcat', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">${t.nome} — categorias</div>
-      <button onclick="document.getElementById('net-tcat').remove()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:#9c8b7c;margin:6px 0 4px">Escolha a sua categoria. Cada uma tem chave e campeão próprios.</div>
-    ${rows||'<p style="color:#9c8b7c;font-size:13px">Este torneio ainda não tem categorias.</p>'}`);
+      <button onclick="document.getElementById('net-tcat').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:6px 0 4px">Escolha a sua categoria. Cada uma tem chave e campeão próprios.</div>
+    ${rows||'<p style="color:var(--ink2);font-size:13px">Este torneio ainda não tem categorias.</p>'}`);
 }
 async function netSairTorneio(id){
   await sb.from('torneio_participantes').delete().eq('torneio_id',id).eq('player_id',MEU_UID);
@@ -1174,21 +1252,21 @@ async function netAbrirTorneios(){
   const card=(t,entrar)=>{
     const n=cont[t.id]||0; const esp=t.tipo==='multi'?((t.categorias||[]).length+' categorias'):(t.esporte==='beach'?'Beach':'Tênis');
     const regra=t.tipo==='restrito'&&t.classes?' · div. '+t.classes.join('/'):'';
-    return `<div class="tsheet-item" onclick="_net.verTorneio('${t.id}')" style="display:flex;align-items:center;gap:11px;padding:13px;border:1px solid #312720;border-radius:12px;margin-top:8px;cursor:pointer">
-      <div style="width:34px;height:34px;border-radius:9px;background:#241C18;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">🏆</div>
+    return `<div class="tsheet-item" onclick="_net.verTorneio('${t.id}')" style="display:flex;align-items:center;gap:11px;padding:13px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;cursor:pointer">
+      <div style="width:34px;height:34px;border-radius:9px;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">🏆</div>
       <div style="flex:1;min-width:0"><b>${t.nome}</b>
-        <div style="font-size:11px;color:#9c8b7c">${esp} · mata-mata · ${n}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos${regra} · ${t.aberto?'aberto':'fechado'}${t.status!=='inscricoes'?' · '+t.status:''}</div></div>
-      ${entrar?`<button onclick="event.stopPropagation();_net.entrarTorneio('${t.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2E7D46;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:'<span style="color:#9c8b7c">›</span>'}
+        <div style="font-size:11px;color:var(--ink2)">${esp} · mata-mata · ${n}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos${regra} · ${t.aberto?'aberto':'fechado'}${t.status!=='inscricoes'?' · '+t.status:''}</div></div>
+      ${entrar?`<button onclick="event.stopPropagation();_net.entrarTorneio('${t.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:'<span style="color:var(--ink2)">›</span>'}
     </div>`;
   };
-  const meusH = meus.length? meus.map(t=>card(t,false)).join('') : `<p style="color:#9c8b7c;font-size:13px;margin-top:8px">Você não está em nenhum torneio ainda.</p>`;
-  const abH = abertos.length? `<div style="font:700 12px system-ui;color:#9c8b7c;margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Torneios abertos</div>`+abertos.map(t=>card(t,true)).join('') : '';
+  const meusH = meus.length? meus.map(t=>card(t,false)).join('') : `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Você não está em nenhum torneio ainda.</p>`;
+  const abH = abertos.length? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Torneios abertos</div>`+abertos.map(t=>card(t,true)).join('') : '';
   _sheet('net-torneios', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Torneios</div>
-      <button onclick="_net.fecharTorneios()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
+      <button onclick="_net.fecharTorneios()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     ${_quemSou()}
-    <button onclick="_net.criarTorneio()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed #57493c;background:#1a1512;color:#EDE4DA;font:700 14px system-ui;cursor:pointer;margin-top:10px">+ Criar torneio</button>
-    <div style="font:700 12px system-ui;color:#9c8b7c;margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Seus torneios</div>
+    <button onclick="_net.criarTorneio()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 14px system-ui;cursor:pointer;margin-top:10px">+ Criar torneio</button>
+    <div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Seus torneios</div>
     ${meusH}${abH}`);
 }
 function netFecharTorneios(){ const el=document.getElementById('net-torneios'); if(el) el.remove(); }
@@ -1196,41 +1274,41 @@ function netFecharTorneios(){ const el=document.getElementById('net-torneios'); 
 // -- UI: criar torneio --
 function netCriarTorneioUI(){
   _tnew = _tnew || { nome:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', tamanho:8, aberto:false, tipo:'aberto', classes:[], cats:[] };
-  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.tset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid #443830;font:600 13px system-ui;cursor:pointer;background:${_tnew[campo]==v?'#2E7D46':'#241C18'};color:#fff">${n}</button>`).join('');
-  const chip=(d,on,click)=>`<button onclick="${click}" style="flex:1;padding:9px;border-radius:9px;border:1px solid #443830;font:700 13px system-ui;cursor:pointer;background:${on?'#2E7D46':'#241C18'};color:#fff">${d}</button>`;
+  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.tset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;background:${_tnew[campo]==v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
+  const chip=(d,on,click)=>`<button onclick="${click}" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:700 13px system-ui;cursor:pointer;background:${on?'#2C5A00':'var(--sup2)'};color:#fff">${d}</button>`;
   // bloco extra conforme o tipo escolhido
   let extra='';
   if(_tnew.tipo==='restrito'){
-    extra = `<div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Divisões que jogam</div>
+    extra = `<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Divisões que jogam</div>
       <div style="display:flex;gap:8px">${['A','B','C','D'].map(d=>chip(d,_tnew.classes.includes(d),`_net.tclasse('${d}')`)).join('')}</div>`;
   }
   if(_tnew.tipo==='multi'){
-    const catRow=(c,i)=>`<div style="border:1px solid #312720;border-radius:12px;padding:11px;margin-top:8px">
+    const catRow=(c,i)=>`<div style="border:1px solid var(--linha);border-radius:12px;padding:11px;margin-top:8px">
       <div style="display:flex;gap:8px;align-items:center">
-        <input value="${(c.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tcatset(${i},'nome',this.value)" placeholder="Nome da categoria (ex.: C masculino)" style="flex:1;padding:10px;border-radius:9px;border:1px solid #443830;background:#15100D;color:#fff;font:600 13px system-ui" autocomplete="off"/>
-        <button onclick="_net.tcatdel(${i})" style="background:none;border:none;color:#9c8b7c;font-size:19px;cursor:pointer">×</button></div>
+        <input value="${(c.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tcatset(${i},'nome',this.value)" placeholder="Nome da categoria (ex.: C masculino)" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui" autocomplete="off"/>
+        <button onclick="_net.tcatdel(${i})" style="background:none;border:none;color:var(--ink2);font-size:19px;cursor:pointer">×</button></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         ${chip('Tênis',c.esporte!=='beach',`_net.tcatset(${i},'esporte','tenis')`)}${chip('Beach',c.esporte==='beach',`_net.tcatset(${i},'esporte','beach')`)}</div>
       <div style="display:flex;gap:8px;margin-top:8px">${['A','B','C','D'].map(d=>chip(d,(c.classes||[]).includes(d),`_net.tcatclasse(${i},'${d}')`)).join('')}</div>
-      <div style="font-size:10px;color:#7f7060;margin-top:5px">Nenhuma classe marcada = todas jogam nesta categoria.</div>
-      <div style="font-size:11px;color:#9c8b7c;margin:9px 0 5px">Tamanho da chave</div>
+      <div style="font-size:10px;color:var(--ink3);margin-top:5px">Nenhuma classe marcada = todas jogam nesta categoria.</div>
+      <div style="font-size:11px;color:var(--ink2);margin:9px 0 5px">Tamanho da chave</div>
       <div style="display:flex;gap:8px">${[4,8,16].map(n=>chip(n,(c.tamanho||8)===n,`_net.tcatset(${i},'tamanho','${n}')`)).join('')}</div>
     </div>`;
-    extra = `<div style="font-size:12px;color:#9c8b7c;margin:14px 0 2px">Categorias (cada uma tem chave e campeão próprios)</div>
+    extra = `<div style="font-size:12px;color:var(--ink2);margin:14px 0 2px">Categorias (cada uma tem chave e campeão próprios)</div>
       ${_tnew.cats.map(catRow).join('')}
-      <button onclick="_net.tcatadd()" style="width:100%;padding:11px;border-radius:11px;border:1px dashed #57493c;background:#1a1512;color:#EDE4DA;font:600 13px system-ui;cursor:pointer;margin-top:8px">+ Adicionar categoria</button>`;
+      <button onclick="_net.tcatadd()" style="width:100%;padding:11px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:8px">+ Adicionar categoria</button>`;
   }
   _sheet('net-tnew', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">${_tnew.id?'Editar regras':'Criar torneio'}</div>
-      <button onclick="_net.fecharTnew()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <input id="tn-nome" value="${(_tnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tset('nome',this.value)" placeholder="Nome do torneio" style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
-    ${_tnew.tipo!=='multi'?`<div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>`:''}
-    ${_tnew.tipo!=='multi'?`<div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Tamanho da chave</div><div style="display:flex;gap:8px">${seg('tamanho',[[4,'4'],[8,'8'],[16,'16']])}</div>`:''}
-    <div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Quem joga</div><div style="display:flex;gap:8px">${seg('tipo',[['aberto','Todas as divisões'],['restrito','Só algumas'],['multi','Categorias']])}</div>
+      <button onclick="_net.fecharTnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <input id="tn-nome" value="${(_tnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tset('nome',this.value)" placeholder="Nome do torneio" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
+    ${_tnew.tipo!=='multi'?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>`:''}
+    ${_tnew.tipo!=='multi'?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Tamanho da chave</div><div style="display:flex;gap:8px">${seg('tamanho',[[4,'4'],[8,'8'],[16,'16']])}</div>`:''}
+    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem joga</div><div style="display:flex;gap:8px">${seg('tipo',[['aberto','Todas as divisões'],['restrito','Só algumas'],['multi','Categorias']])}</div>
     ${extra}
-    <div style="font-size:12px;color:#9c8b7c;margin:14px 0 6px">Quem entra</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (convite)'],[true,'Aberto']])}</div>
-    ${_tnew.id?'<div style="font-size:11px;color:#7f7060;margin-top:10px">As regras podem mudar enquanto as inscrições estão abertas. Quando a chave montar, congelam.</div>':''}
-    <button onclick="_net.tcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D46;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">${_tnew.id?'Salvar regras':'Criar torneio'}</button>`);
+    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem entra</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (convite)'],[true,'Aberto']])}</div>
+    ${_tnew.id?'<div style="font-size:11px;color:var(--ink3);margin-top:10px">As regras podem mudar enquanto as inscrições estão abertas. Quando a chave montar, congelam.</div>':''}
+    <button onclick="_net.tcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">${_tnew.id?'Salvar regras':'Criar torneio'}</button>`);
   const el=document.getElementById('tn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
 function _tset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; if(campo==='tamanho')v=+v; _tnew[campo]=v; if(campo!=='nome') netCriarTorneioUI(); }
@@ -1448,10 +1526,10 @@ async function netVerTorneio(id){
   if(window.aplicarJogadoresReais && ps.some(p=>!S.jogadores[_chaveLocal(p.player_id)])){ try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){} }
   const souParticipante=ps.some(p=>p.player_id===MEU_UID);
   const cheio = ps.length>=t.tamanho;
-  const linha=p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid #241c18">
+  const linha=p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
       <div style="width:28px;height:28px;border-radius:50%;background:${(S.jogadores[_chaveLocal(p.player_id)]||{}).cor||'#5C2E3C'};flex:0 0 28px"></div>
-      <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:#7f7060;font-size:11px">${netId(p.player_id)}</span></div>
-      ${p.player_id===t.dono_id?'<span style="color:#E0C48A;font-size:11px">dono</span>':''}
+      <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.player_id)}</span></div>
+      ${p.player_id===t.dono_id?'<span style="color:var(--gold);font-size:11px">dono</span>':''}
     </div>`;
   const cats = t.tipo==='multi' ? (t.categorias||[]) : [];
   const _tamCat = c => c.tamanho||t.tamanho||8;
@@ -1461,9 +1539,9 @@ async function netVerTorneio(id){
     lista=cats.map(c=>{
       const dentro=ps.filter(p=>p.categoria===c.id), tam=_tamCat(c);
       const podeMontar = t.dono_id===MEU_UID && !c.montada && dentro.length>=tam;
-      return `<div style="font:700 12px system-ui;color:#9c8b7c;margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome} · ${dentro.length}/${tam}${c.montada?' · em jogo':''}</div>`
-        + (dentro.map(linha).join('')||'<p style="color:#7f7060;font-size:12px;margin:6px 0">Ninguém ainda.</p>')
-        + (podeMontar?`<button onclick="_net.montarChave('${id}','${c.id}')" style="width:100%;padding:11px;border-radius:11px;border:none;background:#7A5C2E;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">⚔️ Montar a chave de ${c.nome}</button>`:'');
+      return `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome} · ${dentro.length}/${tam}${c.montada?' · em jogo':''}</div>`
+        + (dentro.map(linha).join('')||'<p style="color:var(--ink3);font-size:12px;margin:6px 0">Ninguém ainda.</p>')
+        + (podeMontar?`<button onclick="_net.montarChave('${id}','${c.id}')" style="width:100%;padding:11px;border-radius:11px;border:none;background:var(--gold-bg);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">⚔️ Montar a chave de ${c.nome}</button>`:'');
     }).join('');
   } else {
     lista=ps.map(linha).join('');
@@ -1496,28 +1574,28 @@ async function netVerTorneio(id){
       const rotulo=r=> r===k.rounds?'Final' : r===k.rounds-1?'Semis' : r===k.rounds-2?'Quartas' : 'Oitavas';
       const confHTML=(c,r,i)=>{
         const w=_winDe(c.m);
-        const lin=uid=>`<div style="padding:5px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${w&&uid===w?'color:#7BB98C;font-weight:700':uid?'':'color:#57493c'}">${nCurto(uid)}</div>`;
+        const lin=uid=>`<div style="padding:5px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${w&&uid===w?'color:var(--up);font-weight:700':uid?'':'color:var(--linha2)'}">${nCurto(uid)}</div>`;
         let acaoC='';
         if(c.a&&c.b&&!w){
           const souJog = MEU_UID===c.a||MEU_UID===c.b;
-          if(c.m&&c.m.status==='pendente') acaoC=`<div style="font-size:10px;color:#E0C48A;padding:0 9px 6px">placar lançado · falta confirmar</div>`;
+          if(c.m&&c.m.status==='pendente') acaoC=`<div style="font-size:10px;color:var(--gold);padding:0 9px 6px">placar lançado · falta confirmar</div>`;
           else if(souJog){
             const adv=MEU_UID===c.a?c.b:c.a;
-            acaoC=`<button onclick="_net.torneioPlacar('${id}',${r},${i},'${adv}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:none;background:#2E7D46;color:#fff;font:600 11px system-ui;cursor:pointer">Lançar placar</button>`;
+            acaoC=`<button onclick="_net.torneioPlacar('${id}',${r},${i},'${adv}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:none;background:#2C5A00;color:#fff;font:600 11px system-ui;cursor:pointer">Lançar placar</button>`;
           }
           // rede de segurança: o dono lança por cima em confronto ALHEIO (vale na
           // hora) — cobre jogador sem celular, sumido ou placar pendente travado
           if(!souJog && t.dono_id===MEU_UID){
-            acaoC+=`<button onclick="_net.torneioPlacarOrg('${id}',${r},${i},'${c.a}','${c.b}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:1px solid #7A5C2E;background:#241C18;color:#E0C48A;font:600 11px system-ui;cursor:pointer">Placar (org.)</button>`;
+            acaoC+=`<button onclick="_net.torneioPlacarOrg('${id}',${r},${i},'${c.a}','${c.b}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:1px solid var(--gold-bg);background:var(--sup2);color:var(--gold);font:600 11px system-ui;cursor:pointer">Placar (org.)</button>`;
           }
         }
-        return `<div style="border:1px solid #312720;border-radius:10px;background:#1a1512;margin-top:8px;min-width:132px;font-size:13px">
-          ${lin(c.a)}<div style="border-top:1px solid #241c18"></div>${lin(c.b)}
-          ${c.m&&c.m.placar?`<div style="font-size:10px;color:#9c8b7c;padding:0 9px 5px">${c.m.placar}</div>`:''}${acaoC}</div>`;
+        return `<div style="border:1px solid var(--linha);border-radius:10px;background:var(--sup);margin-top:8px;min-width:132px;font-size:13px">
+          ${lin(c.a)}<div style="border-top:1px solid var(--sup2)"></div>${lin(c.b)}
+          ${c.m&&c.m.placar?`<div style="font-size:10px;color:var(--ink2);padding:0 9px 5px">${c.m.placar}</div>`:''}${acaoC}</div>`;
       };
-      return (k.campeao?`<div style="text-align:center;padding:11px;border:1px solid #3a3020;border-radius:12px;background:#241C18;margin-top:10px">🏆 <b>Campeão: ${_nomeDe(k.campeao)}</b></div>`:'')
+      return (k.campeao?`<div style="text-align:center;padding:11px;border:1px solid var(--gold-bg);border-radius:12px;background:var(--sup2);margin-top:10px">🏆 <b>Campeão: ${_nomeDe(k.campeao)}</b></div>`:'')
         + `<div style="display:flex;gap:10px;overflow-x:auto;padding:10px 0 4px">`
-        + k.confs.slice(1).map((cs,idx)=>`<div style="flex:0 0 auto"><div style="font:700 11px system-ui;color:#9c8b7c;text-transform:uppercase;letter-spacing:.06em">${rotulo(idx+1)}</div>${cs.map((c,i)=>confHTML(c,idx+1,i)).join('')}</div>`).join('')
+        + k.confs.slice(1).map((cs,idx)=>`<div style="flex:0 0 auto"><div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em">${rotulo(idx+1)}</div>${cs.map((c,i)=>confHTML(c,idx+1,i)).join('')}</div>`).join('')
         + `</div>`;
     };
     if(t.tipo==='multi'){
@@ -1526,7 +1604,7 @@ async function netVerTorneio(id){
       chaveH = cats.filter(c=>c.montada).map(c=>{
         const k=montar(ps.filter(p=>p.categoria===c.id), _tamCat(c), c.id);
         if(k.campeao && camp[c.id]!==k.campeao){ camp[c.id]=k.campeao; mudou=true; }
-        return `<div style="font:700 12px system-ui;color:#E0C48A;margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome}</div>`+pintar(k,c.id);
+        return `<div style="font:700 12px system-ui;color:var(--gold);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome}</div>`+pintar(k,c.id);
       }).join('');
       // final confirmada → o dono grava o campeão da categoria; o torneio só
       // conclui quando TODAS as categorias montaram e todas têm campeão
@@ -1548,23 +1626,23 @@ async function netVerTorneio(id){
   const acao = !inscricoesAbertas
     ? ''
     : souParticipante
-      ? `<button onclick="_net.sairTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid #3a2420;background:#2a1a16;color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair do torneio</button>`
-      : `<button onclick="_net.entrarTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2E7D46;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">Entrar</button>`;
+      ? `<button onclick="_net.sairTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair do torneio</button>`
+      : `<button onclick="_net.entrarTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">Entrar</button>`;
   // no multi o botão de montar vive dentro de cada categoria (na lista), porque
   // cada uma enche e monta no seu próprio ritmo
   const donoMonta = (t.tipo!=='multi' && t.dono_id===MEU_UID && cheio && t.status==='inscricoes')
-    ? `<button onclick="_net.montarChave('${id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:#7A5C2E;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:10px">⚔️ Montar a chave</button>`
+    ? `<button onclick="_net.montarChave('${id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--gold-bg);color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:10px">⚔️ Montar a chave</button>`
     : '';
   _sheet('net-tver', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">${t.nome}</div>
-      <button onclick="_net.fecharTver()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:#9c8b7c;margin:4px 0 12px">${t.tipo==='multi'?(t.categorias||[]).length+' categorias':(t.esporte==='beach'?'Beach':'Tênis')} · mata-mata · ${ps.length}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos · ${t.aberto?'aberto':'fechado'}${t.tipo==='restrito'&&t.classes?' · divisões '+t.classes.join('/'):''}${t.tipo==='aberto'?' · todas as divisões':''}</div>
+      <button onclick="_net.fecharTver()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${t.tipo==='multi'?(t.categorias||[]).length+' categorias':(t.esporte==='beach'?'Beach':'Tênis')} · mata-mata · ${ps.length}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos · ${t.aberto?'aberto':'fechado'}${t.tipo==='restrito'&&t.classes?' · divisões '+t.classes.join('/'):''}${t.tipo==='aberto'?' · todas as divisões':''}</div>
     ${chaveH}
-    ${lista||'<p style="color:#9c8b7c;font-size:13px">Ninguém inscrito ainda.</p>'}
+    ${lista||'<p style="color:var(--ink2);font-size:13px">Ninguém inscrito ainda.</p>'}
     ${acao}${donoMonta}
-    ${inscricoesAbertas?`<button onclick="_net.copiarLinkTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed #57493c;background:#1a1512;color:#EDE4DA;font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
-    <div style="font-size:11px;color:#7f7060;text-align:center;margin-top:6px">Quem abrir o link entra direto, sem aprovação.</div>`:''}
-    ${(t.dono_id===MEU_UID && t.status==='inscricoes')?`<button onclick="_net.editarTorneio('${id}')" style="width:100%;padding:11px;border-radius:11px;border:1px solid #443830;background:#241C18;color:#EDE4DA;font:600 13px system-ui;cursor:pointer;margin-top:8px">⚙️ Editar regras</button>`:''}`);
+    ${inscricoesAbertas?`<button onclick="_net.copiarLinkTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
+    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">Quem abrir o link entra direto, sem aprovação.</div>`:''}
+    ${(t.dono_id===MEU_UID && t.status==='inscricoes')?`<button onclick="_net.editarTorneio('${id}')" style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:8px">⚙️ Editar regras</button>`:''}`);
 }
 function netFecharTver(){ const el=document.getElementById('net-tver'); if(el) el.remove(); }
 
@@ -1581,12 +1659,12 @@ async function netEnviarLogin(email, senha){
 function netAbrirLogin(){
   _sheet('net-login', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Acessar minha conta</div>
-      <button onclick="document.getElementById('net-login').remove()" style="background:none;border:none;color:#9c8b7c;font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:#9c8b7c;margin:8px 0 12px">Entre com o email e a senha da sua conta.</div>
-    <input id="nl-email" type="email" placeholder="seu email" style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui" autocomplete="email" inputmode="email"/>
-    <input id="nl-senha" type="password" placeholder="sua senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui;margin-top:10px" autocomplete="current-password"/>
-    <button onclick="_net.enviarLogin(document.getElementById('nl-email').value, document.getElementById('nl-senha').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D46;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:12px">Entrar</button>
-    <button onclick="_net.esqueciSenha(document.getElementById('nl-email').value)" style="width:100%;padding:11px;border:none;background:none;color:#9c8b7c;font:600 13px system-ui;cursor:pointer;margin-top:4px;text-decoration:underline">Esqueci minha senha</button>`);
+      <button onclick="document.getElementById('net-login').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:8px 0 12px">Entre com o email e a senha da sua conta.</div>
+    <input id="nl-email" type="email" placeholder="seu email" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="email" inputmode="email"/>
+    <input id="nl-senha" type="password" placeholder="sua senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:10px" autocomplete="current-password"/>
+    <button onclick="_net.enviarLogin(document.getElementById('nl-email').value, document.getElementById('nl-senha').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:12px">Entrar</button>
+    <button onclick="_net.esqueciSenha(document.getElementById('nl-email').value)" style="width:100%;padding:11px;border:none;background:none;color:var(--ink2);font:600 13px system-ui;cursor:pointer;margin-top:4px;text-decoration:underline">Esqueci minha senha</button>`);
   const el=document.getElementById('nl-email'); if(el) el.focus();
 }
 window.netAbrirLogin = netAbrirLogin;
@@ -1623,10 +1701,10 @@ async function netEsqueciSenha(email){
 
 function netAbrirNovaSenha(){
   _sheet('net-nova-senha', `<div style="font:700 17px system-ui">Definir uma nova senha</div>
-    <div style="font-size:12px;color:#9c8b7c;margin:8px 0 12px">Escolha a senha nova. Depois disso você já entra direto.</div>
-    <input id="ns-1" type="password" placeholder="nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui" autocomplete="new-password"/>
-    <input id="ns-2" type="password" placeholder="repita a nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid #443830;background:#15100D;color:#fff;font:600 15px system-ui;margin-top:10px" autocomplete="new-password"/>
-    <button onclick="_net.salvarNovaSenha(document.getElementById('ns-1').value, document.getElementById('ns-2').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D46;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:12px">Salvar senha</button>`);
+    <div style="font-size:12px;color:var(--ink2);margin:8px 0 12px">Escolha a senha nova. Depois disso você já entra direto.</div>
+    <input id="ns-1" type="password" placeholder="nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="new-password"/>
+    <input id="ns-2" type="password" placeholder="repita a nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:10px" autocomplete="new-password"/>
+    <button onclick="_net.salvarNovaSenha(document.getElementById('ns-1').value, document.getElementById('ns-2').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:12px">Salvar senha</button>`);
   const el=document.getElementById('ns-1'); if(el) el.focus();
 }
 
