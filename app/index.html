@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=30"></script>
+<script src="net.js?v=31"></script>
 
 <script>
 /* =========================================================================
@@ -1772,6 +1772,14 @@ comunidade(){
           <div class="seta">›</div>
         </div>
       </div>
+      ${window.__ehAdm ? `
+      <div class="card clic" onclick="netAbrirAdm()">
+        <div class="linha-item">
+          <div class="av">🛠</div>
+          <div class="txt"><b>ADM do aplicativo</b><small>Dar troféu, consertar apuração e cadastrar clube</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>` : ''}
       <div class="card clic" onclick="ir('quadro')">
         <div class="linha-item">
           <div class="av">◈</div>

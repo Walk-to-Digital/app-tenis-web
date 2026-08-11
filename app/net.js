@@ -139,6 +139,8 @@ async function netBoot(eu){
     try{ await netEntrarPorLink(); }catch(e){ console.error('[net] entrar por link', e); }
     // virada da temporada: apura troféus e abre a próxima, se a atual venceu
     try{ await netFecharTemporada(); }catch(e){}
+    // sou ADM do app? acende a porta de entrada da aba ADM (migração 18)
+    try{ await netCheckAdm(); }catch(e){}
     console.log('[net] conectado como', uid, '— jogador + partidas carregados');
     return uid;
   }catch(e){
@@ -911,8 +913,13 @@ async function netFecharTemporada(){
 
       const {reinado, coroa} = _apurarTrofeus(temp, reinados, partidas, membros, g.esporte, g.cinturao_dono_id);
       const linhas = [];
-      if(reinado) linhas.push({temporada:temp.n, grupo_id, tipo:'reinado', ...reinado});
-      if(coroa)   linhas.push({temporada:temp.n, grupo_id, tipo:'coroa',   ...coroa});
+      /* `origem:'auto'` explícito. É o default da coluna (migração 20), mas a
+         policy de insert EXIGE o valor, e depender do default aqui é apostar
+         na ordem em que o Postgres aplica default e WITH CHECK. Escrever custa
+         uma palavra; descobrir que a apuração parou de cunhar custa a
+         temporada inteira. */
+      if(reinado) linhas.push({temporada:temp.n, grupo_id, tipo:'reinado', origem:'auto', ...reinado});
+      if(coroa)   linhas.push({temporada:temp.n, grupo_id, tipo:'coroa',   origem:'auto', ...coroa});
       // conflito = outro aparelho já cunhou. É o resultado esperado, não erro.
       if(linhas.length) await sb.from('trofeus_temporada').insert(linhas);
     }
@@ -1846,6 +1853,245 @@ async function netEntrarPorLink(){
 }
 window.netEntrarPorLink = netEntrarPorLink;
 
+/* =========================================================================
+   ADM DO APLICATIVO (11/08) — migrações 18 e 20.
+
+   Não confundir com dono/gestor de comunidade nem com organizador de torneio:
+   aqueles mandam no PRÓPRIO objeto (aceitar membro, montar chave, ligar o
+   cinturão da panela deles). O ADM daqui é do app inteiro, e só existe pra
+   duas coisas:
+
+     DAR o que nenhuma regra produz — campeão de interclubes que rolou fora do
+     app, quem trouxe gente, comemorativo. Esse é o uso principal.
+
+     CONSERTAR o troféu automático quando ele sai errado. Raro, mas o troféu é
+     permanente (`unique` por temporada/comunidade/tipo, sem update nem delete
+     pra mais ninguém), então sem isto o erro não tem volta.
+
+   Quem entra na lista `admins` não entra pelo app: a tabela não tem policy de
+   escrita nenhuma, só se entra pelo SQL Editor. Por isso aqui não existe (e
+   não pode existir) tela de "promover a ADM" — se existisse, a fechadura era
+   de mentira.
+   ========================================================================= */
+let _adm = null;
+let _admEh = null;                                   // null = ainda não perguntei
+
+/* Chamado no boot. Guarda a resposta porque ela não muda no meio da sessão, e
+   acende a porta de entrada — o card do ADM só existe no HTML se este flag
+   estiver ligado (ver `__ehAdm` no index.html). Falhou a consulta? Fica não-ADM:
+   o lado seguro do erro é não mostrar. */
+async function netCheckAdm(){
+  if(_admEh !== null) return _admEh;
+  try{
+    const r = await sb.from('admins').select('player_id').eq('player_id', MEU_UID).maybeSingle();
+    _admEh = !!(r && r.data);
+  }catch(e){ _admEh = false; }
+  window.__ehAdm = _admEh;
+  if(_admEh && typeof render === 'function'){ try{ render(); }catch(e){} }
+  return _admEh;
+}
+
+const _admEsc = (s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+async function netAbrirAdm(){
+  if(!(await netCheckAdm())){ if(window.toast) toast('Essa área é só do ADM.'); return; }
+  _adm = _adm || { aba:'trofeus', q:'', achados:[], sel:null, trofeus:[], grupos:[],
+                   novo:{ nome:'', etiqueta:'', grupo_id:'' },
+                   cidades:[], locais:[], loc:{ nome:'', cidade_id:'', tipo:'clube', quadras:1 } };
+  if(!_adm.cidades.length) await _admCarregarCidades();
+  netRenderAdm();
+}
+function netFecharAdm(){ const el=document.getElementById('net-adm'); if(el) el.remove(); }
+
+async function _admCarregarCidades(){
+  const r = await sb.from('cidades').select('id,nome,uf').order('nome');
+  _adm.cidades = r.data || [];
+  if(!_adm.loc.cidade_id && _adm.cidades.length) _adm.loc.cidade_id = _adm.cidades[0].id;
+  await _admCarregarLocais();
+}
+async function _admCarregarLocais(){
+  if(!_adm.loc.cidade_id){ _adm.locais=[]; return; }
+  const r = await sb.from('locais').select('id,nome,tipo,quadras,ativo')
+    .eq('cidade_id', _adm.loc.cidade_id).order('nome');
+  _adm.locais = r.data || [];
+}
+
+function _admAba(a){ _adm.aba=a; netRenderAdm(); }
+function _admSet(campo, v){ _adm.novo[campo]=v; }
+function _admLocSet(campo, v){
+  _adm.loc[campo] = (campo==='quadras') ? Math.max(1, Math.min(60, parseInt(v||1,10)||1)) : v;
+  if(campo==='cidade_id'){ _admCarregarLocais().then(netRenderAdm); return; }
+  if(campo!=='nome') netRenderAdm();
+}
+
+async function _admBuscar(v){
+  _adm.q = v;
+  if(!v || v.trim().length < 2){ _adm.achados=[]; netRenderAdm(); return; }
+  const r = await sb.from('players').select('id,nome,ap,cor,nivel').ilike('nome', '%'+v.trim()+'%').limit(12);
+  _adm.achados = r.data || [];
+  netRenderAdm();
+}
+
+/* Ao escolher o jogador, carrego os troféus DELE e as comunidades DELE. As
+   comunidades são as dele, não todas: troféu com comunidade só faz sentido
+   onde a pessoa está, e uma lista com todas as comunidades do app seria um
+   campo grande onde escolher errado é fácil e permanente. */
+async function _admSel(id, nome){
+  _adm.sel = { id, nome };
+  _adm.novo = { nome:'', etiqueta:'', grupo_id:'' };
+  const [t, g] = await Promise.all([
+    sb.from('trofeus_temporada').select('id,tipo,nome,etiqueta,origem,temporada,grupo_id,criado_em')
+      .eq('player_id', id).order('criado_em', {ascending:false}),
+    sb.from('grupo_membros').select('grupo_id, grupos(id,nome)').eq('player_id', id),
+  ]);
+  _adm.trofeus = t.data || [];
+  _adm.grupos  = (g.data||[]).map(x=>x.grupos).filter(Boolean);
+  netRenderAdm();
+}
+
+async function _admDar(){
+  const nome = (_adm.novo.nome||'').trim();
+  if(!_adm.sel){ alert('Escolhe o jogador primeiro.'); return; }
+  if(!nome){ alert('O troféu precisa de um nome.'); return; }
+  /* `origem:'adm'` e `criado_por` não são enfeite: a policy da migração 20
+     EXIGE os dois no caminho do ADM. É o que impede um ADM de forjar troféu
+     com cara de apuração automática. `tipo` guarda uma chave estável pra tela
+     agrupar; o que a pessoa lê é o `nome`. */
+  const linha = {
+    player_id: _adm.sel.id, nome, tipo:'especial', origem:'adm', criado_por: MEU_UID,
+    etiqueta: (_adm.novo.etiqueta||'').trim() || null,
+    grupo_id: _adm.novo.grupo_id || null, temporada: null,
+  };
+  const { error } = await sb.from('trofeus_temporada').insert(linha);
+  if(error){ alert('Não deu pra dar o troféu: '+error.message); return; }
+  if(window.toast) toast(`🏅 Troféu entregue pra ${_adm.sel.nome}.`);
+  await _admSel(_adm.sel.id, _adm.sel.nome);
+}
+
+async function _admApagar(id, rotulo){
+  if(!confirm(`Apagar “${rotulo}”? Troféu não volta.`)) return;
+  const { error } = await sb.from('trofeus_temporada').delete().eq('id', id);
+  if(error){ alert('Não deu pra apagar: '+error.message); return; }
+  if(window.toast) toast('Troféu apagado.');
+  await _admSel(_adm.sel.id, _adm.sel.nome);
+}
+
+async function _admSalvarLocal(){
+  const nome = (_adm.loc.nome||'').trim();
+  if(!nome){ alert('O clube precisa de um nome.'); return; }
+  if(!_adm.loc.cidade_id){ alert('Escolhe a cidade.'); return; }
+  const { error } = await sb.from('locais').insert({
+    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras
+  });
+  if(error){
+    alert(error.message.includes('duplicate') || error.code === '23505'
+      ? 'Já existe um local com esse nome nessa cidade.'
+      : 'Não deu pra cadastrar: '+error.message);
+    return;
+  }
+  if(window.toast) toast(`📍 ${nome} cadastrado.`);
+  _adm.loc.nome=''; await _admCarregarLocais(); netRenderAdm();
+}
+
+function netRenderAdm(){
+  const abaBtn=(id,txt)=>`<button onclick="_net.admAba('${id}')" style="flex:1;padding:10px;border-radius:10px;
+    border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;
+    background:${_adm.aba===id?'var(--up-bg)':'var(--sup2)'};color:${_adm.aba===id?'var(--up)':'#fff'}">${txt}</button>`;
+
+  let corpo='';
+
+  if(_adm.aba==='trofeus'){
+    const achados = _adm.achados.map(p=>`
+      <div onclick="_net.admSel('${p.id}','${_admEsc((p.nome||'').replace(/'/g,'’'))}')"
+        style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--linha);border-radius:11px;margin-top:7px;cursor:pointer">
+        <div style="width:32px;height:32px;border-radius:50%;background:${p.cor||'#5C2E3C'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex:0 0 32px">${_admEsc(p.ap||'?')}</div>
+        <div style="flex:1;min-width:0"><b>${_admEsc(p.nome)}</b>
+          <div style="font-size:11px;color:var(--ink2)">Nível ${p.nivel}</div></div>
+        <div style="color:var(--ink3)">›</div></div>`).join('');
+
+    let painel='';
+    if(_adm.sel){
+      const lista = _adm.trofeus.map(t=>{
+        const rotulo = t.nome || (t.tipo==='reinado'?'Reinado':t.tipo==='coroa'?'Coroa':t.tipo);
+        const auto = t.origem!=='adm';
+        return `<div style="display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--linha);border-radius:11px;margin-top:7px">
+          <div style="flex:1;min-width:0">
+            <b>${_admEsc(rotulo)}</b>
+            <span style="font-size:10px;padding:2px 6px;border-radius:5px;margin-left:6px;
+              background:${auto?'var(--sup2)':'var(--gold-bg)'};color:${auto?'var(--ink3)':'var(--gold)'}">${auto?'automático':'dado por você'}</span>
+            <div style="font-size:11px;color:var(--ink2)">${_admEsc(t.etiqueta||'—')}${t.temporada?` · temporada ${t.temporada}`:''}</div>
+          </div>
+          <button onclick="_net.admApagar('${t.id}','${_admEsc(rotulo.replace(/'/g,'’'))}')"
+            style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--dn-bg);color:#fff;font:600 12px system-ui;cursor:pointer">Apagar</button>
+        </div>`;
+      }).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum troféu ainda.</p>`;
+
+      const ops = ['<option value="">Sem comunidade</option>']
+        .concat(_adm.grupos.map(g=>`<option value="${g.id}"${_adm.novo.grupo_id===g.id?' selected':''}>${_admEsc(g.nome)}</option>`)).join('');
+
+      painel = `
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)">
+          <div style="font:700 15px system-ui">${_admEsc(_adm.sel.nome)}</div>
+          ${lista}
+          <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Dar um troféu novo</div>
+          <input id="adm-tn" value="${_admEsc(_adm.novo.nome)}" oninput="_net.admSet('nome',this.value)"
+            placeholder="Nome do troféu (ex.: Campeão Interclubes 2026)"
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
+          <input value="${_admEsc(_adm.novo.etiqueta)}" oninput="_net.admSet('etiqueta',this.value)"
+            placeholder="Linha de baixo (opcional) — ex.: Clube Bahiano · 32 jogadores"
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:7px" autocomplete="off"/>
+          <select onchange="_net.admSet('grupo_id',this.value)"
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:7px">${ops}</select>
+          <button onclick="_net.admDar()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px system-ui;cursor:pointer;margin-top:11px">🏅 Entregar troféu</button>
+        </div>`;
+    }
+
+    corpo = `
+      <input id="adm-q" value="${_admEsc(_adm.q)}" oninput="_net.admBuscar(this.value)" placeholder="Buscar jogador por nome"
+        style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
+      ${achados}${painel}`;
+
+  } else {
+    const cid = _adm.cidades.map(c=>`<option value="${c.id}"${_adm.loc.cidade_id===c.id?' selected':''}>${_admEsc(c.nome)}/${_admEsc(c.uf)}</option>`).join('')
+      || '<option value="">Nenhuma cidade — rode a migração 19</option>';
+    const seg = [['clube','Clube'],['condominio','Condomínio'],['publico','Público'],['academia','Academia']]
+      .map(([v,n])=>`<button onclick="_net.admLocSet('tipo','${v}')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_adm.loc.tipo===v?'var(--up-bg)':'var(--sup2)'};color:${_adm.loc.tipo===v?'var(--up)':'#fff'}">${n}</button>`).join('');
+    const jaTem = _adm.locais.map(l=>`
+      <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
+        <div style="flex:1;min-width:0"><b>${_admEsc(l.nome)}</b>
+          <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}</div></div>
+      </div>`).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum local nessa cidade ainda.</p>`;
+
+    corpo = `
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Cidade</div>
+      <select onchange="_net.admLocSet('cidade_id',this.value)"
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">${cid}</select>
+      ${jaTem}
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Cadastrar um local novo</div>
+      <input id="adm-ln" value="${_admEsc(_adm.loc.nome)}" oninput="_net.admLocSet('nome',this.value)" placeholder="Nome do clube"
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
+      <div style="display:flex;gap:6px;margin-top:8px">${seg}</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <div style="font-size:12px;color:var(--ink2);flex:1">Quantas quadras</div>
+        <input type="number" min="1" max="60" value="${_adm.loc.quadras}" oninput="_net.admLocSet('quadras',this.value)"
+          style="width:84px;padding:10px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;text-align:center"/>
+      </div>
+      <button onclick="_net.admSalvarLocal()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px system-ui;cursor:pointer;margin-top:12px">📍 Cadastrar local</button>`;
+  }
+
+  _sheet('net-adm', `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font:700 17px system-ui">ADM do aplicativo</div>
+      <button onclick="_net.fecharAdm()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="display:flex;gap:7px">${abaBtn('trofeus','🏅 Troféus')}${abaBtn('locais','📍 Locais')}</div>
+    ${corpo}`);
+
+  // devolve o cursor pro campo em que se estava digitando (o painel re-renderiza inteiro)
+  const foco = _adm.aba==='trofeus' ? (_adm.sel && _adm.novo.nome!=='' ? 'adm-tn' : 'adm-q') : (_adm.loc.nome!=='' ? 'adm-ln' : null);
+  if(foco){ const el=document.getElementById(foco); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+}
+window.netAbrirAdm = netAbrirAdm;
+
 // exposto pro app e pros onclick
 window.netAbrirTorneios = netAbrirTorneios;
 window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>MEU_UID,
@@ -1864,5 +2110,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   torneioPlacarOrg:netTorneioPlacarOrg, orgEnviar:_onEnviarOrg, meusCampeonatos:netMeusCampeonatos,
   buscarGrupos:netBuscarGrupos, convidarAmigo:netConvidarAmigo,
   abrirLogin:netAbrirLogin, enviarLogin:netEnviarLogin,
-  esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha };
+  esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha,
+  abrirAdm:netAbrirAdm, fecharAdm:netFecharAdm, admAba:_admAba, admBuscar:_admBuscar,
+  admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
+  admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal };
 window.netAbrirInbox = netAbrirInbox;
