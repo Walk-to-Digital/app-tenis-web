@@ -124,6 +124,11 @@ async function netBoot(eu){
     const { data: meuRow } = await sb.from('players').select('*').eq('id',uid).maybeSingle();
     const contaReal = meuRow && meuRow.nome && meuRow.nome!=='Você';
     if(contaReal && window.hidratarJogador){ window.hidratarJogador(meuRow); }
+    // 11/08: conta anterior à migração 15 não tem declaração de idade nenhuma —
+    // e inventar uma retroativa seria registrar o que ninguém perguntou. A
+    // pergunta é feita AGORA, uma vez, no login: é o registro que faltaria se
+    // alguém cobrasse.
+    if(contaReal && !meuRow.nascimento){ try{ netPedirIdade(); }catch(e){} }
     else if(S.cadastroFeito && S.jogadores[EU].nome!=='Você'){ await netSyncJogador(S.jogadores[EU]); }
     // se não há conta real em lugar nenhum e o cadastro não foi feito, abre o cadastro
     if(!contaReal && !S.cadastroFeito && window.abrirCadastro){ abrirCadastro(); }
@@ -2074,6 +2079,47 @@ async function netMeusTrofeus(){
 }
 
 /* =========================================================================
+   DECLARAÇÃO DE IDADE NO LOGIN (11/08) — pras contas anteriores à migração 15.
+   A mesma trava do cadastro (18 anos), no mesmo vocabulário: a data é o dado,
+   a declaração é o fato histórico — guarda os dois. Menor de 18 declarado
+   sai da conta na hora: a regra da abertura ("só para maiores de 18") vale
+   pra conta velha igual vale pra nova.
+   ========================================================================= */
+function netPedirIdade(){
+  const el = _sheet('net-idade', `
+    <div style="font:700 17px system-ui;margin-bottom:2px">Uma pergunta que faltou</div>
+    <div style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Sua conta foi criada antes de o app pedir a data de nascimento. O Ranket marca jogo presencial entre pessoas que não se conhecem, então a conta é só para maiores de 18 — falta registrar o seu.</div>
+    <input id="net-idade-in" type="date" max="${new Date().toISOString().slice(0,10)}"
+      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;color-scheme:dark"/>
+    <div style="font-size:11px;color:var(--ink3);margin-top:6px">Ela não aparece pra ninguém — nem no seu perfil.</div>
+    <button onclick="_net.idadeConfirmar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:14px">Confirmar</button>`);
+  // sem fechar clicando fora: a pergunta não é opcional — fechar sem responder
+  // deixaria a conta exatamente no estado que esta folha existe pra acabar
+  el.onclick = null;
+}
+async function _idadeConfirmar(){
+  const v = (document.getElementById('net-idade-in')||{}).value;
+  const idade = window.idadeEm ? idadeEm(v, new Date()) : null;
+  if(idade === null){ alert('Preencha sua data de nascimento.'); return; }
+  if(idade > 120){ alert('Confira a data de nascimento.'); return; }
+  if(idade < 18){
+    alert('O Ranket é só para maiores de 18 anos.\n\nO app marca jogo presencial entre pessoas que não se conhecem, e por isso a conta é restrita. A gente se vê quando você fizer 18.');
+    const el=document.getElementById('net-idade'); if(el) el.remove();
+    if(window.sairDaConta) sairDaConta();
+    return;
+  }
+  const agora = new Date().toISOString();
+  const { error } = await sb.from('players').update({
+    nascimento: v, maior_de_18: true, idade_declarada_em: agora,
+  }).eq('id', MEU_UID);
+  if(error){ alert('Não deu pra salvar: '+error.message); return; }
+  const eu = (typeof S!=='undefined') && S.jogadores[EU];
+  if(eu){ eu.nascimento=v; eu.maiorDe18=true; eu.idadeDeclaradaEm=agora; if(window.salvar) salvar(); }
+  const el=document.getElementById('net-idade'); if(el) el.remove();
+  if(window.toast) toast('Registrado. Obrigado!');
+}
+
+/* =========================================================================
    PATCHES (11/08) — migração 22. O desenho é o do protótipo panela-cinturão:
    até 24 caracteres, filtro de 3 camadas, preso à comunidade, envio livre
    entre membros, autoria sempre visível. Patch é identidade, não mérito —
@@ -2495,6 +2541,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   onLocal:_onLocal, onQuadra:_onQuadra, gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus,
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
-  admDarPatch:_admDarPatch, meusPatches:netMeusPatches };
+  admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
+  pedirIdade:netPedirIdade, idadeConfirmar:_idadeConfirmar };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;

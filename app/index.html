@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=34"></script>
+<script src="net.js?v=35"></script>
 
 <script>
 /* =========================================================================
@@ -2817,6 +2817,9 @@ function hidratarJogador(row){
   if(row.bon) eu.bon=row.bon; if(row.roupa) eu.roupa=row.roupa; if(row.cor) eu.cor=row.cor;
   if(row.cena) eu.cena=row.cena; if(row.escudo) eu.escudo=row.escudo;
   if(row.patroc) eu.patroc=row.patroc; if(row.vestiario) eu.vestiario=row.vestiario;
+  // 11/08: a declaração de idade viaja junto — sem ela o sync de outro aparelho
+  // mandaria a linha sem nascimento e a pergunta voltaria pra quem já respondeu
+  if(row.nascimento){ eu.nascimento=row.nascimento; eu.maiorDe18=!!row.maior_de_18; eu.idadeDeclaradaEm=row.idade_declarada_em||null; }
   S.cadastroFeito=true;
   if(typeof onb!=='undefined' && onb) fecharCadastro();
   salvar(); render();
