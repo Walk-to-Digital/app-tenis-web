@@ -2124,6 +2124,7 @@ async function netAbrirPatches(gid){
   const ids=(ps.data||[]).map(p=>p.id);
   const envios = ids.length ? (await sb.from('patch_envios').select('patch_id,para').in('patch_id',ids)).data||[] : [];
   _pat = { gid, nome:g.data.nome, membros:(ms.data||[]).map(m=>m.player_id),
+           amigos:_meusAmigos(),   // 11/08 (decisão do Nuno): patch vai pra amigo também, tipo o troféu
            patches:ps.data||[], envios, texto:'', mandando:null };
   netRenderPatches();
 }
@@ -2161,7 +2162,9 @@ function netRenderPatches(){
   const linhas=_pat.patches.map(p=>{
     const aberto=_pat.mandando===p.id;
     const jaTem=new Set(_pat.envios.filter(e=>e.patch_id===p.id).map(e=>e.para));
-    const alvos=_pat.membros.filter(u=>u!==MEU_UID && !jaTem.has(u));
+    // destino: membros da comunidade E amigos mútuos (migração 23) — etiquetados
+    const ehMembro=new Set(_pat.membros);
+    const alvos=[...new Set([..._pat.membros, ..._pat.amigos])].filter(u=>u!==MEU_UID && !jaTem.has(u));
     return `<div style="border:1px solid var(--linha);border-radius:13px;padding:12px;margin-top:8px">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="font-size:20px">◈</div>
@@ -2170,15 +2173,15 @@ function netRenderPatches(){
         <button onclick="_net.patMandando('${p.id}')" style="padding:8px 12px;border-radius:10px;border:none;background:${aberto?'var(--sup2)':'#2C5A00'};color:#fff;font:600 12px system-ui;cursor:pointer">${aberto?'fechar':'mandar'}</button>
       </div>
       ${aberto?`<div style="margin-top:10px;border-top:1px solid var(--sup2);padding-top:8px">
-        ${alvos.length?alvos.map(u=>`<button onclick="_net.patMandar('${p.id}','${u}')" style="display:block;width:100%;text-align:left;padding:9px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer;margin-top:5px">${_nomeDe(u)}</button>`).join('')
-          :'<p style="color:var(--ink2);font-size:12px;margin:4px 0 0">Todo mundo da comunidade já tem esse patch.</p>'}
+        ${alvos.length?alvos.map(u=>`<button onclick="_net.patMandar('${p.id}','${u}')" style="display:block;width:100%;text-align:left;padding:9px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer;margin-top:5px">${_nomeDe(u)} <span style="font-weight:400;color:var(--ink3);font-size:10px">${ehMembro.has(u)?'da comunidade':'✔ amigo'}</span></button>`).join('')
+          :'<p style="color:var(--ink2);font-size:12px;margin:4px 0 0">Comunidade e amigos — todo mundo já tem esse patch.</p>'}
       </div>`:''}
     </div>`;
   }).join('') || '<p style="color:var(--ink2);font-size:13px;margin-top:10px">Nenhum patch ainda — cria o primeiro aí embaixo.</p>';
   _sheet('net-patches', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">◈ Patches · ${_pat.nome}</div>
       <button onclick="_net.fecharPatches()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:var(--ink2);margin:4px 0 6px">Patch é identidade, não mérito: fica preso à comunidade, vai pra quem você quiser mandar e não exige partida. Autoria sempre visível.</div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 6px">Patch é identidade, não mérito: nasce na comunidade e vai pra qualquer membro ou amigo seu — sem exigir partida. Autoria sempre visível.</div>
     ${linhas}
     <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Criar um patch novo</div>
     <input id="pat-in" value="${(_pat.texto||'').replace(/"/g,'&quot;')}" oninput="_net.patDigitou(this.value)" maxlength="24" placeholder="Texto — até 24 caracteres"
