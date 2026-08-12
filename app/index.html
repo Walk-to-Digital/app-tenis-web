@@ -276,6 +276,20 @@ button,input,select{font:inherit;color:inherit}
 #toast.on{opacity:1;transform:none}
 #toast b{color:var(--up)}
 
+/* 12/08: barra de versão nova.
+   Fica no TOPO de propósito: o toast mora embaixo (bottom:88px) e a nav também,
+   e esta barra precisa aparecer por cima de qualquer tela — inclusive com
+   onboarding (z-40) ou gaveta (z-60) abertos, que é justamente quando alguém
+   pode estar preso na versão velha sem saber. */
+#vnova{
+  position:absolute;left:0;right:0;top:0;z-index:70;
+  background:var(--marca);color:#0A1100;cursor:pointer;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;
+  font-size:12.5px;line-height:1.35;text-align:center;
+  box-shadow:0 6px 20px rgba(0,0,0,.45);
+}
+#vnova b{font-weight:700}
+
 /* gaveta de teste */
 #gaveta{
   position:absolute;inset:0;background:rgba(11,8,6,.78);z-index:30;display:none;
@@ -750,7 +764,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=40"></script>
+<script src="net.js?v=41"></script>
 
 <script>
 /* =========================================================================
@@ -2998,6 +3012,53 @@ fetch('atleta-numeros.json')
     pintarBonecos();
   })
   .catch(()=>{});
+
+/* =========================================================================
+   12/08 — VERSÃO NOVA NO AR
+
+   O GitHub Pages serve o index.html com max-age=600: por até 10 minutos o
+   aparelho continua rodando a versão velha depois de uma publicação, e em app
+   instalado na tela de início isso dura muito mais — ele fica aberto por dias
+   sem nunca recarregar. O `?v=` do <script> protege só o net.js; o motor mora
+   num <script> embutido AQUI, e nada guardava o index.
+
+   Num host estático não dá pra mandar cabeçalho, então a saída é o app
+   PERGUNTAR: busca um versao.json com o cache desligado e compara com a
+   própria versão. Achando número maior, oferece a troca em vez de recarregar
+   sozinho — trocar a página embaixo de alguém que está digitando um placar
+   seria pior que o problema.
+   ========================================================================= */
+const VERSAO = +(((document.querySelector('script[src^="net.js"]')||{}).src||'')
+                 .match(/[?&]v=(\d+)/)||[])[1] || 0;
+
+function ofereceVersaoNova(nova){
+  if(document.getElementById('vnova')) return;
+  const b = document.createElement('div');
+  b.id = 'vnova';
+  b.innerHTML = '<b>Tem versão nova do Ranket.</b> Toque pra atualizar.';
+  /* troca a URL em vez de dar reload: `?v=N` é OUTRA chave de cache, então o
+     navegador é obrigado a buscar o index novo. Um reload pode devolver o
+     mesmo arquivo do cache — e aí o app fica preso na versão velha achando
+     que atualizou, que é o tipo de mentira que só se descobre muito depois. */
+  b.onclick = ()=> location.replace(location.pathname + '?v=' + nova);
+  ($('#fone')||document.body).appendChild(b);
+}
+
+function conferirVersao(){
+  fetch('versao.json', {cache:'no-store'})
+    .then(r=> r.ok ? r.json() : null)
+    .then(j=>{ if(j && +j.v > VERSAO) ofereceVersaoNova(+j.v) })
+    .catch(()=>{});                      // sem rede o app roda igual, só não sabe da versão
+}
+conferirVersao();
+
+/* app instalado passa dias aberto: a volta pro primeiro plano é a única hora
+   em que dá pra perguntar de novo sem custo nenhum. */
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) conferirVersao() });
+
+/* o `?v=` cumpriu o papel de furar o cache uma vez; limpar evita que ele fique
+   grudado no atalho salvo na tela de início. */
+if(/[?&]v=/.test(location.search)) history.replaceState(null,'',location.pathname);
 </script>
 </body>
 </html>
