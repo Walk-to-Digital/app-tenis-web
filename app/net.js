@@ -378,6 +378,56 @@ async function _onConfirmarDesafio(){
   }catch(e){ alert('Não deu pra desafiar: '+(e.message||e)); }
 }
 
+/* ---- lançar na mão (11/08, migração 24) --------------------------------
+   Partida jogada FORA do app. Nasce direto em 'pendente' com o placar e
+   placar_por=eu — o adversário confirma/contesta no fluxo que já existe, com
+   o relógio das 72h e tudo. `origem='mao'` é o que a regra "não conta em
+   circuito aberto" vai ler quando o aberto existir.
+   Pool de adversário: amigo (qualquer classe) OU ±1 classe — o teste da fila
+   no topo vale pra toda superfície nova, e esta não fura a janela. */
+function netAbrirMao(){
+  if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  const meu = window.__meusLocais || {};
+  _on = { step:'mao', advId:'', sets:null, placarTxt:'',
+          fmt:'md3', localId: meu.principal || null, quadra:null, quando:null };
+  netRenderOnline();
+}
+window.netAbrirMao = netAbrirMao;
+function _maoAdv(v){ _on.advId=v||''; netRenderOnline(); }
+function _maoFmt(v){ _on.fmt=v; netRenderOnline(); }
+function _maoElegiveis(){
+  const eu=S.jogadores[EU];
+  const ordem=['A','B','C','D']; const i=ordem.indexOf(divDe(eu));
+  const janela=[ordem[i-1],divDe(eu),ordem[i+1]].filter(Boolean);
+  return Object.keys(S.jogadores)
+    .filter(id=>id!==EU && S.jogadores[id])
+    .filter(id=> netEhAmigo(id) || janela.includes(divDe(S.jogadores[id])));
+}
+async function _maoEnviar(){
+  if(!_on.advId){ alert('Escolhe o adversário.'); return; }
+  const sets=_on.sets; if(!sets){ alert('Placar incompleto. Ex: 6-3 6-4'); return; }
+  let g=0,p=0; sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
+  if(g===p){ alert('Placar empatado — confere os sets.'); return; }
+  try{
+    const { error } = await sb.from('matches').insert({
+      criador_id: MEU_UID, adversario_id: _on.advId,
+      esporte: (typeof S!=='undefined' && S.esporte) ? S.esporte : 'tenis',
+      formato:_on.fmt, dupla:false, cantada:null,
+      status:'pendente', sets, placar:sets.map(([a,b])=>`${a}-${b}`).join(' '),
+      venceu_criador: g>p, placar_por: MEU_UID,
+      placar_em: new Date().toISOString(),        // o relógio das 72h começa aqui
+      quando: _on.quando || null,
+      local_id: _on.localId || null, quadra: _on.quadra || null,
+      origem: 'mao',
+    });
+    if(error) throw error;
+    const nome0=_nomeDe(_on.advId).split(' ')[0];
+    netFecharOnline();
+    if(window.toast) toast(`Placar lançado — ${nome0} confirma no app dele. Nada mexe até lá.`);
+    netAtualizarInbox();
+  }catch(e){ alert('Não deu pra lançar: '+(e.message||e)); }
+}
+
 /* ---- 2a: aceitar / recusar (do lado de quem recebeu) ------------------ */
 async function netAceitar(matchId){
   const { error } = await sb.from('matches').update({ status:'aceito', aceito_at:new Date().toISOString() }).eq('id',matchId);
@@ -656,7 +706,11 @@ function netRenderInbox(){
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
       const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
-      txt=`<b>${outro}</b> lançou o placar: você <b style="color:${euVenci?'var(--up)':'var(--dn)'}">${euVenci?'venceu':'perdeu'}</b> ${meuPl}`
+      // partida lançada na mão carrega a procedência na cara — quem confirma
+      // tem que saber que ela veio de fora do app
+      txt=`${m.origem==='mao'?'<span style="display:inline-block;padding:2px 7px;border-radius:7px;background:var(--sup2);color:var(--gold);font-size:10px;font-weight:700;margin-bottom:6px">LANÇADA NA MÃO</span><br>':''}`
+         +`<b>${outro}</b> lançou o placar: você <b style="color:${euVenci?'var(--up)':'var(--dn)'}">${euVenci?'venceu':'perdeu'}</b> ${meuPl}`
+         + _pinDe(m)
          + _avisoPrazo(m, 'confirmar');
       acoes=`${_btn('Contestar',`_net.contestar('${m.id}')`,'no')}${_btn('Confirmar',`_net.confirmar('${m.id}')`,'ok')}`;
     } else if(m.status==='pendente'){
@@ -707,6 +761,52 @@ function netRenderOnline(){
       ${qdoH}${locH}
       <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${_btn('Desafiar','_net.confirmarDesafio()','ok')}</div>
       <div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`;
+  }
+  else if(_on.step==='mao'){
+    const _p2m=(n)=>String(n).padStart(2,'0');
+    const qvm = _on.quando ? (()=>{ const x=new Date(_on.quando);
+      return `${x.getFullYear()}-${_p2m(x.getMonth()+1)}-${_p2m(x.getDate())}T${_p2m(x.getHours())}:${_p2m(x.getMinutes())}`; })() : '';
+    const eleg=_maoElegiveis();
+    const ls=_locais||[]; const lSel=_locDe(_on.localId);
+    let previa='';
+    if(_on.sets && _on.advId){
+      const eu=S.jogadores[EU]; const adv=S.jogadores[_on.advId];
+      let g=0,p=0; _on.sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
+      const venceu=g>p;
+      const advNivel=(S.esporte==='beach')?(adv.nivelB??1200):(adv.nivel??1200);
+      const c=calcular(nivelDe(eu), advNivel, venceu, 'amistoso', _on.fmt, false, eu.calibrando, eu.cal);
+      previa=`<div style="display:flex;gap:14px;justify-content:center;margin:12px 0">
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">NÍVEL</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:var(--up)">+${c.dPts}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
+      </div>`;
+    }
+    body=`<div style="font:700 17px system-ui;margin-bottom:2px">Lançar na mão</div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">Partida jogada fora do app. ${_on.advId?_nomeDe(_on.advId).split(' ')[0]+' recebe o placar e':'O adversário recebe o placar e'} confirma no app dele — com o mesmo prazo de 72h. Não vai contar em circuito aberto, só nas fechadas.</div>
+      <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">Contra quem</div>
+      <select onchange="_net.maoAdv(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+        <option value="" ${!_on.advId?'selected':''}>Escolher…</option>
+        ${eleg.map(u=>`<option value="${u}" ${_on.advId===u?'selected':''}>${_nomeDe(u)}${netEhAmigo(u)?' · amigo':''}</option>`).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px">Amigo em qualquer classe; fora isso, a mesma janela de ±1 classe do radar.</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        ${[['md3','Melhor de 3'],['set','Set único']].map(([v,n])=>`<button onclick="_net.maoFmt('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_on.fmt===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Placar — seus games primeiro. Ex: <b>6-3 6-4</b></div>
+      <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
+        style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 17px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+      ${previa}
+      <div style="font-size:12px;color:var(--ink2);margin:10px 0 6px">🗓 Quando foi <span style="color:var(--ink3)">(opcional)</span></div>
+      <input type="datetime-local" value="${qvm}" max="${new Date().toISOString().slice(0,16)}" onchange="_net.onQuando(this.value)"
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;color-scheme:dark"/>
+      ${ls.length?`<div style="font-size:12px;color:var(--ink2);margin:10px 0 6px">📍 Onde <span style="color:var(--ink3)">(opcional)</span></div>
+      <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+        <option value="" ${!_on.localId?'selected':''}>Não lembro / outro lugar</option>
+        ${ls.map(l=>`<option value="${l.id}" ${_on.localId===l.id?'selected':''}>${l.nome}</option>`).join('')}
+      </select>
+      ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}`:''}
+      <div style="display:flex;gap:8px;margin-top:14px">${_btn('Cancelar','_net.fechar()')}${(_on.sets&&_on.advId)?_btn('Lançar placar','_net.maoEnviar()','ok'):''}</div>`;
   }
   else if(_on.step==='placar'){
     const eu=S.jogadores[EU]; const sets=_on.sets; let previa='';
@@ -2542,6 +2642,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
   admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
-  pedirIdade:netPedirIdade, idadeConfirmar:_idadeConfirmar };
+  pedirIdade:netPedirIdade, idadeConfirmar:_idadeConfirmar,
+  abrirMao:netAbrirMao, maoAdv:_maoAdv, maoFmt:_maoFmt, maoEnviar:_maoEnviar };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;

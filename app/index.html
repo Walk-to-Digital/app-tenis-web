@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=35"></script>
+<script src="net.js?v=36"></script>
 
 <script>
 /* =========================================================================
@@ -1668,6 +1668,10 @@ registrar(){
     return {titulo:'Registrar', dir:`${_prop.length} proposta${_prop.length>1?'s':''}`, html:`${propostasH}
       <div class="vazio"><span class="ic">✚</span>
         Nenhuma partida esperando placar ainda.<br>Assim que aceitarem seu horário, ela nasce aqui.
+      </div>
+      <div class="sec">
+        <button class="btn gh" onclick="netAbrirMao()">Jogou fora do app? Lançar na mão</button>
+        <p class="nota" style="margin-top:9px">Partida lançada na mão não conta em circuito aberto — só nas fechadas. O adversário confirma, com o mesmo prazo de 72h.</p>
       </div>`};
   }
   return {titulo:'Registrar', dir:`${_esp.length} pendente${_esp.length>1?'s':''}`, html:`${propostasH}
@@ -1688,12 +1692,11 @@ registrar(){
           </div>
           <p class="nota" style="margin-top:9px">${CTX_NOME[p.contexto]}</p>
         </div>`).join('')}
-      <!-- 11/08: era um botão "+ Lançar na mão" cuja única ação era mostrar um
-           toast com a regra. Prometia criar e entregava aula. Fica desabilitado
-           e explícito até o formulário existir — a regra vira nota, no futuro,
-           porque ela só passa a valer quando houver o que lançar. -->
-      <button class="btn gh" disabled>Jogou fora do app? Lançar na mão — em breve</button>
-      <p class="nota" style="margin-top:9px">Quando existir, partida lançada na mão não vai contar em circuito aberto — só nas fechadas.</p>
+      <!-- 11/08 (noite): o formulário chegou (migração 24). Adversário, formato,
+           placar, quando, onde — e a coluna de origem que a regra do circuito
+           aberto vai ler. O adversário confirma, com o prazo de 72h. -->
+      <button class="btn gh" onclick="netAbrirMao()">Jogou fora do app? Lançar na mão</button>
+      <p class="nota" style="margin-top:9px">Partida lançada na mão não conta em circuito aberto — só nas fechadas. O adversário confirma, com o mesmo prazo de 72h.</p>
     </div>`};
 },
 
