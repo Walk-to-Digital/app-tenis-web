@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=31"></script>
+<script src="net.js?v=32"></script>
 
 <script>
 /* =========================================================================
@@ -1471,7 +1471,9 @@ quadro(){
         ${avatar(EU,'gg')}
         <div class="txt">
           <div class="nm">${eu.nome}</div>
-          <div class="sub">${eu.clube} · Salvador/BA</div>
+          <!-- cidade DERIVADA do local principal (migração 19) — o hardcode
+               Salvador/BA fica só de fallback pra quem ainda não marcou onde joga -->
+          <div class="sub">${eu.clube} · ${(window.__meusLocais&&window.__meusLocais.cidade)||'Salvador/BA'}</div>
         </div>
       </div>
       <div class="linha-nivel">
@@ -1517,10 +1519,25 @@ radar(){
   const i=ordemDiv.indexOf(divDe(eu));
   const permitidas=[ordemDiv[i-1],divDe(eu),ordemDiv[i+1]].filter(Boolean);
   // Jogadores REAIS cadastrados, na faixa de ±1 divisão. Sem elenco fake.
-  const disp = Object.keys(S.jogadores)
+  let disp = Object.keys(S.jogadores)
     .filter(id=> id!==EU && S.jogadores[id])
     .map(id=> ({id, j:S.jogadores[id]}))
     .filter(x=> permitidas.includes(divDe(x.j)));
+
+  /* 11/08: segundo eixo — onde a pessoa joga (migração 19). O chip só
+     RESTRINGE entre quem declarou local; quem não declarou nunca some
+     (filtro que esvazia o pool é pior que filtro nenhum — aprendizado
+     do teto de distância do cinturão). ±1 classe segue intocado. */
+  const meu=window.__meusLocais||{}; const mapa=window.__mapaLocais||{};
+  const tenhoLocal=!!meu.principal;
+  if(S.radarFiltro==='clube' && tenhoLocal)
+    disp=disp.filter(x=>{ const m=mapa[x.id]; return !m || (meu.ids||[]).includes(m.local_id); });
+  if(S.radarFiltro==='cidade' && tenhoLocal)
+    disp=disp.filter(x=>{ const m=mapa[x.id]; return !m || m.cidade_id===meu.cidadeId; });
+  const chipLoc=(v,n)=>`<button class="chip ${(S.radarFiltro||'todos')===v?'on':''}" onclick="radarFiltrar('${v}')">${n}</button>`;
+  const chipsLoc = tenhoLocal
+    ? `<div class="grade" style="margin-bottom:12px">${chipLoc('todos','Todos')}${chipLoc('clube','Meu clube')}${chipLoc('cidade',meu.cidade?meu.cidade.split('/')[0]:'Minha cidade')}</div>`
+    : '';
 
   return {titulo:'Radar', dir:`±1 classe`, html:`
     <div class="sec">
@@ -1536,6 +1553,7 @@ radar(){
       <!-- 11/08: era "divisões" aqui e "±1 classe" onze linhas acima, na mesma
            tela. O app chama de classe; o vocabulário antigo era divisão. -->
       <div class="rot">Quem tá no app <span>classes ${permitidas.join(' · ')}</span></div>
+      ${chipsLoc}
       ${disp.length ? disp.map(x=>`
         <div class="card clic" onclick="netDesafiar('${x.id}')">
           <div class="linha-item">
@@ -1549,7 +1567,7 @@ radar(){
 
     <div class="sec">
       <div class="rot">Fora do alcance</div>
-      <div class="card"><p class="nota">Jogadores a mais de uma classe de distância não aparecem aqui — nem pela busca por nome. É a mesma trava que faz o quadro ser somente leitura.</p></div>
+      <div class="card"><p class="nota">Jogadores a mais de uma classe de distância não aparecem aqui — nem pela busca por nome. É a mesma trava que faz o quadro ser somente leitura.${(S.radarFiltro&&S.radarFiltro!=='todos')?' Com o filtro de lugar ligado, some também quem declarou jogar em outro '+(S.radarFiltro==='clube'?'clube':'cidade')+' — quem ainda não disse onde joga continua aparecendo.':''}</p></div>
     </div>`};
 },
 
@@ -1853,6 +1871,10 @@ ficha(){
         <div class="txt">
           <div class="nm">${eu.nome}</div>
           <div class="sub">${eu.clube?eu.clube+' · ':''}${(window.netId&&window._net)?netId(_net.uid()):''}</div>
+          <!-- 11/08: onde a pessoa joga (migração 19) — dado real, não o escudo
+               cosmético do vestiário. É a porta das contas que nasceram antes
+               do passo existir no cadastro. -->
+          <div class="sub" style="cursor:pointer" onclick="window.netAbrirMeusLocais&&netAbrirMeusLocais()">📍 ${(window.__meusLocais&&window.__meusLocais.principalNome)||'<u>Diga onde você joga</u>'}</div>
         </div>
       </div>
       <div class="linha-nivel">
@@ -2263,6 +2285,8 @@ function selAba(a){ trAba=a; trSel=null; desenharTrofeus() }
 // campeonatos vencidos (4d) — derivados do banco via netMeusCampeonatos(), não
 // de tabela própria; carregam ao abrir a sala e viram as taças da aba Troféus
 let _camps=[];
+let _trofs=[];   // troféus do banco (trofeus_temporada): reinado, coroa, e os do ADM
+const _trTipoNome=(t)=> t==='reinado'?'Reinado':t==='coroa'?'Coroa da Temporada':'Troféu';
 // mês/ano direto da string ISO — new Date('2026-08-01') nasce UTC e Salvador
 // (UTC-3) puxaria 01/08 pra "jul/2026"
 const _mesAno=d=>{ try{ const [a,m]=String(d).slice(0,10).split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m-1]+'/'+a }catch(e){ return '' } };
@@ -2314,6 +2338,10 @@ function abrirTrofeus(){ trSel=null; let el=$('#trofeus'); if(el) el.classList.a
   // busca os campeonatos no banco e redesenha quando chegarem (sala abre na hora)
   if(window._net && _net.uid && _net.uid() && _net.meusCampeonatos)
     _net.meusCampeonatos().then(l=>{ _camps=l||[]; desenharTrofeus() }).catch(()=>{});
+  // 11/08: e os troféus de trofeus_temporada — Reinado, Coroa e os que o ADM
+  // entrega. Existiam no banco e a sala nunca leu; troféu que ninguém vê não premia.
+  if(window._net && _net.uid && _net.uid() && _net.meusTrofeus)
+    _net.meusTrofeus().then(l=>{ _trofs=l||[]; desenharTrofeus() }).catch(()=>{});
 }
 function fecharTrofeus(){ const el=$('#trofeus'); if(el) el.classList.remove('on') }
 function selTrofeu(id){ trSel = trSel===id?null:id; desenharTrofeus() }
@@ -2349,7 +2377,7 @@ function desenharTrofeus(){
   $('#tr-abas').innerHTML=chip('trofeus','Troféus')+chip('selos','Selos')+chip('patches','Patches');
   $('#tr-cnt').innerHTML = trAba==='selos' ? `<b>${got.size}</b> de ${TR_PECAS.length}`
     : trAba==='patches' ? `<b>${patches.length}</b> ◈`
-    : `<b>${_camps.length}</b> 🏆`;
+    : `<b>${_camps.length+_trofs.length}</b> 🏆`;
 
   const temCint=false;   // cinturão só quando o jogador for dono na comunidade
   const camadas=[];
@@ -2365,9 +2393,14 @@ function desenharTrofeus(){
       <img data-src="${img}" style="height:${TR_ALT}px" alt=""><em>${label}</em></button>`;
   let itens=[];
   if(trAba==='trofeus'){
-    // uma taça por campeonato vencido; passou de 12, o último slot vira "+N"
-    itens=_camps.slice(0,12).map((c,i)=>peca('camp:'+i,'tem','../trofeus/trofeu-circuito.png',c.cat||c.nome));
-    if(_camps.length>12) itens[11]=peca('camp:mais','tem','../trofeus/trofeu-circuito.png','+'+(_camps.length-11)+' mais');
+    // uma taça por campeonato vencido + os troféus do banco (Reinado, Coroa e
+    // os do ADM, arte de temporada); passou de 12, o último slot vira "+N"
+    const tudo=[
+      ..._camps.map((c,i)=>({s:'camp:'+i, img:'../trofeus/trofeu-circuito.png', n:c.cat||c.nome})),
+      ..._trofs.map((t,i)=>({s:'db:'+i,   img:'../trofeus/trofeu-temporada.png', n:t.nome||_trTipoNome(t.tipo)})),
+    ];
+    itens=tudo.slice(0,12).map(x=>peca(x.s,'tem',x.img,x.n));
+    if(tudo.length>12) itens[11]=peca('camp:mais','tem','../trofeus/trofeu-circuito.png','+'+(tudo.length-11)+' mais');
   } else if(trAba==='selos'){
     itens=TR_PECAS.map(p=>peca(p.id,got.has(p.id)?'tem':'nao','../trofeus-v1/'+p.arq+'.png',p.n));
   } else {
@@ -2382,8 +2415,14 @@ function desenharTrofeus(){
   // cara (torneio, categoria, esporte, chave, quando) — decisão de 07/08
   let det=null;
   if(trSel==='camp:mais'){
-    det=`<b>🏆 Todos os campeonatos <span class="tr-pill tem">${_camps.length}</span></b>
-      <p>${_camps.map(c=>c.nome+(c.cat?' · '+c.cat:'')).join(' — ')}</p>`;
+    const nomes=[..._camps.map(c=>c.nome+(c.cat?' · '+c.cat:'')), ..._trofs.map(t=>t.nome||_trTipoNome(t.tipo))];
+    det=`<b>🏆 Todos os troféus <span class="tr-pill tem">${nomes.length}</span></b>
+      <p>${nomes.join(' — ')}</p>`;
+  } else if(trSel && trSel.startsWith('db:')){
+    const t=_trofs[+trSel.slice(3)];
+    // etiqueta na própria cara, como o troféu de campeonato: de onde veio, quando
+    if(t) det=`<b>🏆 ${t.nome||_trTipoNome(t.tipo)} <span class="tr-pill tem">pra sempre</span></b>
+      <p>${t.etiqueta?t.etiqueta+' · ':''}${t.temporada?'Temporada '+t.temporada+' · ':''}${t.origem==='adm'?'entregue pelo app':'conquistado na temporada'} · ${_mesAno(t.criado_em)}</p>`;
   } else if(trSel && trSel.startsWith('camp:')){
     const c=_camps[+trSel.slice(5)];
     if(c) det=`<b>🏆 Campeão · ${c.nome}${c.cat?' · '+c.cat:''} <span class="tr-pill tem">pra sempre</span></b>
@@ -2401,7 +2440,7 @@ function desenharTrofeus(){
   }
   // texto de descanso por aba — cada objeto explica a própria natureza
   const vazio = trAba==='trofeus'
-    ? `<b>Troféus</b><p>Vença um campeonato e a taça entra na prateleira — torneio, chave e data na etiqueta. Pra sempre.</p>`
+    ? `<b>Troféus</b><p>Vença um campeonato e a taça entra na prateleira — torneio, chave e data na etiqueta. Reinado e Coroa da temporada entram sozinhos. Pra sempre.</p>`
     : trAba==='patches'
     ? `<b>Patches</b><p>Patch vem da comunidade: quando alguém te mandar um, aparece aqui. É pertencimento, não mérito.</p>`
     : `<b>Toque numa peça</b><p>Bloqueada, ela fica de vulto e diz o que fazer pra conquistar.</p>`;
@@ -2447,9 +2486,14 @@ function mostrarDesafioVS(m){
 function fecharVS(){ const el=document.getElementById('vs'); if(el) el.classList.remove('on') }
 window.mostrarDesafioVS = mostrarDesafioVS;
 
+// filtro de lugar do radar (11/08) — estado de sessão, não persiste de propósito:
+// o radar abre sempre em "Todos" pra nunca esconder gente por um filtro esquecido
+function radarFiltrar(v){ S.radarFiltro = v==='todos' ? null : v; render(); }
+
 function marcarJogo(id){
+  const meuLoc=(window.__meusLocais&&window.__meusLocais.principalNome)||null;
   const novo={id:'p'+Date.now(), adv:id, dupla:false, contexto:'amistoso', formato:'md3',
-    local:'Clube Bahiano · Quadra 2', quando:'marcado agora'};
+    local: meuLoc||'a combinar', quando:'marcado agora'};
   S.pendentes.push(novo);
   aba='inicio'; pilha=[{rota:'registrar'}]; salvar(); render();
   toast('Jogo marcado. Ele já nasceu no app — depois é <b>só o placar</b>.');
@@ -2529,6 +2573,13 @@ function onbNome(v){ onb.nome=v }                 // sem re-render pra não perd
 function onbEmail(v){ onb.email=v }
 function onbSenha(v){ onb.senha=v }
 function onbNasc(v){ onb.nasc=v }
+// marca/desmarca um local no passo 4 — a ordem de marcação decide o principal
+function onbLocal(id){
+  onb.locSel = onb.locSel||[];
+  const i=onb.locSel.indexOf(id);
+  if(i>=0) onb.locSel.splice(i,1); else onb.locSel.push(id);
+  renderOnb();
+}
 
 /* Idade completa na data de referência. Conta por ano/mês/dia em vez de
    dividir milissegundos: ano bissexto e fuso fazem a divisão errar por um dia
@@ -2586,6 +2637,9 @@ function onbQuiz(div){
 }
 function completarCadastro(){
   const eu=S.jogadores[EU];
+  // cópia ANTES do fecharCadastro() abaixo zerar o `onb` — o IIFE assíncrono
+  // do fim roda depois e leria null
+  const onbLocSel=(onb.locSel||[]).slice();
   // esporte escolhido no início: define o esporte ativo E o cenário (quadra).
   S.esporte = onb.esporte || 'tenis';
   eu.cena = S.esporte==='beach' ? {quadra:'areia',momento:'noite'} : {quadra:'saibro',momento:'noite'};
@@ -2610,6 +2664,11 @@ function completarCadastro(){
   // já que a conta acabou de ser criada com email+senha nesta sessão.
   (async()=>{
     if(window.netSyncJogador){ try{ await netSyncJogador(eu); }catch(e){} }
+    // os locais do passo 4 — DEPOIS do sync (o FK de player_locais aponta pra
+    // linha de players, que precisa existir primeiro)
+    if(onbLocSel.length && window._net && _net.salvarMeusLocais){
+      try{ await _net.salvarMeusLocais(onbLocSel, onbLocSel[0]); }catch(e){}
+    }
     if(window.netBoot){ try{ await netBoot(S.jogadores[EU]); }catch(e){} }
   })();
   toast('Bem-vindo, '+eu.nome.split(' ')[0]+'! Você entra em <b>calibragem</b> — as 8 primeiras partidas ajustam seu Nível.');
@@ -2617,7 +2676,7 @@ function completarCadastro(){
 
 function renderOnb(){
   const el=document.getElementById('onb');
-  const dots=(n)=>`<div class="onb-dots">${[0,1,2,3,4].map(i=>`<span class="${i===n?'on':''}"></span>`).join('')}</div>`;
+  const dots=(n)=>`<div class="onb-dots">${[0,1,2,3,4,5].map(i=>`<span class="${i===n?'on':''}"></span>`).join('')}</div>`;
   let body='';
 
   if(onb.step===0){
@@ -2634,7 +2693,7 @@ function renderOnb(){
       </div>`;
   } else if(onb.step===1){
     body=`
-      <div class="onb-head"><div class="onb-kick">Passo 1 de 3</div><h2>Que esporte você joga?</h2></div>
+      <div class="onb-head"><div class="onb-kick">Passo 1 de 4</div><h2>Que esporte você joga?</h2></div>
       <div class="seg2" style="margin-bottom:8px">
         <button class="${onb.esporte==='tenis'?'on':''}" onclick="onbEsporte('tenis')">Tênis</button>
         <button class="${onb.esporte==='beach'?'on':''}" onclick="onbEsporte('beach')">Beach Tennis</button>
@@ -2654,7 +2713,7 @@ function renderOnb(){
   } else if(onb.step===2){
     const eu2=S.jogadores[EU];
     body=`
-      <div class="onb-head"><div class="onb-kick">Passo 2 de 3</div><h2>Monte seu personagem</h2></div>
+      <div class="onb-head"><div class="onb-kick">Passo 2 de 4</div><h2>Monte seu personagem</h2></div>
       <div class="onb-preview" style="--camisa:${eu2.cor}">
         <div class="glow"></div>
         <div class="boneco"><img src="../bonecos-t/${eu2.bon}.png" alt=""></div>
@@ -2672,12 +2731,37 @@ function renderOnb(){
         <div class="onb-cards">${Q.o.map(([t,d])=>`<button class="onb-card" onclick="onbQuiz('${d}')"><b>${t}</b></button>`).join('')}</div>`;
     } else {
       body=`
-        <div class="onb-head"><div class="onb-kick">Passo 3 de 3</div><h2>Qual seu nível hoje?</h2></div>
+        <div class="onb-head"><div class="onb-kick">Passo 3 de 4</div><h2>Qual seu nível hoje?</h2></div>
         <p class="nota" style="margin-bottom:14px">Você se declara e já entra jogando. As 8 primeiras partidas ajustam de verdade — se você se diz C e ganha dos B, sobe rápido.</p>
         <div class="onb-cards">${NIVEIS.map(n=>`<button class="onb-card ${onb.div===n.d?'on':''}" onclick="onbSet('div','${n.d}')"><div class="dv">${n.d}</div><div class="tx"><b>${n.t}</b><small>${n.s}</small></div></button>`).join('')}</div>
         <button class="onb-link" onclick="onbAbrirQuiz()">Não sei meu nível — me ajuda a escolher</button>
         <div class="onb-nav"><button class="onb-prim" onclick="onbNext()" ${onb.div?'':'disabled'}>Continuar</button></div>`;
     }
+  } else if(onb.step===4){
+    /* 11/08: onde você joga (migração 19). A conta já existe neste ponto
+       (passo 1 fez o signUp), então dá pra ler `locais` do banco. A lista
+       carrega lazy; sem clube cadastrado (ou sem rede), o passo se explica
+       e deixa pular — o local nunca barra um cadastro. */
+    if(onb.locais===undefined && window._net && _net.locais){
+      onb.locais=null;
+      _net.locais().then(l=>{ onb.locais=l||[]; if(onb.step===4) renderOnb(); })
+                   .catch(()=>{ onb.locais=[]; if(onb.step===4) renderOnb(); });
+    }
+    onb.locSel = onb.locSel||[];
+    const ls = onb.locais||[];
+    const linhas = ls.map(l=>`
+      <button class="onb-card ${onb.locSel.includes(l.id)?'on':''}" onclick="onbLocal('${l.id}')">
+        <div class="dv">📍</div>
+        <div class="tx"><b>${l.nome}</b><small>${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+l.cidade:''}${l.endereco?' · '+l.endereco:''}${onb.locSel[0]===l.id&&onb.locSel.length>1?' · principal':''}</small></div>
+      </button>`).join('');
+    body=`
+      <div class="onb-head"><div class="onb-kick">Passo 4 de 4</div><h2>Onde você joga?</h2></div>
+      <p class="nota" style="margin-bottom:14px">É daqui que sai sua cidade e o endereço dos seus desafios. Marque quantos quiser — o primeiro vira o principal.</p>
+      <div class="onb-cards">${onb.locais===null?'<p class="nota">Carregando os clubes…</p>':(linhas||'<p class="nota">Nenhum clube cadastrado ainda — dá pra jogar sem, e você marca depois na sua ficha.</p>')}</div>
+      <div class="onb-nav">
+        <button class="onb-prim" onclick="onbNext()" ${onb.locSel.length?'':'disabled'}>Continuar</button>
+        <button class="onb-link" onclick="onbNext()" style="margin-top:12px">Pular — marco depois</button>
+      </div>`;
   } else {
     body=`
       <div class="onb-preview tall" style="--camisa:${onb.cor}">

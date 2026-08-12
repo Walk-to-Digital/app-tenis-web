@@ -141,6 +141,9 @@ async function netBoot(eu){
     try{ await netFecharTemporada(); }catch(e){}
     // sou ADM do app? acende a porta de entrada da aba ADM (migração 18)
     try{ await netCheckAdm(); }catch(e){}
+    // localização (migração 19): locais + os meus + o mapa do radar. O espelho
+    // em window é o que as telas síncronas leem (ficha, quadro, radar).
+    try{ await netLocais(); await netMeusLocais(); await netMapaLocais(); }catch(e){}
     console.log('[net] conectado como', uid, '— jogador + partidas carregados');
     return uid;
   }catch(e){
@@ -331,10 +334,27 @@ function netDesafiar(id){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
   const j = S.jogadores && S.jogadores[id];
   if(!j){ alert('Jogador não encontrado.'); return; }
-  _on = { step:'desafio', advId:id, adv:{id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB} };
+  // o 📍 nasce preenchido com o MEU local principal — quem marca sabe onde
+  // joga; trocar é exceção, não formulário (decisão de 11/08)
+  const meu = window.__meusLocais || {};
+  _on = { step:'desafio', advId:id, adv:{id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB},
+          localId: meu.principal || null, quadra: null, quando: null };
   netRenderOnline();
 }
 window.netDesafiar = netDesafiar;
+function _onLocal(v){ _on.localId = v || null; _on.quadra = null; netRenderOnline(); }
+function _onQuadra(v){
+  const l=_locDe(_on.localId); const max=l?l.quadras:60;
+  const n=parseInt(v,10);
+  _on.quadra = (n>=1 && n<=max) ? n : null;
+}
+/* o input datetime-local entrega "2026-08-15T19:00" no fuso do aparelho;
+   new Date() interpreta nesse fuso e o toISOString normaliza pra UTC — o
+   banco guarda timestamptz e cada aparelho mostra na sua hora */
+function _onQuando(v){
+  const d = v ? new Date(v) : null;
+  _on.quando = (d && !isNaN(d)) ? d.toISOString() : null;
+}
 
 async function _onConfirmarDesafio(){
   const adv=_on.adv;
@@ -343,6 +363,8 @@ async function _onConfirmarDesafio(){
       criador_id: MEU_UID, adversario_id: adv.id,
       esporte: (typeof S!=='undefined' && S.esporte) ? S.esporte : 'tenis',
       formato:'md3', dupla:false, status:'desafiado', cantada:null,
+      local_id: _on.localId || null, quadra: _on.quadra || null,
+      quando: _on.quando || null,
     });
     if(error) throw error;
     netFecharOnline();
@@ -583,6 +605,21 @@ const _sheet = (id, inner)=>{
 };
 
 function netAbrirInbox(){ netRenderInbox(); }
+/* "🗓 sáb 15/08 · 19h" + "📍 Clube Bahiano de Tênis · Quadra 3 — endereço" —
+   informação, não campo (11/08): as linhas só aparecem quando a partida tem.
+   Data ABSOLUTA, não contagem: "faltam 2 dias" mente nas bordas (o floor e o
+   ceil erram de jeitos diferentes); a data não mente nunca. */
+const _pinDe = (m)=>{
+  let h='';
+  if(m.quando){
+    const d=new Date(m.quando), p=(n)=>String(n).padStart(2,'0');
+    const dias=['dom','seg','ter','qua','qui','sex','sáb'];
+    h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">🗓 ${dias[d.getDay()]} ${p(d.getDate())}/${p(d.getMonth()+1)} · ${d.getHours()}h${d.getMinutes()?p(d.getMinutes()):''}</div>`;
+  }
+  const l = m.local_id && _locDe(m.local_id);
+  if(l) h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:${m.quando?'3px':'6px'}">📍 ${l.nome}${m.quadra?' · Quadra '+m.quadra:''}${l.endereco?`<span style="color:var(--ink3)"> — ${l.endereco}</span>`:''}</div>`;
+  return h;
+};
 function netRenderInbox(){
   const linhas = _inbox.map(m=>{
     const outro=_nomeDe(_advId(m)).split(' ')[0];
@@ -599,6 +636,7 @@ function netRenderInbox(){
         </div>
       </div>
       <div style="font-size:14px"><b>${j.nome.split(' ')[0]}</b> te desafiou pra uma partida</div>
+      ${_pinDe(m)}
       <!-- 11/08: regra que só existe no documento não muda comportamento. A
            decisão "recusar não custa fair play" existia desde o protótipo do
            radar e nunca chegou à tela — e quem não sabe que é de graça acaba
@@ -606,9 +644,9 @@ function netRenderInbox(){
       <div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Recusar não custa nada — não mexe no seu nível nem na sua reputação.</div>`;
       acoes=`${_btn('Recusar',`_net.recusar('${m.id}')`,'no')}${_btn('Aceitar',`_net.aceitar('${m.id}')`,'ok')}`;
     } else if(m.status==='desafiado'){
-      txt=`Aguardando <b>${outro}</b> aceitar seu desafio`;
+      txt=`Aguardando <b>${outro}</b> aceitar seu desafio` + _pinDe(m);
     } else if(m.status==='aceito'){
-      txt=`Partida marcada com <b>${outro}</b>`;
+      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m);
       acoes=`${_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok')}`;
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
@@ -634,8 +672,34 @@ function _onDigitou(v){ _on.placarTxt=v; _on.sets=netParsePlacar(v); netRenderOn
 function netRenderOnline(){
   let body='';
   if(_on.step==='desafio'){
+    // 🗓 quando: dia e hora são a primeira coisa que dois jogadores combinam
+    // (pedido de 11/08). Opcional — desafio sem hora vale como "a combinar";
+    // obrigar aqui emperraria o registro, que é o elo frágil do ciclo.
+    // value= preenchido de volta: trocar o local re-renderiza o sheet, e um
+    // input vazio com _on.quando cheio seria estado invisível — bug fantasma
+    const _p2=(n)=>String(n).padStart(2,'0');
+    const qv = _on.quando ? (()=>{ const x=new Date(_on.quando);
+      return `${x.getFullYear()}-${_p2(x.getMonth()+1)}-${_p2(x.getDate())}T${_p2(x.getHours())}:${_p2(x.getMinutes())}`; })() : '';
+    const qdoH = `
+      <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🗓 Quando <span style="color:var(--ink3)">(opcional — sem data vale "a combinar")</span></div>
+      <input type="datetime-local" value="${qv}" onchange="_net.onQuando(this.value)"
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;color-scheme:dark"/>
+      <div style="height:12px"></div>`;
+    // 📍 da partida: nasce com o local principal do desafiante, dá pra trocar
+    // ou tirar. A quadra é opcional e limitada ao nº real de quadras do local.
+    const ls=_locais||[]; const lSel=_locDe(_on.localId);
+    const locH = ls.length ? `
+      <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">📍 Onde</div>
+      <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+        <option value="" ${!_on.localId?'selected':''}>A combinar</option>
+        ${ls.map(l=>`<option value="${l.id}" ${_on.localId===l.id?'selected':''}>${l.nome}</option>`).join('')}
+      </select>
+      ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}
+      <div style="height:14px"></div>` : '';
     body = `<div style="font:700 17px system-ui;margin-bottom:2px">Desafiar ${_on.adv.nome}</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.</div>
+      ${qdoH}${locH}
       <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${_btn('Desafiar','_net.confirmarDesafio()','ok')}</div>
       <div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`;
   }
@@ -1006,6 +1070,11 @@ function netCriarGrupoUI(){
     <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
     <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem acha a comunidade</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (só convite)'],[true,'Aberto (aceita pedidos)']])}</div>
     <div style="font-size:11px;color:var(--ink3);margin-top:6px">Aberto = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Fechado = só entra pelo link de convite.</div>
+    ${(_locais&&_locais.length)?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">📍 Onde joga <span style="color:var(--ink3)">(opcional)</span></div>
+    <select onchange="_net.gset('local_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+      <option value="" ${!_gnew.local_id?'selected':''}>Sem casa fixa</option>
+      ${_locais.map(l=>`<option value="${l.id}" ${_gnew.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
+    </select>`:''}
     <button onclick="_net.gcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">Criar comunidade</button>`);
   const el=document.getElementById('gn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
@@ -1013,7 +1082,7 @@ function _gset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; _gnew[cam
 async function _gcriar(){
   if(!_gnew.nome || !_gnew.nome.trim()){ alert('Dá um nome pra comunidade.'); return; }
   try{ if(window.netSyncJogador && typeof S!=='undefined') await netSyncJogador(S.jogadores[EU]); }catch(e){}
-  const { data, error } = await sb.from('grupos').insert({ nome:_gnew.nome, dono_id:MEU_UID, esporte:_gnew.esporte, aberto:!!_gnew.aberto }).select().single();
+  const { data, error } = await sb.from('grupos').insert({ nome:_gnew.nome, dono_id:MEU_UID, esporte:_gnew.esporte, aberto:!!_gnew.aberto, local_id:_gnew.local_id||null }).select().single();
   if(error){ alert('Erro ao criar: '+error.message); return; }
   await sb.from('grupo_membros').insert({ grupo_id:data.id, player_id:MEU_UID, papel:'dono' });
   _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove();
@@ -1137,15 +1206,31 @@ async function netVerGrupo(gid){
         Um por comunidade, no ${g.esporte==='beach'?'beach':'tênis'}. Nasce com você e passa pra quem te vencer.</div>`;
   }
 
+  // casa da comunidade (migração 19): todo mundo vê no cabeçalho; o gestor
+  // define/troca aqui — a policy grupos_upd já limita a escrita a ele
+  const casaH = (souGestor && _locais && _locais.length) ? `
+    <div style="display:flex;align-items:center;gap:8px;margin:0 0 12px">
+      <span style="font-size:12px;color:var(--ink2);flex:0 0 auto">📍 Casa</span>
+      <select onchange="_net.gcasa('${gid}',this.value)" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 12px system-ui">
+        <option value="" ${!g.local_id?'selected':''}>Sem casa fixa</option>
+        ${_locais.map(l=>`<option value="${l.id}" ${g.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
+      </select></div>` : '';
   _sheet('net-gver', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">${g.nome}</div>
       <button onclick="_net.fecharGver()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${g.esporte==='beach'?'Beach':'Tênis'} · ${ms.length} membros · ${g.aberto?'aberto':'fechado'}</div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${g.esporte==='beach'?'Beach':'Tênis'} · ${ms.length} membros · ${g.aberto?'aberto':'fechado'}${g.local_id&&_locNome(g.local_id)?' · 📍 '+_locNome(g.local_id):''}</div>
+    ${casaH}
     ${cinturaoH}
     ${ms.map(linha).join('')||'<p style="color:var(--ink2);font-size:13px">Ninguém ainda.</p>'}
     ${pedidosH}${entrar}${sair}${link}`);
 }
 function netFecharGver(){ const el=document.getElementById('net-gver'); if(el) el.remove(); }
+async function netDefinirCasa(gid, v){
+  const { error } = await sb.from('grupos').update({ local_id: v||null }).eq('id', gid);
+  if(error){ alert('Erro ao definir a casa: '+error.message); return; }
+  if(window.toast) toast(v ? `📍 Casa da comunidade: <b>${_locNome(v)||''}</b>.` : 'Comunidade sem casa fixa.');
+  netVerGrupo(gid);
+}
 
 /* Ligar o cinturão. Nasce com quem CRIOU a comunidade (09/08) — se um admin liga,
    vai pro dono, não pra ele. Escrita normal em `comunidades`: a policy grupos_upd
@@ -1854,6 +1939,139 @@ async function netEntrarPorLink(){
 window.netEntrarPorLink = netEntrarPorLink;
 
 /* =========================================================================
+   LOCALIZAÇÃO (11/08) — migração 19, que estava toda órfã: o banco tinha
+   cidades/locais/player_locais e o app não lia nada. A cidade NUNCA é campo
+   digitado — deriva do clube onde a pessoa joga, que é o que ela sabe
+   escolher numa lista (texto livre vira "Salvador"/"SSA" em uma semana e aí
+   não filtra nada, que era a única razão de existir).
+   ========================================================================= */
+let _locais = null;      // todos os locais ativos, com o nome da cidade colado
+let _meusLocais = null;  // [{local_id, principal}] — os MEUS
+let _mapaLoc = null;     // player_id → {local_id, cidade_id, regiao_id} (view player_cidade)
+
+async function netLocais(force){
+  if(_locais && !force) return _locais;
+  const [ls, cs] = await Promise.all([
+    sb.from('locais').select('id,nome,tipo,quadras,cidade_id,endereco').eq('ativo',true).order('nome'),
+    sb.from('cidades').select('id,nome,uf'),
+  ]);
+  const cid = {}; (cs.data||[]).forEach(c=>cid[c.id]=c);
+  _locais = (ls.data||[]).map(l=>({ ...l, cidade: cid[l.cidade_id] ? `${cid[l.cidade_id].nome}/${cid[l.cidade_id].uf}` : '' }));
+  return _locais;
+}
+const _locDe   = (id)=> (_locais||[]).find(l=>l.id===id) || null;
+const _locNome = (id)=> { const l=_locDe(id); return l ? l.nome : null; };
+
+async function netMeusLocais(force){
+  if(_meusLocais && !force) return _meusLocais;
+  if(!MEU_UID) return [];
+  const r = await sb.from('player_locais').select('local_id,principal').eq('player_id', MEU_UID);
+  _meusLocais = r.data || [];
+  _locPublicar();
+  return _meusLocais;
+}
+/* O render das telas locais (ficha, quadro, radar) é síncrono — ele não pode
+   esperar query. Então o que ele lê é este espelho em window, atualizado
+   sempre que a lista muda. */
+function _locPublicar(){
+  const pr = (_meusLocais||[]).find(x=>x.principal) || (_meusLocais||[])[0] || null;
+  const l  = pr ? _locDe(pr.local_id) : null;
+  window.__meusLocais = {
+    ids: (_meusLocais||[]).map(x=>x.local_id),
+    principal: pr ? pr.local_id : null,
+    principalNome: l ? l.nome : null,
+    cidadeId: l ? l.cidade_id : null,
+    cidade: l ? l.cidade : null,
+  };
+  if(window.render){ try{ render(); }catch(e){} }
+}
+/* Regrava a lista inteira (apagar+inserir): são meia dúzia de linhas por
+   pessoa e a RLS só deixa cada um mexer em si — mais simples que diff. */
+async function netSalvarMeusLocais(ids, principalId){
+  if(!MEU_UID) return { erro:'sem sessão' };
+  ids = (ids||[]).filter(Boolean);
+  const pr = principalId && ids.includes(principalId) ? principalId : ids[0] || null;
+  await sb.from('player_locais').delete().eq('player_id', MEU_UID);
+  if(ids.length){
+    const { error } = await sb.from('player_locais')
+      .insert(ids.map(id=>({ player_id:MEU_UID, local_id:id, principal:id===pr })));
+    if(error) return { erro:error.message };
+  }
+  _meusLocais = ids.map(id=>({ local_id:id, principal:id===pr }));
+  _locPublicar();
+  return { ok:true };
+}
+
+/* Mapa jogador→lugar pro radar filtrar. A view só tem quem marcou principal —
+   quem não marcou fica FORA do mapa e o radar nunca esconde essa pessoa:
+   filtro que esvazia o pool é pior que filtro nenhum. */
+async function netMapaLocais(force){
+  if(_mapaLoc && !force) return _mapaLoc;
+  const r = await sb.from('player_cidade').select('player_id,local_id,cidade_id,regiao_id');
+  _mapaLoc = {};
+  (r.data||[]).forEach(x=>{ _mapaLoc[x.player_id]=x; });
+  window.__mapaLocais = _mapaLoc;
+  return _mapaLoc;
+}
+
+/* ---- UI: "Onde eu jogo" — a MESMA folha serve o onboarding e a ficha ---- */
+let _loc = null;
+async function netAbrirMeusLocais(){
+  await netLocais(); await netMeusLocais();
+  const meus = _meusLocais||[];
+  _loc = { sel: meus.map(x=>x.local_id),
+           principal: (meus.find(x=>x.principal)||meus[0]||{}).local_id || null };
+  netRenderMeusLocais();
+}
+function netFecharMeusLocais(){ _loc=null; const el=document.getElementById('net-locais'); if(el) el.remove(); }
+function _locToggle(id){
+  const i=_loc.sel.indexOf(id);
+  if(i>=0){ _loc.sel.splice(i,1); if(_loc.principal===id) _loc.principal=_loc.sel[0]||null; }
+  else { _loc.sel.push(id); if(!_loc.principal) _loc.principal=id; }
+  netRenderMeusLocais();
+}
+function _locPrincipal(id){ if(_loc.sel.includes(id)) _loc.principal=id; netRenderMeusLocais(); }
+async function _locSalvar(){
+  const r = await netSalvarMeusLocais(_loc.sel, _loc.principal);
+  if(r.erro){ alert('Não deu pra salvar: '+r.erro); return; }
+  netFecharMeusLocais();
+  if(window.toast) toast(window.__meusLocais.principalNome
+    ? `📍 Você joga no <b>${window.__meusLocais.principalNome}</b>.`
+    : 'Locais salvos.');
+}
+function netRenderMeusLocais(){
+  const TIPO={clube:'clube',condominio:'condomínio',publico:'quadra pública',academia:'academia',outro:''};
+  const linhas=(_locais||[]).map(l=>{
+    const on=_loc.sel.includes(l.id), pr=_loc.principal===l.id;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--sup2)">
+      <button onclick="_net.locToggle('${l.id}')" style="width:24px;height:24px;border-radius:7px;border:1px solid ${on?'#2C5A00':'var(--linha2)'};background:${on?'#2C5A00':'var(--bg)'};color:#fff;font:700 13px system-ui;cursor:pointer;flex:0 0 24px">${on?'✓':''}</button>
+      <div style="flex:1;min-width:0"><b style="font-size:14px">${l.nome}</b>
+        <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+l.cidade:''}</div>
+        ${l.endereco?`<div style="font-size:10.5px;color:var(--ink3)">${l.endereco}</div>`:''}</div>
+      ${on?`<button onclick="_net.locPrincipal('${l.id}')" style="padding:6px 10px;border-radius:9px;border:1px solid ${pr?'var(--gold-bg)':'var(--linha2)'};background:${pr?'var(--gold-bg)':'var(--sup2)'};color:${pr?'var(--gold)':'var(--ink2)'};font:600 11px system-ui;cursor:pointer">${pr?'★ principal':'tornar principal'}</button>`:''}
+    </div>`;
+  }).join('');
+  _sheet('net-locais', `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font:700 17px system-ui">📍 Onde você joga</div>
+      <button onclick="_net.fecharLocais()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 8px">Marque os lugares onde você costuma jogar. O <b>principal</b> vira o endereço dos seus desafios e diz sua cidade — dá pra jogar em mais de um.</div>
+    ${linhas || '<p style="color:var(--ink2);font-size:13px;margin:14px 0">Nenhum clube cadastrado ainda. Fala com o ADM do app pra incluir o seu — por enquanto dá pra jogar sem local.</p>'}
+    <button onclick="_net.locSalvar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:16px">Salvar</button>`);
+}
+
+/* ---- meus troféus (a Sala de Conquistas lê o BANCO, não só os torneios) ----
+   Descoberto em 11/08 testando o ADM: a sala derivava tudo (torneios, selos
+   locais) e nunca leu trofeus_temporada — Reinado, Coroa e troféu do ADM
+   existiam no banco e não apareciam pra ninguém. */
+async function netMeusTrofeus(){
+  if(!MEU_UID) return [];
+  const r = await sb.from('trofeus_temporada')
+    .select('id,tipo,nome,etiqueta,origem,temporada,grupo_id,criado_em')
+    .eq('player_id', MEU_UID).order('criado_em', {ascending:false});
+  return r.data || [];
+}
+
+/* =========================================================================
    ADM DO APLICATIVO (11/08) — migrações 18 e 20.
 
    Não confundir com dono/gestor de comunidade nem com organizador de torneio:
@@ -1898,7 +2116,7 @@ async function netAbrirAdm(){
   if(!(await netCheckAdm())){ if(window.toast) toast('Essa área é só do ADM.'); return; }
   _adm = _adm || { aba:'trofeus', q:'', achados:[], sel:null, trofeus:[], grupos:[],
                    novo:{ nome:'', etiqueta:'', grupo_id:'' },
-                   cidades:[], locais:[], loc:{ nome:'', cidade_id:'', tipo:'clube', quadras:1 } };
+                   cidades:[], locais:[], loc:{ nome:'', endereco:'', cidade_id:'', tipo:'clube', quadras:1 } };
   if(!_adm.cidades.length) await _admCarregarCidades();
   netRenderAdm();
 }
@@ -1912,7 +2130,7 @@ async function _admCarregarCidades(){
 }
 async function _admCarregarLocais(){
   if(!_adm.loc.cidade_id){ _adm.locais=[]; return; }
-  const r = await sb.from('locais').select('id,nome,tipo,quadras,ativo')
+  const r = await sb.from('locais').select('id,nome,tipo,quadras,ativo,endereco')
     .eq('cidade_id', _adm.loc.cidade_id).order('nome');
   _adm.locais = r.data || [];
 }
@@ -1922,7 +2140,8 @@ function _admSet(campo, v){ _adm.novo[campo]=v; }
 function _admLocSet(campo, v){
   _adm.loc[campo] = (campo==='quadras') ? Math.max(1, Math.min(60, parseInt(v||1,10)||1)) : v;
   if(campo==='cidade_id'){ _admCarregarLocais().then(netRenderAdm); return; }
-  if(campo!=='nome') netRenderAdm();
+  // nome e endereço são texto corrido: re-render a cada tecla perde o cursor
+  if(campo!=='nome' && campo!=='endereco') netRenderAdm();
 }
 
 async function _admBuscar(v){
@@ -1979,10 +2198,14 @@ async function _admApagar(id, rotulo){
 
 async function _admSalvarLocal(){
   const nome = (_adm.loc.nome||'').trim();
+  const endereco = (_adm.loc.endereco||'').trim();
   if(!nome){ alert('O clube precisa de um nome.'); return; }
   if(!_adm.loc.cidade_id){ alert('Escolhe a cidade.'); return; }
+  // endereço obrigatório (11/08): o nome serve pra quem já conhece o clube;
+  // quem chega pelo desafio precisa saber AONDE ir
+  if(!endereco){ alert('Coloca o endereço — é ele que diz aonde ir pra quem não conhece o clube.'); return; }
   const { error } = await sb.from('locais').insert({
-    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras
+    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras, endereco
   });
   if(error){
     alert(error.message.includes('duplicate') || error.code === '23505'
@@ -1991,7 +2214,7 @@ async function _admSalvarLocal(){
     return;
   }
   if(window.toast) toast(`📍 ${nome} cadastrado.`);
-  _adm.loc.nome=''; await _admCarregarLocais(); netRenderAdm();
+  _adm.loc.nome=''; _adm.loc.endereco=''; await _admCarregarLocais(); netRenderAdm();
 }
 
 function netRenderAdm(){
@@ -2060,7 +2283,7 @@ function netRenderAdm(){
     const jaTem = _adm.locais.map(l=>`
       <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
         <div style="flex:1;min-width:0"><b>${_admEsc(l.nome)}</b>
-          <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}</div></div>
+          <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}${l.endereco?' · '+_admEsc(l.endereco):''}</div></div>
       </div>`).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum local nessa cidade ainda.</p>`;
 
     corpo = `
@@ -2071,6 +2294,8 @@ function netRenderAdm(){
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Cadastrar um local novo</div>
       <input id="adm-ln" value="${_admEsc(_adm.loc.nome)}" oninput="_net.admLocSet('nome',this.value)" placeholder="Nome do clube"
         style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
+      <input id="adm-le" value="${_admEsc(_adm.loc.endereco||'')}" oninput="_net.admLocSet('endereco',this.value)" placeholder="Endereço — ex.: Av. Sete de Setembro, 3222 — Barra"
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:8px" autocomplete="off"/>
       <div style="display:flex;gap:6px;margin-top:8px">${seg}</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
         <div style="font-size:12px;color:var(--ink2);flex:1">Quantas quadras</div>
@@ -2113,5 +2338,10 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha,
   abrirAdm:netAbrirAdm, fecharAdm:netFecharAdm, admAba:_admAba, admBuscar:_admBuscar,
   admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
-  admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal };
+  admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal,
+  locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
+  abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
+  locToggle:_locToggle, locPrincipal:_locPrincipal, locSalvar:_locSalvar,
+  onLocal:_onLocal, onQuadra:_onQuadra, gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus };
+window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;
