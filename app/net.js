@@ -2058,12 +2058,19 @@ let _mapaLoc = null;     // player_id → {local_id, cidade_id, regiao_id} (view
 
 async function netLocais(force){
   if(_locais && !force) return _locais;
-  const [ls, cs] = await Promise.all([
-    sb.from('locais').select('id,nome,tipo,quadras,cidade_id,endereco').eq('ativo',true).order('nome'),
+  const [ls, cs, rs] = await Promise.all([
+    sb.from('locais').select('id,nome,tipo,quadras,cidade_id,regiao_id,endereco').eq('ativo',true).order('nome'),
     sb.from('cidades').select('id,nome,uf'),
+    sb.from('regioes').select('id,nome,cidade_id'),
   ]);
   const cid = {}; (cs.data||[]).forEach(c=>cid[c.id]=c);
-  _locais = (ls.data||[]).map(l=>({ ...l, cidade: cid[l.cidade_id] ? `${cid[l.cidade_id].nome}/${cid[l.cidade_id].uf}` : '' }));
+  const reg = {}; (rs.data||[]).forEach(r=>reg[r.id]=r);
+  /* O NOME da região vem colado aqui, e não numa consulta na hora de desenhar:
+     o render do radar é síncrono (não pode esperar query) e precisa do rótulo
+     pro chip. Mesma razão pela qual a cidade já vinha colada. */
+  _locais = (ls.data||[]).map(l=>({ ...l,
+    cidade: cid[l.cidade_id] ? `${cid[l.cidade_id].nome}/${cid[l.cidade_id].uf}` : '',
+    regiao: reg[l.regiao_id] ? reg[l.regiao_id].nome : null }));
   return _locais;
 }
 const _locDe   = (id)=> (_locais||[]).find(l=>l.id===id) || null;
@@ -2089,6 +2096,10 @@ function _locPublicar(){
     principalNome: l ? l.nome : null,
     cidadeId: l ? l.cidade_id : null,
     cidade: l ? l.cidade : null,
+    // a região sai do local PRINCIPAL, como a cidade. Fica nula enquanto o ADM
+    // não classificar o clube — e aí o chip de região nem aparece.
+    regiaoId: l ? l.regiao_id : null,
+    regiao: l ? l.regiao : null,
   };
   if(window.render){ try{ render(); }catch(e){} }
 }
@@ -2383,7 +2394,8 @@ async function netAbrirAdm(){
   if(!(await netCheckAdm())){ if(window.toast) toast('Essa área é só do ADM.'); return; }
   _adm = _adm || { aba:'trofeus', q:'', achados:[], sel:null, trofeus:[], grupos:[],
                    novo:{ nome:'', etiqueta:'', grupo_id:'' },
-                   cidades:[], locais:[], loc:{ nome:'', endereco:'', cidade_id:'', tipo:'clube', quadras:1 } };
+                   cidades:[], locais:[], regioes:[], regNova:'',
+                   loc:{ nome:'', endereco:'', cidade_id:'', regiao_id:'', tipo:'clube', quadras:1 } };
   if(!_adm.cidades.length) await _admCarregarCidades();
   netRenderAdm();
 }
@@ -2395,11 +2407,22 @@ async function _admCarregarCidades(){
   if(!_adm.loc.cidade_id && _adm.cidades.length) _adm.loc.cidade_id = _adm.cidades[0].id;
   await _admCarregarLocais();
 }
+/* Região e local vêm sempre no mesmo par: região só existe dentro de uma
+   cidade, e a lista de locais é desenhada com o seletor de região em cada
+   linha. Carregar um sem o outro deixaria a tela pedindo pra escolher entre
+   opções que ainda não chegaram. */
 async function _admCarregarLocais(){
-  if(!_adm.loc.cidade_id){ _adm.locais=[]; return; }
-  const r = await sb.from('locais').select('id,nome,tipo,quadras,ativo,endereco')
-    .eq('cidade_id', _adm.loc.cidade_id).order('nome');
-  _adm.locais = r.data || [];
+  if(!_adm.loc.cidade_id){ _adm.locais=[]; _adm.regioes=[]; return; }
+  const [ls, rs] = await Promise.all([
+    sb.from('locais').select('id,nome,tipo,quadras,ativo,endereco,regiao_id')
+      .eq('cidade_id', _adm.loc.cidade_id).order('nome'),
+    sb.from('regioes').select('id,nome').eq('cidade_id', _adm.loc.cidade_id).order('nome'),
+  ]);
+  _adm.locais  = ls.data || [];
+  _adm.regioes = rs.data || [];
+  // trocou de cidade? a região escolhida no formulário é de outra cidade e não
+  // vale mais — deixar ela lá gravaria um local em região de cidade errada.
+  if(_adm.loc.regiao_id && !_adm.regioes.some(r=>r.id===_adm.loc.regiao_id)) _adm.loc.regiao_id='';
 }
 
 function _admAba(a){ _adm.aba=a; netRenderAdm(); }
@@ -2410,6 +2433,8 @@ function _admLocSet(campo, v){
   // nome e endereço são texto corrido: re-render a cada tecla perde o cursor
   if(campo!=='nome' && campo!=='endereco') netRenderAdm();
 }
+// mesmo motivo: texto corrido não re-renderiza a cada tecla
+function _admRegSet(v){ _adm.regNova = v; }
 
 async function _admBuscar(v){
   _adm.q = v;
@@ -2496,7 +2521,10 @@ async function _admSalvarLocal(){
   // quem chega pelo desafio precisa saber AONDE ir
   if(!endereco){ alert('Coloca o endereço — é ele que diz aonde ir pra quem não conhece o clube.'); return; }
   const { error } = await sb.from('locais').insert({
-    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras, endereco
+    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras, endereco,
+    // opcional de propósito: clube em cidade que ainda não tem região dividida
+    // entra sem, e é classificado depois pela lista
+    regiao_id: _adm.loc.regiao_id || null
   });
   if(error){
     alert(error.message.includes('duplicate') || error.code === '23505'
@@ -2506,6 +2534,70 @@ async function _admSalvarLocal(){
   }
   if(window.toast) toast(`📍 ${nome} cadastrado.`);
   _adm.loc.nome=''; _adm.loc.endereco=''; await _admCarregarLocais(); netRenderAdm();
+  await netLocais(true); await netMapaLocais(true);
+}
+
+/* =========================================================================
+   REGIÕES (12/08) — migração 19 criou a tabela e ela ficou sem tela.
+
+   Região aqui é ZONA DENTRO DA CIDADE (Barra, Pituba, Itaigara), não
+   macrorregião do país: é a régua que decide se dá pra jogar com alguém numa
+   terça à noite, e é um dos quatro eixos da segmentação (classe × horário ×
+   região × formato).
+
+   Quem escreve é só o ADM, como cidade e local — pela mesma razão da migração
+   19: texto livre vira "Barra"/"barra"/"Barra Avenida" numa semana e aí não
+   filtra nada, que era a única razão de existir. E ninguém digita a própria
+   região: ela deriva do clube onde a pessoa joga, exatamente como a cidade.
+   ========================================================================= */
+async function _admCriarRegiao(){
+  const nome = (_adm.regNova||'').trim();
+  if(!nome){ alert('A região precisa de um nome — ex.: Barra, Pituba, Itaigara.'); return; }
+  if(!_adm.loc.cidade_id){ alert('Escolhe a cidade primeiro.'); return; }
+  const { error } = await sb.from('regioes').insert({ nome, cidade_id:_adm.loc.cidade_id });
+  if(error){
+    alert(/duplicate|23505/.test(error.message||error.code||'')
+      ? 'Já existe uma região com esse nome nessa cidade.'
+      : 'Não deu pra criar a região: '+error.message);
+    return;
+  }
+  if(window.toast) toast(`🗺️ Região ${nome} criada.`);
+  _adm.regNova=''; await _admCarregarLocais(); netRenderAdm();
+}
+
+/* Apagar não é destrutivo pro local: `locais.regiao_id` é `on delete set null`
+   (migração 19), então o clube fica sem região, não some. Ainda assim o aviso
+   diz quantos perdem a classificação — apagar "Barra" com 6 clubes dentro
+   esvazia o chip de 6 clubes de uma vez, e isso não pode ser surpresa. */
+async function _admApagarRegiao(id, nome){
+  const usados = _adm.locais.filter(l=>l.regiao_id===id).length;
+  const aviso = usados
+    ? `\n\n${usados} ${usados===1?'clube fica':'clubes ficam'} sem região (o clube não some, só perde a classificação).`
+    : '';
+  if(!confirm(`Apagar a região “${nome}”?${aviso}`)) return;
+  const { error } = await sb.from('regioes').delete().eq('id', id);
+  if(error){ alert('Não deu pra apagar: '+error.message); return; }
+  if(window.toast) toast('Região apagada.');
+  if(_adm.loc.regiao_id===id) _adm.loc.regiao_id='';
+  await _admCarregarLocais(); netRenderAdm();
+  await netLocais(true); await netMapaLocais(true);
+}
+
+/* Classificar um clube JÁ CADASTRADO. Sem isto a tela nasceria inútil: todo
+   local que existe hoje entrou antes de haver região e está com `regiao_id`
+   nulo — só o cadastro novo carregar região não classificaria nenhum deles. */
+async function _admLocalRegiao(localId, regiaoId){
+  const { error } = await sb.from('locais')
+    .update({ regiao_id: regiaoId || null }).eq('id', localId);
+  if(error){ alert('Não deu pra mudar a região: '+error.message); return; }
+  const l = _adm.locais.find(x=>x.id===localId); if(l) l.regiao_id = regiaoId || null;
+  const r = _adm.regioes.find(x=>x.id===regiaoId);
+  if(window.toast) toast(r ? `📍 ${l?l.nome:'Local'} → ${r.nome}.` : `📍 ${l?l.nome:'Local'} ficou sem região.`);
+  netRenderAdm();
+  /* O cache de locais do app inteiro (`_locais`) e o mapa do radar guardam a
+     região. Sem recarregar, o chip do radar segue com o valor velho até o
+     próximo boot — e o ADM ia jurar que não funcionou. */
+  await netLocais(true); await netMapaLocais(true);
 }
 
 function netRenderAdm(){
@@ -2576,16 +2668,48 @@ function netRenderAdm(){
       || '<option value="">Nenhuma cidade — rode a migração 19</option>';
     const seg = [['clube','Clube'],['condominio','Condomínio'],['publico','Público'],['academia','Academia']]
       .map(([v,n])=>`<button onclick="_net.admLocSet('tipo','${v}')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_adm.loc.tipo===v?'var(--up-bg)':'var(--sup2)'};color:${_adm.loc.tipo===v?'var(--up)':'#fff'}">${n}</button>`).join('');
+    /* Opções de região, reusadas no formulário e em cada linha da lista. O
+       `sel` chega de fora porque cada linha tem a sua região marcada. */
+    const regOps = (sel)=>['<option value="">Sem região</option>']
+      .concat(_adm.regioes.map(r=>`<option value="${r.id}"${sel===r.id?' selected':''}>${_admEsc(r.nome)}</option>`)).join('');
+
+    /* As regiões da cidade. Ficam ACIMA da lista de locais de propósito: é aqui
+       que se cria a opção que a linha de baixo vai oferecer, e a ordem na tela
+       é a ordem do trabalho (dividir a cidade → classificar os clubes). */
+    const chipsReg = _adm.regioes.map(r=>{
+      const n = _adm.locais.filter(l=>l.regiao_id===r.id).length;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--linha);border-radius:10px;margin-top:6px">
+        <div style="flex:1;min-width:0"><b style="font-size:13px">${_admEsc(r.nome)}</b>
+          <span style="font-size:11px;color:var(--ink2)"> · ${n} ${n===1?'clube':'clubes'}</span></div>
+        <button onclick="_net.admApagarRegiao('${r.id}','${_admEsc(r.nome.replace(/'/g,'’'))}')"
+          style="padding:6px 9px;border-radius:8px;border:1px solid var(--linha2);background:var(--dn-bg);color:#fff;font:600 11px system-ui;cursor:pointer">Apagar</button>
+      </div>`;
+    }).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:6px">Nenhuma região ainda. Enquanto não houver, o radar dessa cidade só filtra por clube.</p>`;
+
     const jaTem = _adm.locais.map(l=>`
-      <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
-        <div style="flex:1;min-width:0"><b>${_admEsc(l.nome)}</b>
-          <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}${l.endereco?' · '+_admEsc(l.endereco):''}</div></div>
+      <div style="padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
+        <b>${_admEsc(l.nome)}</b>
+        <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}${l.endereco?' · '+_admEsc(l.endereco):''}</div>
+        <select onchange="_net.admLocalRegiao('${l.id}',this.value)"
+          style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.regiao_id?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.regiao_id?'#fff':'var(--gold)'};font:600 12px system-ui;margin-top:7px">${regOps(l.regiao_id)}</select>
       </div>`).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum local nessa cidade ainda.</p>`;
+
+    const semReg = _adm.locais.filter(l=>!l.regiao_id).length;
 
     corpo = `
       <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Cidade</div>
       <select onchange="_net.admLocSet('cidade_id',this.value)"
         style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">${cid}</select>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Regiões dessa cidade <span style="color:var(--ink3)">— zona dentro da cidade (Barra, Pituba), não macrorregião</span></div>
+      ${chipsReg}
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="adm-rn" value="${_admEsc(_adm.regNova||'')}" oninput="_net.admRegSet(this.value)" placeholder="Nome da região — ex.: Barra"
+          style="flex:1;min-width:0;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui" autocomplete="off"/>
+        <button onclick="_net.admCriarRegiao()" style="padding:11px 14px;border-radius:11px;border:none;background:var(--up-bg);color:var(--up);font:700 13px system-ui;cursor:pointer;white-space:nowrap">+ Criar</button>
+      </div>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Locais dessa cidade${semReg?` <span style="color:var(--gold)">— ${semReg} sem região</span>`:''}</div>
       ${jaTem}
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Cadastrar um local novo</div>
       <input id="adm-ln" value="${_admEsc(_adm.loc.nome)}" oninput="_net.admLocSet('nome',this.value)" placeholder="Nome do clube"
@@ -2598,6 +2722,8 @@ function netRenderAdm(){
         <input type="number" min="1" max="60" value="${_adm.loc.quadras}" oninput="_net.admLocSet('quadras',this.value)"
           style="width:84px;padding:10px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;text-align:center"/>
       </div>
+      <select onchange="_net.admLocSet('regiao_id',this.value)"
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:8px">${regOps(_adm.loc.regiao_id)}</select>
       <button onclick="_net.admSalvarLocal()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px system-ui;cursor:pointer;margin-top:12px">📍 Cadastrar local</button>`;
   }
 
@@ -2608,7 +2734,9 @@ function netRenderAdm(){
     ${corpo}`);
 
   // devolve o cursor pro campo em que se estava digitando (o painel re-renderiza inteiro)
-  const foco = _adm.aba==='trofeus' ? (_adm.sel && _adm.novo.nome!=='' ? 'adm-tn' : 'adm-q') : (_adm.loc.nome!=='' ? 'adm-ln' : null);
+  const foco = _adm.aba==='trofeus'
+    ? (_adm.sel && _adm.novo.nome!=='' ? 'adm-tn' : 'adm-q')
+    : (_adm.regNova ? 'adm-rn' : _adm.loc.nome!=='' ? 'adm-ln' : null);
   if(foco){ const el=document.getElementById(foco); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 window.netAbrirAdm = netAbrirAdm;
@@ -2635,6 +2763,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   abrirAdm:netAbrirAdm, fecharAdm:netFecharAdm, admAba:_admAba, admBuscar:_admBuscar,
   admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
   admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal,
+  admRegSet:_admRegSet, admCriarRegiao:_admCriarRegiao, admApagarRegiao:_admApagarRegiao,
+  admLocalRegiao:_admLocalRegiao,
   locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
   abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
   locToggle:_locToggle, locPrincipal:_locPrincipal, locSalvar:_locSalvar,

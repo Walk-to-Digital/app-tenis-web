@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=36"></script>
+<script src="net.js?v=37"></script>
 
 <script>
 /* =========================================================================
@@ -1530,13 +1530,22 @@ radar(){
      do teto de distância do cinturão). ±1 classe segue intocado. */
   const meu=window.__meusLocais||{}; const mapa=window.__mapaLocais||{};
   const tenhoLocal=!!meu.principal;
+  /* 12/08: terceiro degrau — a região (zona da cidade, migração 19). Só existe
+     quando o ADM classificou o MEU clube; sem isso o chip nem aparece, porque
+     um filtro que não tem o que comparar só faz a lista sumir sem explicação. */
+  const tenhoRegiao = tenhoLocal && !!meu.regiaoId;
   if(S.radarFiltro==='clube' && tenhoLocal)
     disp=disp.filter(x=>{ const m=mapa[x.id]; return !m || (meu.ids||[]).includes(m.local_id); });
+  /* Clube sem região classificada NÃO some — mesma regra de quem não declarou
+     local. Durante o lançamento a maioria dos clubes ainda está sem região, e
+     esconder todos eles esvaziaria o radar justo em quem está começando. */
+  if(S.radarFiltro==='regiao' && tenhoRegiao)
+    disp=disp.filter(x=>{ const m=mapa[x.id]; return !m || !m.regiao_id || m.regiao_id===meu.regiaoId; });
   if(S.radarFiltro==='cidade' && tenhoLocal)
     disp=disp.filter(x=>{ const m=mapa[x.id]; return !m || m.cidade_id===meu.cidadeId; });
   const chipLoc=(v,n)=>`<button class="chip ${(S.radarFiltro||'todos')===v?'on':''}" onclick="radarFiltrar('${v}')">${n}</button>`;
   const chipsLoc = tenhoLocal
-    ? `<div class="grade" style="margin-bottom:12px">${chipLoc('todos','Todos')}${chipLoc('clube','Meu clube')}${chipLoc('cidade',meu.cidade?meu.cidade.split('/')[0]:'Minha cidade')}</div>`
+    ? `<div class="grade" style="margin-bottom:12px">${chipLoc('todos','Todos')}${chipLoc('clube','Meu clube')}${tenhoRegiao?chipLoc('regiao',meu.regiao):''}${chipLoc('cidade',meu.cidade?meu.cidade.split('/')[0]:'Minha cidade')}</div>`
     : '';
 
   return {titulo:'Radar', dir:`±1 classe`, html:`
@@ -1567,7 +1576,7 @@ radar(){
 
     <div class="sec">
       <div class="rot">Fora do alcance</div>
-      <div class="card"><p class="nota">Jogadores a mais de uma classe de distância não aparecem aqui — nem pela busca por nome. É a mesma trava que faz o quadro ser somente leitura.${(S.radarFiltro&&S.radarFiltro!=='todos')?' Com o filtro de lugar ligado, some também quem declarou jogar em outro '+(S.radarFiltro==='clube'?'clube':'cidade')+' — quem ainda não disse onde joga continua aparecendo.':''}</p></div>
+      <div class="card"><p class="nota">Jogadores a mais de uma classe de distância não aparecem aqui — nem pela busca por nome. É a mesma trava que faz o quadro ser somente leitura.${(S.radarFiltro&&S.radarFiltro!=='todos')?' Com o filtro de lugar ligado, some também quem declarou jogar em outr'+({clube:'o clube',regiao:'a região',cidade:'a cidade'}[S.radarFiltro]||'o lugar')+' — quem ainda não disse onde joga continua aparecendo.':''}</p></div>
     </div>`};
 },
 
