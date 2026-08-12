@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=32"></script>
+<script src="net.js?v=33"></script>
 
 <script>
 /* =========================================================================
@@ -1842,12 +1842,11 @@ comunidade(){
           <div class="av">◈</div>
           <div class="txt"><b>${p.t}</b><small>criado por ${nome(p.de)}</small></div>
         </div></div>`).join('')}
-      <!-- 11/08: mesmo caso do "lançar na mão" — o botão só explicava a regra.
-           Aqui é pior, porque depende do backend de patches, que não existe:
-           hoje S.comunidade.patches vive no aparelho e patch não atravessa
-           conta nenhuma. Desabilitado até o backend chegar. -->
-      <button class="btn gh" disabled>Criar patch — em breve</button>
-      <p class="nota" style="margin-top:9px">Vai passar por filtro de 3 camadas, com até 24 caracteres, e vai custar por criação — não por envio.</p>
+      <!-- 11/08 (noite): o backend chegou (migração 22) e o botão morto virou
+           porta: patch mora na comunidade real, então o caminho é abrir a sua
+           e criar lá — o sheet dela tem o "◈ Patches da comunidade". -->
+      <button class="btn gh" onclick="netAbrirGrupos()">◈ Criar e mandar patch — na sua comunidade</button>
+      <p class="nota" style="margin-top:9px">Até 24 caracteres, filtro de 3 camadas, autoria sempre visível. Patch não se ganha — se recebe.</p>
     </div>
 
     <div class="sec">
@@ -2286,7 +2285,11 @@ function selAba(a){ trAba=a; trSel=null; desenharTrofeus() }
 // de tabela própria; carregam ao abrir a sala e viram as taças da aba Troféus
 let _camps=[];
 let _trofs=[];   // troféus do banco (trofeus_temporada): reinado, coroa, e os do ADM
+let _patsBanco=[];  // patches recebidos de outras contas (patch_envios, migração 22)
 const _trTipoNome=(t)=> t==='reinado'?'Reinado':t==='coroa'?'Coroa da Temporada':'Troféu';
+// arte do patch: p1..p9 escolhida pelo id — estável (o mesmo patch tem sempre a
+// mesma cara) sem guardar coluna de arte
+const _patArte=(id)=>{ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return '../patches-v1/p'+(h%9+1)+'.png'; };
 // mês/ano direto da string ISO — new Date('2026-08-01') nasce UTC e Salvador
 // (UTC-3) puxaria 01/08 pra "jul/2026"
 const _mesAno=d=>{ try{ const [a,m]=String(d).slice(0,10).split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m-1]+'/'+a }catch(e){ return '' } };
@@ -2342,6 +2345,9 @@ function abrirTrofeus(){ trSel=null; let el=$('#trofeus'); if(el) el.classList.a
   // entrega. Existiam no banco e a sala nunca leu; troféu que ninguém vê não premia.
   if(window._net && _net.uid && _net.uid() && _net.meusTrofeus)
     _net.meusTrofeus().then(l=>{ _trofs=l||[]; desenharTrofeus() }).catch(()=>{});
+  // 11/08 (noite): patches do banco (migração 22) — o que chega de outra conta
+  if(window._net && _net.uid && _net.uid() && _net.meusPatches)
+    _net.meusPatches().then(l=>{ _patsBanco=l||[]; desenharTrofeus() }).catch(()=>{});
 }
 function fecharTrofeus(){ const el=$('#trofeus'); if(el) el.classList.remove('on') }
 function selTrofeu(id){ trSel = trSel===id?null:id; desenharTrofeus() }
@@ -2370,7 +2376,11 @@ function desenharTrofeus(){
   cena.style.backgroundPosition=`${(Tw-largNaTela)/2}px ${topo}px`;
 
   const got=trofeusConquistados();
-  const patches=(S.comunidade&&S.comunidade.patches)||[];
+  // patches: os do banco (entre contas, migração 22) + o legado local do aparelho
+  const patches=[
+    ..._patsBanco.map(e=>({ t:e.patch.nome, de:e.de, arte:_patArte(e.patch.id), adm:e.patch.origem==='adm' })),
+    ...((S.comunidade&&S.comunidade.patches)||[]),
+  ];
 
   // abas + contador do objeto ativo
   const chip=(a,n)=>`<button class="tr-aba ${trAba===a?'on':''}" onclick="selAba('${a}')">${n}</button>`;
@@ -2404,7 +2414,7 @@ function desenharTrofeus(){
   } else if(trAba==='selos'){
     itens=TR_PECAS.map(p=>peca(p.id,got.has(p.id)?'tem':'nao','../trofeus-v1/'+p.arq+'.png',p.n));
   } else {
-    itens=patches.slice(0,12).map((p,i)=>peca('patch:'+i,'tem','../patches-v1/p'+((i%9)+1)+'.png',p.t));
+    itens=patches.slice(0,12).map((p,i)=>peca('patch:'+i,'tem',p.arte||('../patches-v1/p'+((i%9)+1)+'.png'),p.t));
   }
   for(let i=0;i<4;i++){
     const y=yDe(TR_PRATELEIRAS[i+1]);
@@ -2429,8 +2439,9 @@ function desenharTrofeus(){
       <p>${c.esporte==='beach'?'Beach Tennis':'Tênis'} · chave de ${c.chave} · ${_mesAno(c.quando)}</p>`;
   } else if(trSel && trSel.startsWith('patch:')){
     const p=patches[+trSel.slice(6)];
+    const quem=(u)=>(window._nomeDe?_nomeDe(u):null)||(typeof nome==='function'?nome(u):u);
     if(p) det=`<b>◈ ${p.t} <span class="tr-pill tem">pertencimento</span></b>
-      <p>Criado por ${typeof nome==='function'?nome(p.de):p.de} na sua comunidade. Patch não se ganha — se recebe.</p>`;
+      <p>${p.adm?'Entregue pelo app':'Mandado por '+quem(p.de)+' na sua comunidade'}. Patch não se ganha — se recebe.</p>`;
   } else if(trSel==='cint'){
     det=`<b>Cinturão da Comunidade <span class="tr-pill ${temCint?'tem':'nao'}">${temCint?'com você':'sem dono'}</span></b>
       <p>${temCint?'Defenda jogando — quem te vencer na comunidade leva.':'Vença o dono do cinturão numa partida da comunidade pra tomar.'}</p>`;

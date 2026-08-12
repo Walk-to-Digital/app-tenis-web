@@ -1160,6 +1160,8 @@ async function netVerGrupo(gid){
       ? `<div style="text-align:center;color:var(--gold);font-size:13px;margin-top:14px">Pedido enviado — aguardando o gestor aprovar.</div>`
       : `<button onclick="_net.pedirEntrar('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">${(pd&&pd.estado==='recusado')?'Não rolou · pedir de novo':'Pedir pra entrar'}</button>`;
   }
+  // patches da comunidade (migração 22) — todo membro cria e manda
+  const patchesBtn = meu ? `<button onclick="_net.abrirPatches('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:14px">◈ Patches da comunidade — criar e mandar</button>` : '';
   const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
   const link = souGestor ? `<button onclick="_net.copiarLinkGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
     <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">O link é o seu convite: quem abrir entra direto, sem pedido.</div>
@@ -1222,7 +1224,7 @@ async function netVerGrupo(gid){
     ${casaH}
     ${cinturaoH}
     ${ms.map(linha).join('')||'<p style="color:var(--ink2);font-size:13px">Ninguém ainda.</p>'}
-    ${pedidosH}${entrar}${sair}${link}`);
+    ${pedidosH}${entrar}${patchesBtn}${sair}${link}`);
 }
 function netFecharGver(){ const el=document.getElementById('net-gver'); if(el) el.remove(); }
 async function netDefinirCasa(gid, v){
@@ -2072,6 +2074,122 @@ async function netMeusTrofeus(){
 }
 
 /* =========================================================================
+   PATCHES (11/08) — migração 22. O desenho é o do protótipo panela-cinturão:
+   até 24 caracteres, filtro de 3 camadas, preso à comunidade, envio livre
+   entre membros, autoria sempre visível. Patch é identidade, não mérito —
+   não exige partida. A cobrança por criação fica pra quando houver meio de
+   pagamento; o modelo já separa criação de envio por isso.
+   ========================================================================= */
+
+/* Filtro de 3 camadas — roda no CLIENTE, e é cortesia (a trava do banco é o
+   tamanho). Camada 1: lista dura, bloqueia. Camada 2: nome de membro da
+   comunidade, bloqueia (patch apontado nominalmente é bullying com moldura).
+   Camada 3: lista cinza, cria marcado pra revisão do ADM. */
+const _PAT_DURA  = ['merda','bosta','caralho','porra','puta','puto','viado','buceta','cu ','fdp','arrombad','desgraça','corno','vagabund','otári','idiota','imbecil','retardad','babaca'];
+// "frango" NÃO está aqui de propósito: "Rei do Frango" é o exemplo canônico do
+// protótipo — zoação de quadra é a alma do patch; a cinza pega o ambíguo-hostil
+const _PAT_CINZA = ['animal','burro','perna de pau','lixo','ruim de bola','pipoqueiro'];
+function netPatchFiltro(texto, nomesMembros){
+  const low = (texto||'').toLowerCase();
+  if(!low.trim()) return { key:'vazio', ic:'', t:'', d:'' };
+  if(_PAT_DURA.some(p=>low.includes(p)))
+    return { key:'hard', ic:'⛔', t:'Bloqueado pela lista dura', d:'Conteúdo ofensivo: o patch não é criado nem salvo.' };
+  const nomes = (nomesMembros||[]).flatMap(n=>String(n||'').toLowerCase().split(/\s+/)).filter(p=>p.length>2);
+  if(nomes.some(p=>low.includes(p)))
+    return { key:'target', ic:'⛔', t:'Nome de membro detectado', d:'Patch apontado nominalmente a alguém da comunidade não pode ser criado.' };
+  if(_PAT_CINZA.some(p=>low.includes(p)))
+    return { key:'gray', ic:'⚠️', t:'Cria marcado pra revisão', d:'Palavra ambígua: o patch nasce, mas fica sinalizado pro ADM revisar.' };
+  return { key:'clear', ic:'✓', t:'Pode ser criado', d:'Não bateu em lista dura, lista cinza nem nome de membro.' };
+}
+
+async function netMeusPatches(){
+  if(!MEU_UID) return [];
+  const es=(await sb.from('patch_envios').select('patch_id,de,criado_em').eq('para',MEU_UID)).data||[];
+  if(!es.length) return [];
+  const ps=(await sb.from('patches').select('id,nome,grupo_id,origem,criado_por').in('id',es.map(e=>e.patch_id))).data||[];
+  const porId={}; ps.forEach(p=>porId[p.id]=p);
+  return es.map(e=>({ ...e, patch:porId[e.patch_id] })).filter(x=>x.patch)
+           .sort((a,b)=>(b.criado_em||'').localeCompare(a.criado_em||''));
+}
+
+/* ---- UI: patches da comunidade (criar, mandar) ------------------------- */
+let _pat=null;
+async function netAbrirPatches(gid){
+  const [g, ms, ps] = await Promise.all([
+    sb.from('grupos').select('id,nome').eq('id',gid).maybeSingle(),
+    sb.from('grupo_membros').select('player_id').eq('grupo_id',gid),
+    sb.from('patches').select('id,nome,criado_por,revisao,criado_em').eq('grupo_id',gid).order('criado_em'),
+  ]);
+  if(!g.data){ alert('Comunidade não encontrada.'); return; }
+  const ids=(ps.data||[]).map(p=>p.id);
+  const envios = ids.length ? (await sb.from('patch_envios').select('patch_id,para').in('patch_id',ids)).data||[] : [];
+  _pat = { gid, nome:g.data.nome, membros:(ms.data||[]).map(m=>m.player_id),
+           patches:ps.data||[], envios, texto:'', mandando:null };
+  netRenderPatches();
+}
+function netFecharPatches(){ _pat=null; const el=document.getElementById('net-patches'); if(el) el.remove(); }
+// re-render a cada tecla porque contador e filtro respondem ao vivo (é o
+// protótipo); o refoco no fim do render devolve o cursor pro fim do texto
+function _patDigitou(v){ _pat.texto=v.slice(0,24); netRenderPatches(); }
+function _patMandando(pid){ _pat.mandando = _pat.mandando===pid ? null : pid; netRenderPatches(); }
+async function _patCriar(){
+  const nome=(_pat.texto||'').trim();
+  if(!nome){ alert('Escreve o texto do patch.'); return; }
+  const f = netPatchFiltro(nome, _pat.membros.map(u=>_nomeDe(u)));
+  if(f.key==='hard' || f.key==='target'){ alert(f.d); return; }
+  const { error } = await sb.from('patches').insert({
+    grupo_id:_pat.gid, nome, criado_por:MEU_UID, origem:'membro', revisao:f.key==='gray',
+  });
+  if(error){ alert('Não deu pra criar: '+error.message); return; }
+  if(window.toast) toast(f.key==='gray' ? `◈ <b>${nome}</b> criado — marcado pra revisão.` : `◈ Patch <b>${nome}</b> criado! Agora manda pra alguém.`);
+  await netAbrirPatches(_pat.gid);
+}
+async function _patMandar(pid, paraUid){
+  const { error } = await sb.from('patch_envios').insert({ patch_id:pid, de:MEU_UID, para:paraUid });
+  if(error){
+    alert(/duplicate|23505/.test(error.message||error.code||'') ? `${_nomeDe(paraUid)} já tem esse patch.` : 'Não deu pra mandar: '+error.message);
+    return;
+  }
+  if(window.toast) toast(`◈ Patch mandado pra <b>${_nomeDe(paraUid)}</b>.`);
+  await netAbrirPatches(_pat.gid);
+}
+function netRenderPatches(){
+  const f = netPatchFiltro(_pat.texto, _pat.membros.map(u=>_nomeDe(u)));
+  const bloqueado = f.key==='hard'||f.key==='target';
+  const corF = f.key==='clear'?'var(--up)':f.key==='gray'?'var(--gold)':'var(--dn)';
+  const nEnvios=(pid)=>_pat.envios.filter(e=>e.patch_id===pid).length;
+  const linhas=_pat.patches.map(p=>{
+    const aberto=_pat.mandando===p.id;
+    const jaTem=new Set(_pat.envios.filter(e=>e.patch_id===p.id).map(e=>e.para));
+    const alvos=_pat.membros.filter(u=>u!==MEU_UID && !jaTem.has(u));
+    return `<div style="border:1px solid var(--linha);border-radius:13px;padding:12px;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:20px">◈</div>
+        <div style="flex:1;min-width:0"><b style="font-size:14px">${p.nome}</b>${p.revisao?' <span style="color:var(--gold);font-size:10px">em revisão</span>':''}
+          <div style="font-size:11px;color:var(--ink2)">por ${_nomeDe(p.criado_por)} · ${nEnvios(p.id)} envio${nEnvios(p.id)===1?'':'s'}</div></div>
+        <button onclick="_net.patMandando('${p.id}')" style="padding:8px 12px;border-radius:10px;border:none;background:${aberto?'var(--sup2)':'#2C5A00'};color:#fff;font:600 12px system-ui;cursor:pointer">${aberto?'fechar':'mandar'}</button>
+      </div>
+      ${aberto?`<div style="margin-top:10px;border-top:1px solid var(--sup2);padding-top:8px">
+        ${alvos.length?alvos.map(u=>`<button onclick="_net.patMandar('${p.id}','${u}')" style="display:block;width:100%;text-align:left;padding:9px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer;margin-top:5px">${_nomeDe(u)}</button>`).join('')
+          :'<p style="color:var(--ink2);font-size:12px;margin:4px 0 0">Todo mundo da comunidade já tem esse patch.</p>'}
+      </div>`:''}
+    </div>`;
+  }).join('') || '<p style="color:var(--ink2);font-size:13px;margin-top:10px">Nenhum patch ainda — cria o primeiro aí embaixo.</p>';
+  _sheet('net-patches', `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font:700 17px system-ui">◈ Patches · ${_pat.nome}</div>
+      <button onclick="_net.fecharPatches()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 6px">Patch é identidade, não mérito: fica preso à comunidade, vai pra quem você quiser mandar e não exige partida. Autoria sempre visível.</div>
+    ${linhas}
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Criar um patch novo</div>
+    <input id="pat-in" value="${(_pat.texto||'').replace(/"/g,'&quot;')}" oninput="_net.patDigitou(this.value)" maxlength="24" placeholder="Texto — até 24 caracteres"
+      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:7px" autocomplete="off"/>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:4px"><span>${f.key!=='vazio'?`<span style="color:${corF}">${f.ic} ${f.t}</span> — ${f.d}`:''}</span><span>${(_pat.texto||'').length}/24</span></div>
+    <button onclick="_net.patCriar()" ${bloqueado||!(_pat.texto||'').trim()?'disabled style="opacity:.4;cursor:default;"':''}
+      style="width:100%;padding:13px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:10px">${f.key==='gray'?'Criar e marcar pra revisão':'Criar patch'}</button>`);
+  const el=document.getElementById('pat-in'); if(el && _pat.mandando===null){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
+}
+
+/* =========================================================================
    ADM DO APLICATIVO (11/08) — migrações 18 e 20.
 
    Não confundir com dono/gestor de comunidade nem com organizador de torneio:
@@ -2158,7 +2276,7 @@ async function _admBuscar(v){
    campo grande onde escolher errado é fácil e permanente. */
 async function _admSel(id, nome){
   _adm.sel = { id, nome };
-  _adm.novo = { nome:'', etiqueta:'', grupo_id:'' };
+  _adm.novo = { nome:'', etiqueta:'', grupo_id:'', patch:'' };
   const [t, g] = await Promise.all([
     sb.from('trofeus_temporada').select('id,tipo,nome,etiqueta,origem,temporada,grupo_id,criado_em')
       .eq('player_id', id).order('criado_em', {ascending:false}),
@@ -2193,6 +2311,30 @@ async function _admApagar(id, rotulo){
   const { error } = await sb.from('trofeus_temporada').delete().eq('id', id);
   if(error){ alert('Não deu pra apagar: '+error.message); return; }
   if(window.toast) toast('Troféu apagado.');
+  await _admSel(_adm.sel.id, _adm.sel.nome);
+}
+
+/* Mandar patch do app (pedido de 11/08, migração 22): patch com origem='adm'
+   e grupo_id nulo. O molde é REUSADO por nome — "Fundador" mandado pra 10
+   pessoas é um patch com 10 envios, não 10 patches: a contagem conta a
+   história e a prateleira não vira estoque. */
+async function _admDarPatch(){
+  const nome = (_adm.novo.patch||'').trim();
+  if(!_adm.sel){ alert('Escolhe o jogador primeiro.'); return; }
+  if(!nome){ alert('O patch precisa de um texto (até 24 caracteres).'); return; }
+  let p = (await sb.from('patches').select('id').eq('origem','adm').eq('nome',nome).maybeSingle()).data;
+  if(!p){
+    const r = await sb.from('patches').insert({ nome, criado_por:MEU_UID, origem:'adm', grupo_id:null }).select('id').single();
+    if(r.error){ alert('Não deu pra criar o patch: '+r.error.message); return; }
+    p = r.data;
+  }
+  const { error } = await sb.from('patch_envios').insert({ patch_id:p.id, de:MEU_UID, para:_adm.sel.id });
+  if(error){
+    alert(/duplicate|23505/.test(error.message||error.code||'') ? `${_adm.sel.nome} já tem esse patch.` : 'Não deu pra mandar: '+error.message);
+    return;
+  }
+  if(window.toast) toast(`◈ Patch <b>${nome}</b> mandado pra ${_adm.sel.nome}.`);
+  _adm.novo.patch='';
   await _admSel(_adm.sel.id, _adm.sel.nome);
 }
 
@@ -2267,6 +2409,11 @@ function netRenderAdm(){
           <select onchange="_net.admSet('grupo_id',this.value)"
             style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:7px">${ops}</select>
           <button onclick="_net.admDar()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px system-ui;cursor:pointer;margin-top:11px">🏅 Entregar troféu</button>
+          <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Mandar um patch do app <span style="color:var(--ink3)">(reusa o molde se o texto já existir)</span></div>
+          <input value="${_admEsc(_adm.novo.patch||'')}" oninput="_net.admSet('patch',this.value)" maxlength="24"
+            placeholder="Texto do patch — até 24 (ex.: Fundador)"
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
+          <button onclick="_net.admDarPatch()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">◈ Mandar patch</button>
         </div>`;
     }
 
@@ -2342,6 +2489,9 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
   abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
   locToggle:_locToggle, locPrincipal:_locPrincipal, locSalvar:_locSalvar,
-  onLocal:_onLocal, onQuadra:_onQuadra, gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus };
+  onLocal:_onLocal, onQuadra:_onQuadra, gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus,
+  abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
+  patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
+  admDarPatch:_admDarPatch, meusPatches:netMeusPatches };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;
