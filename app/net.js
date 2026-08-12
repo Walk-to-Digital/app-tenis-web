@@ -149,6 +149,10 @@ async function netBoot(eu){
     // localização (migração 19): locais + os meus + o mapa do radar. O espelho
     // em window é o que as telas síncronas leem (ficha, quadro, radar).
     try{ await netLocais(); await netMeusLocais(); await netMapaLocais(); }catch(e){}
+    // as comunidades reais e minha posição em cada uma (12/08) — mesmo padrão
+    try{ await netMeusQuadros(); }catch(e){}
+    // destaque por movimento na comunidade (12/08)
+    try{ await netDestaques(); }catch(e){}
     console.log('[net] conectado como', uid, '— jogador + partidas carregados');
     return uid;
   }catch(e){
@@ -331,7 +335,14 @@ function netAplicarConfirmadas(list){
         : `Partida com ${nome0} confirmada · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`);
     }
   });
-  if(mexeu){ salvar(); if(window.render) render(); netSyncJogador(S.jogadores[EU]).catch(()=>{}); }
+  if(mexeu){
+    salvar(); if(window.render) render(); netSyncJogador(S.jogadores[EU]).catch(()=>{});
+    /* A pontuação mudou, então a posição nas comunidades mudou junto: recarrega
+       o espelho que o quadro lê. Assíncrono de propósito — nada aqui pode
+       esperar query, e o placar já está aplicado. */
+    netMeusQuadros(true).catch(()=>{});
+    netDestaques(true).catch(()=>{});   // a partida nova entra nos destaques
+  }
 }
 
 /* ---- 2a: desafiar ----------------------------------------------------- */
@@ -1009,6 +1020,203 @@ async function netRanking(escopo, esporte){
   }catch(e){ return {} }
 }
 
+/* =========================================================================
+   AS COMUNIDADES REAIS NO QUADRO (12/08)
+
+   Até aqui o quadro mostrava um "Circuito do Clube Bahiano" que era estado
+   local fixo: recebia exatamente o mesmo dPts da comunidade e tinha exatamente
+   os mesmos membros — o mesmo ranking, duas vezes, com o vocabulário do bloco
+   de Ligas revogado em 09/08. Pior, o texto dele dizia "qualquer partida sua
+   alimenta ele, mesmo contra quem não é membro", e o banco faz o contrário.
+
+   O container de verdade é a COMUNIDADE, e o ranking dela já existe desde a
+   migração 17: `pontos_creditar` carimba cada lançamento com um escopo e só
+   escreve `grupo:<id>` quando OS DOIS jogadores são membros — que é o
+   "alimentado pelas partidas entre membros" decidido em 09/08.
+
+   O render do quadro é síncrono e não pode esperar query, então o resultado
+   mora num espelho em `window`, mesmo padrão do `__meusLocais`.
+   ========================================================================= */
+let _quadros = null;
+
+async function netMeusQuadros(force){
+  if(_quadros && !force) return _quadros;
+  if(!MEU_UID){ _quadros = null; return []; }
+  const esp = (typeof S !== 'undefined' && S.esporte) || 'tenis';
+  try{
+    const { meus, cont } = await netMeusGrupos();
+    /* só as comunidades DO ESPORTE corrente: o livro-caixa é carimbado por
+       esporte, e misturar traria a posição de um trilho dentro do outro. */
+    const doEsporte = (meus||[]).filter(g => (g.esporte||'tenis') === esp);
+    _quadros = await Promise.all(doEsporte.map(async g=>{
+      const soma  = await netRanking('grupo:'+g.id, esp);
+      const ordem = Object.entries(soma).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+      const i = ordem.indexOf(MEU_UID);
+      return { id:g.id, nome:g.nome, membros:(cont && cont[g.id]) || 0,
+               /* sem lançamento nenhum eu não estou na soma. Posição fica NULA
+                  em vez de virar "1º" — agregado sem o que agregar precisa de
+                  caso explícito, senão o vazio mente com cara de dado. */
+               pos: i >= 0 ? i+1 : null,
+               pts: soma[MEU_UID] || 0 };
+    }));
+  }catch(e){ _quadros = []; }
+  window.__meusQuadros = _quadros;
+  if(window.render){ try{ render(); }catch(e){} }
+  return _quadros;
+}
+
+/* =========================================================================
+   DESTAQUE POR MOVIMENTO, NÃO POR POSIÇÃO (12/08)
+
+   Do protótipo `quadro-circuito`, congelado em 04/08 e revisto hoje. O
+   argumento é o mais forte que sobrou dele: *se só o primeiro aparece, os 90%
+   de baixo ficam invisíveis — e são eles que abandonam primeiro*. Por isso a
+   evidência é ESCASSA (quatro) e ROTATIVA: premia o que mudou na semana, não
+   quem está no topo. Ataca retenção, que é o gargalo de um produto cuja
+   métrica é jogos a mais.
+
+   "Quem mais subiu" só é calculável porque o livro-caixa guarda o LANÇAMENTO
+   com `criado_em`, e não o saldo: dá pra somar até uma data de corte e
+   reconstruir o quadro de sete dias atrás. Com um acumulador isso exigiria uma
+   tabela de fotografias que ninguém escreveu.
+
+   Calculado no CLIENTE, em duas consultas. SQL novo seria mais elegante e só
+   rodaria em produção — e a regra do projeto é que entre o elegante que não dá
+   pra testar e o testável que dá pra rodar quinze vezes antes de entregar, o
+   testável ganha. Aqui não há escrita, migração nem superfície de RLS nova.
+
+   TETO: as duas consultas trazem a temporada inteira (limitadas a 500
+   partidas). Serve com folga pro lançamento clube por clube; quando o volume
+   crescer, isto vira view no banco.
+   ========================================================================= */
+const DESTAQUE_DIAS = 7;
+let _destaques = null;
+
+async function netDestaques(force){
+  if(_destaques && !force) return _destaques;
+  if(!MEU_UID){ _destaques = null; return []; }
+  const esp = (typeof S !== 'undefined' && S.esporte) || 'tenis';
+  try{
+    const t = await netTemporada();
+    /* Toda comparação de data aqui é em MILISSEGUNDOS, nunca em texto: o
+       Postgres devolve o carimbo como `...+00:00` e o `toISOString()` produz
+       `...Z`. Comparadas como string, as duas divergem no meio do carimbo e o
+       filtro erra em silêncio — que é o pior tipo de erro. */
+    const corteMs = Date.now() - DESTAQUE_DIAS*24*3600e3;
+    const ms = (v)=> Date.parse(v);
+
+    /* A janela NÃO entra na consulta de partidas de propósito: a sequência de
+       vitórias e a estreia precisam de história anterior aos sete dias. Quem
+       recorta por data é cada destaque, abaixo. */
+
+    const [ps, ls] = await Promise.all([
+      sb.from('matches')
+        .select('id,criador_id,adversario_id,venceu_criador,delta_criador,delta_adversario,confirmed_at')
+        .eq('status','confirmada').eq('esporte',esp)
+        .order('confirmed_at',{ascending:false}).limit(500),
+      t == null ? Promise.resolve({data:[]}) : sb.from('pontos_lancamentos')
+        .select('player_id,pontos,criado_em')
+        .eq('temporada',t).eq('esporte',esp).eq('escopo','geral'),
+    ]);
+    const partidas = (ps.data||[]).filter(m=>m.confirmed_at);
+    const lanc     = ls.data || [];
+
+    /* ---- 1. quem mais subiu: quadro de hoje contra o de sete dias atrás ---
+       Quem não tinha lançamento antes do corte não "subiu" — ele estreou, e é
+       o quarto destaque. Somar posição pra quem não tinha posição inventaria
+       um salto que não aconteceu. */
+    const somar = (ateMs)=>{
+      const s={}; lanc.forEach(l=>{ if(ateMs==null || ms(l.criado_em) <= ateMs) s[l.player_id]=(s[l.player_id]||0)+l.pontos });
+      return Object.entries(s).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+    };
+    const agora = somar(null), antes = somar(corteMs);
+    let subiu = null;
+    agora.forEach((pid,i)=>{
+      const j = antes.indexOf(pid); if(j < 0) return;
+      const d = j - i;
+      if(d > 0 && (!subiu || d > subiu.d)) subiu = { pid, d };
+    });
+
+    /* ---- 2. maior zebra da janela ----------------------------------------
+       `zebra` viaja no delta do jogador, gravado na confirmação. O critério de
+       "maior" é o dPts do vencedor: é o número que o próprio motor já usou pra
+       dizer o tamanho do feito, em vez de eu inventar uma segunda régua. */
+    let zebra = null;
+    partidas.filter(m=> ms(m.confirmed_at) >= corteMs).forEach(m=>{
+      const venc = m.venceu_criador ? m.delta_criador : m.delta_adversario;
+      if(!venc || !venc.zebra) return;
+      const pid = m.venceu_criador ? m.criador_id : m.adversario_id;
+      if(!zebra || (venc.dPts||0) > zebra.pts) zebra = { pid, pts: venc.dPts||0 };
+    });
+
+    /* ---- 3. sequência de vitórias mais longa, contando do jogo mais recente
+       pra trás. Quebra na primeira derrota — é "sequência atual", não recorde. */
+    const seq = {}, parou = {};
+    partidas.forEach(m=>{                       // já vêm do mais novo pro mais velho
+      [[m.criador_id, m.venceu_criador], [m.adversario_id, !m.venceu_criador]].forEach(([pid,ganhou])=>{
+        if(parou[pid]) return;
+        if(ganhou) seq[pid] = (seq[pid]||0) + 1; else parou[pid] = true;
+      });
+    });
+    let melhor = null;
+    Object.entries(seq).forEach(([pid,n])=>{ if(n >= 2 && (!melhor || n > melhor.n)) melhor = { pid, n } });
+
+    /* ---- 4. quem estreou: primeira partida confirmada dentro da janela ---- */
+    const primeira = {};
+    partidas.forEach(m=>{                       // do mais novo pro mais velho: a última escrita é a mais antiga
+      primeira[m.criador_id]    = m.confirmed_at;
+      primeira[m.adversario_id] = m.confirmed_at;
+    });
+    const novatos = Object.keys(primeira).filter(pid => ms(primeira[pid]) >= corteMs);
+
+    /* Só entra o destaque que tem base real. Sem candidato, a linha não existe
+       — quatro caixas preenchidas na marra seriam o mesmo vazio disfarçado de
+       estado que o circuito falso era. */
+    const out = [];
+    if(subiu)  out.push({ ic:'🚀', k:'quem mais subiu',      v:_nomeDe(subiu.pid),  d:`+${subiu.d} ${subiu.d===1?'posição':'posições'} em ${DESTAQUE_DIAS} dias` });
+    if(zebra)  out.push({ ic:'🦓', k:'maior zebra',           v:_nomeDe(zebra.pid),  d:`venceu quem estava acima · +${zebra.pts} pts` });
+    if(melhor) out.push({ ic:'🔥', k:'sequência mais longa',  v:_nomeDe(melhor.pid), d:`${melhor.n} vitórias seguidas` });
+    if(novatos.length) out.push({ ic:'🌱', k:'quem estreou',
+      v: novatos.length===1 ? _nomeDe(novatos[0]) : `${novatos.length} jogadores`,
+      d: novatos.length===1 ? 'primeira partida no app' : `entraram nos últimos ${DESTAQUE_DIAS} dias` });
+
+    _destaques = out;
+  }catch(e){ _destaques = []; }
+  window.__destaques = _destaques;
+  if(window.render){ try{ render(); }catch(e){} }
+  return _destaques;
+}
+
+/* Onde ESTA partida caiu de verdade. Lido de volta do livro-caixa em vez de
+   recalculado aqui: quem decide os escopos é o `pontos_creditar`, e duplicar
+   essa regra no cliente criaria uma segunda verdade, que diverge da primeira
+   vez que a do banco mudar. Falhou? devolve vazio, e a tela mostra só o que
+   tem certeza — nunca completa com container inventado. */
+async function netQuadrosDaPartida(mid){
+  if(!mid || !MEU_UID) return [];
+  try{
+    const { data } = await sb.from('pontos_lancamentos')
+      .select('escopo,pontos').eq('match_id', mid).eq('player_id', MEU_UID);
+    const linhas = data || [];
+    if(!linhas.length) return [];
+
+    const gid = {}; ((await netMeusGrupos()).meus || []).forEach(g=>gid[g.id]=g.nome);
+    const tids = linhas.filter(l=>l.escopo.startsWith('torneio:')).map(l=>l.escopo.slice(8));
+    const tid = {};
+    if(tids.length){
+      const r = await sb.from('torneios').select('id,nome').in('id', tids);
+      (r.data||[]).forEach(t=>tid[t.id]=t.nome);
+    }
+    return linhas.map(l=>({
+      escopo: l.escopo,
+      pontos: l.pontos,
+      nome: l.escopo.startsWith('grupo:')   ? (gid[l.escopo.slice(6)] || 'Comunidade')
+          : l.escopo.startsWith('torneio:') ? (tid[l.escopo.slice(8)] || 'Campeonato')
+          : 'Quadro geral',
+    }));
+  }catch(e){ return [] }
+}
+
 /* ---- troféus de temporada: Reinado e Coroa (09/08) ---------------------
    Reinado — maior tempo de posse DEFENDIDA.
    Coroa   — quem terminou a temporada com o cinturão.
@@ -1192,6 +1400,7 @@ async function _gcriar(){
   await sb.from('grupo_membros').insert({ grupo_id:data.id, player_id:MEU_UID, papel:'dono' });
   _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove();
   if(window.toast) toast('Comunidade criada! Manda o link pros amigos.');
+  netMeusQuadros(true).catch(()=>{});   // entrou uma comunidade: o quadro muda
   netVerGrupo(data.id);
 }
 function netFecharGnew(){ _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove(); }
@@ -1380,6 +1589,7 @@ async function netRemoverMembro(gid,uid){
 async function netSairGrupo(gid){
   if(!confirm('Sair da comunidade?')) return;
   await sb.from('grupo_membros').delete().eq('grupo_id',gid).eq('player_id',MEU_UID);
+  netMeusQuadros(true).catch(()=>{});   // saiu: some do quadro junto
   netFecharGver(); netAbrirGrupos();
 }
 
@@ -1408,6 +1618,7 @@ async function netEntrarGrupoPorLink(token){
     if(error){ alert('Erro ao entrar: '+error.message); return; }
     await sb.from('grupo_pedidos').delete().eq('grupo_id',g.id).eq('player_id',MEU_UID);
     if(window.toast) toast('Você entrou na comunidade '+g.nome+'!');
+    netMeusQuadros(true).catch(()=>{});
   }
   setTimeout(()=>{ try{ netVerGrupo(g.id); }catch(e){} }, 300);
 }
@@ -2765,6 +2976,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal,
   admRegSet:_admRegSet, admCriarRegiao:_admCriarRegiao, admApagarRegiao:_admApagarRegiao,
   admLocalRegiao:_admLocalRegiao,
+  meusQuadros:netMeusQuadros, quadrosDaPartida:netQuadrosDaPartida, destaques:netDestaques,
   locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
   abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
   locToggle:_locToggle, locPrincipal:_locPrincipal, locSalvar:_locSalvar,

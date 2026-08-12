@@ -750,7 +750,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=37"></script>
+<script src="net.js?v=40"></script>
 
 <script>
 /* =========================================================================
@@ -772,13 +772,10 @@ function estadoInicial(){ return {
     u001:{nome:'Você', ap:'VC', nivel:1200, div:'C', nivelB:1200, divB:'C', clube:'', calibrando:true, cal:0, bon:'m1', roupa:'camiseta', cor:'#C9663C', cena:{quadra:'saibro',momento:'noite'}, escudo:'bahiano', patroc:'stella', vestiario:'tunel'},
   },
   // pontos de temporada por jogador, por contexto — preenchidos por partida real
-  pontos:{  comunidade:{u001:0}, c_clube:{u001:0} },
-  pontosB:{ comunidade:{u001:0}, c_clube:{u001:0} },
-  ant:{comunidade:{},c_clube:{}},
+  pontos:{  comunidade:{u001:0} },
+  pontosB:{ comunidade:{u001:0} },
+  ant:{comunidade:{}},
   comunidade:{ nome:'Sua comunidade', membros:['u001'], cinturao:null, patches:[] },
-  circuitos:[
-    {id:'c_clube', nome:'Circuito do Clube Bahiano', membros:1, principal:true, aberto:true},
-  ],
   open:{nome:'Ace Open 2026', dias:52, inscrito:true},
   pendentes:[],
   aguardando:null,     // partida enviada esperando confirmação do adversário
@@ -813,8 +810,17 @@ if(!S || !S.jogadores) S = estadoInicial();
   const novo = estadoInicial();
   if(!S.esporte)  S.esporte  = 'tenis';
   if(!S.pontosB)  S.pontosB  = novo.pontosB;
-  S.circuitos.forEach(c=>{ if(!S.pontosB[c.id]) S.pontosB[c.id] = novo.pontosB[c.id] || {} });
   if(!S.pontosB.comunidade) S.pontosB.comunidade = novo.pontosB.comunidade;
+  /* 12/08: o "Circuito do Clube Bahiano" saiu. Ele era um container fixo que
+     recebia exatamente o mesmo dPts da comunidade e tinha exatamente os mesmos
+     membros — o mesmo ranking, duas vezes, com o vocabulário do bloco de Ligas
+     revogado em 09/08. Quem já usou o app tem essas chaves GRAVADAS no
+     aparelho, então limpar aqui: chave persistida que some precisa de migração,
+     senão vira lixo que ninguém lê e ninguém apaga. */
+  delete S.circuitos;
+  if(S.pontos)  delete S.pontos.c_clube;
+  if(S.pontosB) delete S.pontosB.c_clube;
+  if(S.ant)     delete S.ant.c_clube;
   Object.keys(S.jogadores).forEach(id=>{
     const j = S.jogadores[id], p = novo.jogadores[id];
     if(j.nivelB==null) j.nivelB = p ? p.nivelB : 1200;
@@ -1142,11 +1148,14 @@ function aplicar(p){
   const caiuDiv  = divDepois!==divAntes && !subiuDiv;
   if(beach) eu.divB = divDepois; else eu.div = divDepois;
 
-  // pontos derramam na comunidade e em TODOS os circuitos (31/07: circuito é lente)
-  // 06/08: derramam só dentro do esporte da partida
+  /* 06/08: derramam só dentro do esporte da partida.
+     12/08: o derrame para containers REAIS não mora mais aqui. Quem decide em
+     que escopos a partida cai é o `pontos_creditar` (migração 17), e ele só
+     credita em `grupo:<id>` quando OS DOIS jogadores são membros — regra que o
+     circuito local contrariava ao dizer "qualquer partida sua alimenta ele". O
+     que a tela mostra agora é lido de volta do banco, não recalculado aqui. */
   const T = tabelaPontos();
   T.comunidade[EU] = (T.comunidade[EU]||0) + r.dPts;
-  S.circuitos.forEach(c=>{ T[c.id][EU] = (T[c.id][EU]||0) + r.dPts });
 
   S.historico.unshift({
     adv:p.adv, venceu:p.venceu, placar:p.placar,
@@ -1169,9 +1178,7 @@ function ordena(tabela){
 }
 function posicoes(){
   const T = tabelaPontos();
-  const o = {comunidade: ordena(T.comunidade).indexOf(EU)+1};
-  S.circuitos.forEach(c=>{ o[c.id] = ordena(T[c.id]).indexOf(EU)+1 });
-  return o;
+  return { comunidade: ordena(T.comunidade).indexOf(EU)+1 };
 }
 
 /* 06/08: trocar de esporte troca a lente inteira — nível, divisão, quadro e pontos.
@@ -1189,6 +1196,10 @@ function trocarEsporte(e){
   eu.cena = eu.cenas[e] || (e==='beach' ? {quadra:'areia',momento:mom} : {quadra:'saibro',momento:mom});
   eu.cenas[e] = eu.cena;
   pilha=[]; salvar(); render();
+  /* o livro-caixa é carimbado por esporte, então as comunidades e a minha
+     posição em cada uma são outras neste trilho — recarrega o espelho */
+  if(window._net && _net.meusQuadros) _net.meusQuadros(true).catch(()=>{});
+  if(window._net && _net.destaques)   _net.destaques(true).catch(()=>{});
   toast(e==='beach' ? 'Beach Tennis — quadra de areia' : 'Tênis — quadra de saibro');
 }
 
@@ -1363,12 +1374,12 @@ inicio(){
       <button onclick="trocarAba('comunidade')">▣ Minha comunidade</button>
     </div>`;
 
-  // faixa "o que mexeu na comunidade" — o feed real, não loot
-  const strip = S.feed.map(f=>`
+  // faixa "o que mexeu na comunidade" — o feed real, não loot.
+  // 12/08: mesma fonte da seção do quadro (destaque por movimento).
+  const strip = (window.__destaques||[]).map(f=>`
     <div class="mcard">
       <div class="mic">${f.ic}</div>
-      <div class="mtx"><b>${f.t}</b><small>${f.d}</small></div>
-      ${f.v?`<div class="mv">${f.v}</div>`:''}
+      <div class="mtx"><b>${f.v}</b><small>${f.k}</small></div>
     </div>`).join('') || `<div class="mcard"><div class="mtx"><b>Tudo quieto</b><small>marque um jogo pra começar a mexer</small></div></div>`;
 
   return {titulo:'Início', dir:'', html:`
@@ -1501,26 +1512,43 @@ quadro(){
       <div class="pos">${i+1}</div>
       ${avatar(id)}
       <div class="nm">${id===EU?'Você':nome(id)}
-        <small>${S.comunidade.cinturao.dono===id?'Cinturão · ':''}Nível ${nivelDe(S.jogadores[id])}</small></div>
+        <!-- a guarda não é enfeite: cinturao nasce null e só deixa de ser
+             quando alguém liga o cinturão numa comunidade. Sem ela o .dono
+             estoura e a aba Quadro inteira não renderiza — que é o estado de
+             toda conta nova. O cabeçalho da home já guardava; esta ficou pra trás.
+             (sem crase aqui dentro: comentário dentro de template literal não usa) -->
+        <small>${(S.comunidade.cinturao && S.comunidade.cinturao.dono===id)?'Cinturão · ':''}Nível ${nivelDe(S.jogadores[id])}</small></div>
       ${movimento(i+1, id===EU?S.ant.comunidade[EU]:null)}
       <div class="pt">${tabelaPontos().comunidade[id]}</div>
     </div>`).join('');
 
-  const circuitos = S.circuitos.map(c=>{
-    const p = ordena(tabelaPontos()[c.id]).indexOf(EU)+1;
-    const mv = S.ant[c.id]? (S.ant[c.id][EU]-p) : 0;
-    return `<div class="card clic" onclick="ir('circuito',{id:'${c.id}'})">
-      <div class="linha-item">
-        <div class="txt"><b>${c.nome}</b><small>${c.membros} jogadores · ${p}º lugar${c.principal?' · principal':''}</small></div>
-        ${mv>0?`<span class="pil up">▲ ${mv}</span>`:mv<0?`<span class="pil dn">▼ ${-mv}</span>`:`<span class="pil gh">${tabelaPontos()[c.id][EU]} pts</span>`}
-      </div></div>`}).join('');
+  /* 12/08: as comunidades REAIS, lidas do banco (escopo `grupo:<id>` do
+     livro-caixa) e publicadas em `__meusQuadros` pelo net.js. O render é
+     síncrono e não pode esperar query — daí o espelho, mesmo padrão do
+     `__meusLocais`. Enquanto não carregou, a lista é nula e a seção não mente:
+     não desenha placar nenhum. */
+  const meusQ = window.__meusQuadros;
+  const comunidades = !meusQ ? ''
+    : meusQ.length ? meusQ.map(c=>`
+      <div class="card clic" onclick="netVerGrupo('${c.id}')">
+        <div class="linha-item">
+          <div class="txt"><b>${c.nome}</b><small>${c.membros} ${c.membros===1?'jogador':'jogadores'}${c.pos?` · ${c.pos}º lugar`:''}</small></div>
+          <span class="pil gh">${c.pts} pts</span>
+        </div></div>`).join('')
+    : `<div class="card"><p class="nota">Você ainda não está em nenhuma comunidade. É nela que a partida entre membros vira ranking próprio — e onde o cinturão existe.</p></div>`;
 
-  const feed = S.feed.map(f=>`
-    <div class="card"><div class="linha-item">
-      <div class="av">${f.ic}</div>
-      <div class="txt"><b>${f.t}</b><small>${f.d}</small></div>
-      ${f.v?`<span class="pil up">${f.v}</span>`:''}
-    </div></div>`).join('');
+  /* 12/08: esta seção lia S.feed, que é zerado no boot e nunca preenchido —
+     desenhava nada, sempre. Agora traz o destaque por movimento, do protótipo
+     `quadro-circuito`: o que MUDOU na semana, não quem está no topo. Só entra
+     linha com base real; sem base, o vazio é dito em vez de fingido. */
+  const dest = window.__destaques;
+  const feed = !dest ? ''
+    : dest.length ? dest.map(f=>`
+      <div class="card"><div class="linha-item">
+        <div class="av">${f.ic}</div>
+        <div class="txt"><b>${f.v}</b><small>${f.k} · ${f.d}</small></div>
+      </div></div>`).join('')
+    : `<div class="card"><p class="nota">Ainda não houve movimento essa semana. Assim que os placares começarem a entrar, aparece aqui quem subiu, quem deu zebra e quem estreou.</p></div>`;
 
   return {titulo:'Quadro', dir:`Semana ${S.semana} de 12`, html:`
     <div class="hero">
@@ -1539,7 +1567,6 @@ quadro(){
       </div>
       <div class="stats">
         <div><div class="v">${pos.comunidade}º</div><div class="k">Na comunidade</div></div>
-        <div><div class="v">${pos.c_clube}º</div><div class="k">No clube</div></div>
         <div><div class="v">${S.historico.length}</div><div class="k">Jogos</div></div>
       </div>
     </div>
@@ -1554,9 +1581,9 @@ quadro(){
     </div>
 
     <div class="sec">
-      <div class="rot">Seus circuitos <span>${S.circuitos.length} de 5</span></div>
-      ${circuitos}
-      <div class="card clic" onclick="toast('O Ace Open é um Open — chave aberta, não gera circuito próprio.')">
+      <div class="rot">Suas comunidades${meusQ&&meusQ.length?` <span>${meusQ.length}</span>`:''}</div>
+      ${comunidades}
+      <div class="card clic" onclick="toast('O Ace Open é um Open — chave aberta, não gera ranking próprio.')">
         <div class="linha-item">
           <div class="txt"><b>${S.open.nome}</b><small>Chave de 32 · começa em ${S.open.dias} dias</small></div>
           <span class="pil gold">Inscrito</span>
@@ -1803,6 +1830,16 @@ placar(p){
 /* ---------------- O QUE MEXEU ---------------- */
 mexeu(){
   const u=S.ultimo, eu=S.jogadores[EU];
+  /* 12/08: os containers em que a partida REALMENTE caiu, lidos de volta do
+     livro-caixa (`pontos_lancamentos`) depois do crédito. Ler em vez de
+     recalcular é o que impede a tela de divergir do banco: quem decide os
+     escopos é o `pontos_creditar`, e a regra dele ("só em grupo onde os dois
+     são membros") sai de graça aqui. `geral` fica de fora da lista porque já
+     é a linha do quadro da comunidade logo acima. Se a leitura falhou, a lista
+     vem vazia e a tela mostra só o que tem certeza — nunca completa com
+     container inventado, que era o defeito do circuito antigo. */
+  const quadros = (u.quadros||[]).filter(q=> q.escopo !== 'geral');
+  const qN = quadros.length + 1;
   const linhaPos=(rot,antes,depois,extra)=>{
     const d=antes-depois;
     return `<div class="l">
@@ -1819,14 +1856,17 @@ mexeu(){
       <p style="margin-top:4px">Nível ${u.nivel} · Classe ${u.div}</p>
     </div>
     <div class="sec">
-      <div class="rot">Um placar, ${S.circuitos.length+1} quadros</div>
+      <div class="rot">${qN===1?'Um placar, um quadro':`Um placar, ${qN} quadros`}</div>
       <div class="mexeu">
         <div class="l">
           <div class="i"><div class="t">Pontos de temporada</div><div class="d">${CTX_NOME[u.contexto]}${u.zebra?' · multiplicador de zebra':''}</div></div>
           <div class="v" style="color:var(--up)">+${u.dPts}</div>
         </div>
         ${linhaPos('Quadro da comunidade', u.posAntes.comunidade, u.posDepois.comunidade)}
-        ${S.circuitos.map(c=>linhaPos(c.nome, u.posAntes[c.id], u.posDepois[c.id], c.membros+' jogadores')).join('')}
+        ${quadros.map(q=>`<div class="l">
+          <div class="i"><div class="t">${q.nome}</div><div class="d">a partida contou aqui</div></div>
+          <div class="v" style="color:var(--up)">+${q.pontos}</div>
+        </div>`).join('')}
       </div>
       ${u.subiuDiv?`<div class="card" style="border-color:var(--up)"><div class="linha-item">
         <div class="av" style="background:var(--up-bg);color:var(--up)">▲</div>
@@ -1834,7 +1874,9 @@ mexeu(){
       ${u.caiuDiv?`<div class="card" style="border-color:var(--dn)"><div class="linha-item">
         <div class="av" style="background:var(--dn-bg);color:var(--dn)">▼</div>
         <div class="txt"><b>Você caiu pra Classe ${u.div}</b><small>O radar muda junto</small></div></div></div>`:''}
-      <p class="nota" style="margin-top:10px">É isso que um registro faz: um placar move a comunidade e todos os seus circuitos de uma vez. Foi por isso que valeu a pena digitar.</p>
+      <p class="nota" style="margin-top:10px">${quadros.length
+        ? 'É isso que um registro faz: um placar move o quadro e todas as comunidades onde vocês dois estão, de uma vez. Foi por isso que valeu a pena digitar.'
+        : 'Esse placar contou no quadro da comunidade. Entrando numa comunidade com quem você joga, a mesma partida passa a mover o ranking de lá também.'}</p>
       <button class="btn" style="margin-top:14px" onclick="verQuadro()">Ver o quadro</button>
     </div>`};
 },
@@ -1870,7 +1912,7 @@ comunidade(){
       <div class="card clic" onclick="ir('quadro')">
         <div class="linha-item">
           <div class="av">◈</div>
-          <div class="txt"><b>Quadro & circuitos</b><small>A tabela completa da comunidade e seus ${S.circuitos.length} circuitos</small></div>
+          <div class="txt"><b>Quadro</b><small>A tabela completa da comunidade e as suas comunidades</small></div>
           <div class="seta">›</div>
         </div>
       </div>
@@ -1884,12 +1926,20 @@ comunidade(){
           <div class="txt"><b>${nome(c.dono)}</b><small>♦ Campeão há ${c.desde} dias</small></div>
           <span class="pil gold">Dono</span>
         </div>
+        <!-- 12/08: aqui havia "Aspirante", com ap(c.aspirante) sem guarda — e
+             aspirante NÃO EXISTE MAIS desde 09/08: o cinturão passa pra quem
+             vencer o dono numa partida normal, sem desafio formal e sem
+             cooldown. Além de contar um modelo revogado, quebrava a aba inteira
+             quando o campo faltava, que é o formato que vem do banco hoje
+             (cinturao_dono_id + cinturao_desde, e nada mais).
+             O que a tela mostra agora é o que a decisão manda: o histórico na
+             cara, e o relógio que impede o "não jogar" de ser a estratégia. -->
         <div class="stats" style="margin-top:13px">
-          <div><div class="v" style="font-size:14px">${ap(c.aspirante)}</div><div class="k">Aspirante</div></div>
-          <div><div class="v" style="font-size:14px">${c.prazoDias}d</div><div class="k">Prazo</div></div>
-          <div><div class="v" style="font-size:14px">Md 3</div><div class="k">Formato</div></div>
+          <div><div class="v" style="font-size:14px">${c.desde}d</div><div class="k">Reinado</div></div>
+          <div><div class="v" style="font-size:14px">${c.defesas ?? 0}</div><div class="k">Defesas</div></div>
+          <div><div class="v" style="font-size:14px">${c.prazoDias}d</div><div class="k">Vence em</div></div>
         </div>
-        <p class="nota" style="margin-top:11px">Um aspirante por ciclo de 30 dias, escolhido por preferência de ranking. Não existe botão de desafiar — o campeão vê um nome, uma vez por mês.</p>
+        <p class="nota" style="margin-top:11px">Não existe desafio formal: o cinturão passa pra quem vencer o dono numa partida normal. Ficar 14 dias sem jogar congela o reinado, e 30 dias entregam o cinturão pro 1º do ranking da comunidade — segurar parando não funciona.</p>
       </div>` : `<div class="card"><p class="nota">O cinturão ainda não tem dono. Quando a comunidade tiver disputa rolando, o primeiro campeão aparece aqui.</p></div>`}
     </div>
 
@@ -1920,7 +1970,7 @@ comunidade(){
 
     <div class="sec">
       <div class="rot">Copa interna</div>
-      <div class="card clic" onclick="toast('A copa organiza partidas — não cria outro ranking. Cada resultado derrama nos circuitos de quem jogou.')">
+      <div class="card clic" onclick="toast('A copa organiza partidas — não cria outro ranking. Cada resultado conta nas comunidades onde os dois jogadores estão.')">
         <div class="linha-item">
           <div class="txt"><b>Copa do Sábado</b><small>Chave de 8 · eliminatória simples</small></div>
           <div class="seta">›</div>
@@ -2015,27 +2065,11 @@ ficha(){
     </div>`};
 },
 
-/* ---------------- CIRCUITO ---------------- */
-circuito(p){
-  const c=S.circuitos.find(x=>x.id===p.id);
-  const ordem=ordena(tabelaPontos()[c.id]);
-  return {titulo:c.nome, dir:`${c.membros} jogadores`, html:`
-    <div class="sec">
-      <div class="rot">Quadro do circuito <span>por Pontos de Temporada</span></div>
-      <div class="tab">
-        <div class="cab"><div class="r">#</div><div></div><div>Jogador</div><div class="c">Mov</div><div class="r">Pts</div></div>
-        ${ordem.map((id,i)=>`
-          <div class="ln ${id===EU?'eu':''}">
-            <div class="pos">${i+1}</div>
-            ${avatar(id)}
-            <div class="nm">${id===EU?'Você':nome(id)}<small>Classe ${divDe(S.jogadores[id])}</small></div>
-            ${movimento(i+1, id===EU?S.ant[c.id][EU]:null)}
-            <div class="pt">${tabelaPontos()[c.id][id]}</div>
-          </div>`).join('')}
-      </div>
-      <p class="nota" style="margin-top:9px">Circuito é <b>lente, não recorte</b>: qualquer partida sua alimenta ele, mesmo contra quem não é membro. E é plano — classe não entra aqui dentro.</p>
-    </div>`};
-},
+/* 12/08: a tela CIRCUITO saiu. Ela renderizava um ranking que era cópia exata
+   do quadro da comunidade, e o texto dela ("qualquer partida sua alimenta ele,
+   mesmo contra quem não é membro") contradizia o `pontos_creditar`, que só
+   credita no escopo de um grupo quando OS DOIS jogadores são membros. O lugar
+   do ranking por container agora é a própria comunidade (`netVerGrupo`). */
 
 /* ---------------- JOGADOR ---------------- */
 jogador(p){
@@ -2076,7 +2110,11 @@ function previa(par){
   return `<div class="stats" style="margin:12px 0">
     <div><div class="v" style="color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div class="k">Nível</div></div>
     <div><div class="v" style="color:var(--up)">+${c.dPts}</div><div class="k">Pontos</div></div>
-    <div><div class="v">${S.circuitos.length+1}</div><div class="k">Quadros</div></div>
+    <!-- 12/08: saiu a peça "Quadros". Antes ela contava S.circuitos.length+1 e
+         dava sempre 2, com o circuito fake dentro. O número verdadeiro depende
+         de em quantas comunidades os DOIS jogadores estão, e isso só se sabe
+         depois do crédito — prever aqui seria afirmar o que ainda não aconteceu.
+         A prévia mostra só o que é certo antes do jogo. -->
   </div>${c.zebra?`<p class="nota" style="text-align:center;color:var(--up)">Zebra — multiplicador aplicado nos pontos de temporada.</p>`:''}`;
 }
 
@@ -2615,10 +2653,11 @@ function cancelarProposta(id){
 
 function avancarSemana(){
   S.semana=Math.min(12,S.semana+1); S.open.dias=Math.max(0,S.open.dias-7);
-  S.comunidade.cinturao.prazoDias=Math.max(0,S.comunidade.cinturao.prazoDias-7);
-  S.comunidade.cinturao.desde+=7;
+  if(S.comunidade.cinturao){   // mesma guarda: sem cinturão ligado, não há o que avançar
+    S.comunidade.cinturao.prazoDias=Math.max(0,S.comunidade.cinturao.prazoDias-7);
+    S.comunidade.cinturao.desde+=7;
+  }
   S.ant.comunidade[EU]=posicoes().comunidade;
-  S.circuitos.forEach(c=>{ S.ant[c.id][EU]=posicoes()[c.id] });
   // os outros também jogam
   Object.keys(tabelaPontos().comunidade).forEach(id=>{ if(id!==EU) tabelaPontos().comunidade[id]+=Math.round(Math.abs(Math.sin(S.semana*id.charCodeAt(2))*34)) });
   fecharGaveta(); salvar(); render();
@@ -2922,9 +2961,8 @@ function aplicarJogadoresReais(lista){
   const ids = Object.keys(novo);
   S.comunidade.membros = ids.slice();
   const soReais = (tab)=>{ const o={}; ids.forEach(id=> o[id] = (tab && tab[id]) || 0); return o; };
-  S.pontos.comunidade  = soReais(S.pontos.comunidade);  S.pontos.c_clube  = soReais(S.pontos.c_clube);
-  S.pontosB.comunidade = soReais(S.pontosB.comunidade); S.pontosB.c_clube = soReais(S.pontosB.c_clube);
-  S.circuitos.forEach(c=> c.membros = ids.length);
+  S.pontos.comunidade  = soReais(S.pontos.comunidade);
+  S.pontosB.comunidade = soReais(S.pontosB.comunidade);
   // qualquer referência a jogador que não é real some (lixo de localStorage antigo)
   S.historico = (S.historico||[]).filter(h=> novo[h.adv]);
   S.pendentes = (S.pendentes||[]).filter(p=> novo[p.adv]);
