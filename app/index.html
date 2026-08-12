@@ -1244,11 +1244,68 @@ function toast(msg){
    ========================================================================= */
 const nome=(id)=>S.jogadores[id].nome;
 const ap=(id)=>S.jogadores[id].ap;
+/* =========================================================================
+   12/08 — O ARO TEM PISO DE CONTRASTE PRÓPRIO.
+
+   A cor da camisa é o identificador do jogador a 34px, mas camisa e aro são
+   superfícies diferentes: a camisa é área grande com dobra e sombra e se lê
+   sozinha; o aro é um anel de 2px chapado. Contra o fundo Ranket (verde quase
+   preto), 8 das 11 cores da paleta ficavam abaixo de 3:1 — o preto #141414
+   dava 1.09 contra o card, ou seja, não existia.
+
+   A correção que estava decidida (usar o carvão da camisa, luminância 0.12)
+   foi MEDIDA e piorava: 1.02, porque cai em cima da luminância do próprio
+   card. Ela é de 11/08, o mesmo dia em que a paleta virou Ranket — foi pensada
+   contra o fundo claro anterior.
+
+   A regra sobe só a LUMINÂNCIA, preservando matiz e saturação: a cor continua
+   sendo a da pessoa, só sai da faixa em que o fundo a engole. Cor que já passa
+   não é tocada, então nada já aprovado muda de aparência — mesma lógica da
+   conta afim do _pintarMagenta. Piso calibrado no `qa-aro.html` (raiz do
+   work-folder), que mostra as 11 lado a lado.
+
+   Só o ARO. O `--camisa` também alimenta os glows do vestiário, do VS e do
+   onboarding (radial-gradient, opacity .30): área grande e suave, não precisa
+   de piso, e mexer neles mudaria cena já aprovada.
+   ========================================================================= */
+const ARO_CONTRASTE = 3.30;
+
+const _linC   = c => { c/=255; return c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4) };
+const _lumHex = h => { const [r,g,b]=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+                       return 0.2126*_linC(r)+0.7152*_linC(g)+0.0722*_linC(b) };
+const _crHex  = (a,b)=>{ const [hi,lo]=[_lumHex(a),_lumHex(b)].sort((x,y)=>y-x); return (hi+0.05)/(lo+0.05) };
+
+let _fundoAro = null;
+const _aroCache = new Map();
+function corAro(cor){
+  if(!cor) return cor;
+  if(_aroCache.has(cor)) return _aroCache.get(cor);
+  /* o fundo vem do :root, não de um hexadecimal solto aqui: se a paleta virar
+     outra vez, o aro recalibra sozinho em vez de envelhecer em silêncio — que
+     foi exatamente o que aconteceu com o carvão. */
+  if(!_fundoAro) _fundoAro = getComputedStyle(document.documentElement)
+                               .getPropertyValue('--sup2').trim() || '#15200B';
+  let out = cor;
+  if(_crHex(cor,_fundoAro) < ARO_CONTRASTE){
+    const [r,g,b] = [1,3,5].map(i=>parseInt(cor.slice(i,i+2),16));
+    const [h,s,l] = _rgbHsl(r,g,b);
+    // busca binária: contraste não é linear em L, então não dá pra resolver direto
+    let lo=l, hi=1;
+    for(let i=0;i<24;i++){
+      const mid=(lo+hi)/2;
+      const c='#'+_hslRgb(h,s,mid).map(v=>v.toString(16).padStart(2,'0')).join('');
+      if(_crHex(c,_fundoAro) >= ARO_CONTRASTE){ out=c; hi=mid } else lo=mid;
+    }
+  }
+  _aroCache.set(cor,out);
+  return out;
+}
+
 // avatar: boneco recortado + aro na cor da camisa. classe extra: '', 'g' (52) ou 'gg' (76)
 function avatar(id, tam){
   const j=S.jogadores[id];
   const cls = 'av'+(tam?' '+tam:'')+(id===EU?' eu':'');
-  const aro = j.cor ? `style="--camisa:${j.cor}"` : '';
+  const aro = j.cor ? `style="--camisa:${corAro(j.cor)}"` : '';
   // `bonecos/` só tem pose "parado" de m1–m4 e f1–f3; m5 e f4 nasceram no elenco
   // de 06/08 e nunca ganharam essa pose. Cai pro sprite do elenco em vez de furo.
   const img = j.bon ? `<img src="bonecos/${j.bon}-parado.png" onerror="this.onerror=null;this.src='../bonecos-t/${j.bon}.png'" alt="">` : '';
