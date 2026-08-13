@@ -217,8 +217,23 @@ async function netCarregarAmigos(){
    `upsert` e não `insert`: a PK é (de,para) e 'recusado' é linha viva, não
    linha apagada. Reabrir um pedido é voltar pra 'pendente', e a policy
    `amizade_pedidos_reabrir` permite exatamente essa transição. */
-async function netPedirAmizade(uid){
+/* `nome` vem da busca de propósito: `_nomeDe` só enxerga quem já está em
+   `S.jogadores` (adversário ou amigo), e quem acabou de ser achado na busca
+   ainda não está — o toast saía "Vocês viram amigos quando Jogador aceitar".
+   Mesma razão do `desafiarUid`, que já carregava o nome no onclick. */
+async function netPedirAmizade(uid, nome){
   if(!MEU_UID || uid === MEU_UID) return;
+  const primeiro = ((nome||'').trim() || _nomeDe(uid)).split(' ')[0];
+  /* 13/08 — o segundo clique morria. O pedido já existia como (de,para)
+     'pendente', então o upsert virava UPDATE pendente→pendente, e NENHUMA das
+     duas policies de update cobre essa transição: `recusar` exige ser o `para`,
+     `reabrir` exige estado 'recusado'. Vinha 42501 e a tela dizia "não deu pra
+     enviar" sobre um pedido que estava enviado desde o primeiro clique.
+     O caminho certo é nem ir ao banco: pedido pendente é estado conhecido. */
+  if(netJaPedi(uid)){
+    if(window.toast) toast('Você já pediu — falta <b>' + primeiro + '</b> aceitar.');
+    return;
+  }
   const { error } = await sb.from('amizade_pedidos')
     .upsert({ de: MEU_UID, para: uid, estado: 'pendente' }, { onConflict: 'de,para' });
   if(error){
@@ -228,12 +243,32 @@ async function netPedirAmizade(uid){
   }
   /* NÃO entra em `_meusAmigos()`: a amizade não existe ainda, e escrever aqui
      faria a tela afirmar o que não aconteceu — a mesma armadilha do toast que
-     confirma o que não persistiu. */
+     confirma o que não persistiu. Mas o PEDIDO existe, e a lista dele é o que
+     faz o botão virar "pedido enviado" em vez de continuar oferecendo o que já
+     foi feito. Escrever sem superfície de leitura é o que quebrou aqui. */
+  if(_pedidosEnviados && !_pedidosEnviados.includes(uid)) _pedidosEnviados.push(uid);
+  else if(!_pedidosEnviados) _pedidosEnviados = [uid];
   if(window.render) render();
   if(window.netRenderBusca) netRenderBusca();
-  if(window.toast) toast('Pedido enviado. Vocês viram amigos quando <b>'
-    + _nomeDe(uid).split(' ')[0] + '</b> aceitar.');
+  if(window.toast) toast('Pedido enviado. Vocês viram amigos quando <b>' + primeiro + '</b> aceitar.');
 }
+
+/* Os pedidos que EU mandei. `netCarregarPedidosAmizade` só trazia os recebidos
+   (`para = eu`), então a busca não tinha como saber que o pedido já saiu — e
+   oferecia "Pedir amizade" pra quem já tinha sido pedido. */
+let _pedidosEnviados = null;
+async function netCarregarPedidosEnviados(force){
+  if(_pedidosEnviados && !force) return _pedidosEnviados;
+  if(!MEU_UID) return [];
+  const { data, error } = await sb.from('amizade_pedidos')
+    .select('para').eq('de', MEU_UID).eq('estado','pendente');
+  if(error){ console.error('[net] pedidos enviados', error); _pedidosEnviados = null; return []; }
+  _pedidosEnviados = (data||[]).map(r=>r.para);
+  return _pedidosEnviados;
+}
+const netJaPedi = (uid)=> (_pedidosEnviados||[]).includes(uid);
+window.netCarregarPedidosEnviados = netCarregarPedidosEnviados;
+window.netJaPedi = netJaPedi;
 window.netPedirAmizade = netPedirAmizade;
 /* o nome antigo continua ligado: `_net.addAmigo` está chumbado no onclick do
    botão da busca, e trocar rótulo sem trocar a chave falha em silêncio */
@@ -1008,13 +1043,29 @@ let _on=null;
 
 /* ---- Buscar amigos (por nome/email/ID) -------------------------------- */
 let _busca = {termo:'', resultados:[]};
-function netAbrirBusca(){ _busca={termo:'',resultados:[]}; netRenderBusca(); }
+function netAbrirBusca(){
+  _busca={termo:'',resultados:[]};
+  netRenderBusca();
+  /* os dois lados da relação, buscados em paralelo e redesenhados quando
+     chegam: sem isto o primeiro render mostraria "Pedir amizade" pra quem já
+     foi pedido, que é o estado errado no exato momento em que a tela abre. */
+  Promise.all([
+    netCarregarPedidosEnviados(true),
+    (window.netCarregarPedidosAmizade ? netCarregarPedidosAmizade(true) : Promise.resolve([]))
+  ]).then(()=>{ if(document.getElementById('net-busca')) netRenderBusca(); })
+   .catch(e=>console.error('[net] pedidos na busca', e));
+}
 function netFecharBusca(){ const el=document.getElementById('net-busca'); if(el) el.remove(); }
 async function _onBuscar(v){ _busca.termo=v; _busca.resultados = await netBuscar(v); netRenderBusca(); }
 window.netRenderBusca = netRenderBusca;
 function netRenderBusca(){
   const linhas=_busca.resultados.map(p=>{
     const amigo=netEhAmigo(p.id);
+    /* três estados, não dois: sem relação · pedido enviado · pedido recebido.
+       Antes só existiam "amigo" e "não amigo", então o pedido enviado ficava
+       invisível e o botão continuava oferecendo o que já tinha sido feito. */
+    const jaPedi=!amigo && netJaPedi(p.id);
+    const mePediu=!amigo && (window.netPedidosAmizade?netPedidosAmizade():[]).some(x=>x.de===p.id);
     const div=window.divisaoDe?divisaoDe(p.nivel):'';
     const nomeEsc=(p.nome||'').replace(/'/g,'’');
     return `<div style="display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--linha);border-radius:12px;margin-top:8px">
@@ -1022,7 +1073,10 @@ function netRenderBusca(){
       <div style="flex:1;min-width:0"><b>${p.nome}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.id)}</span>
         <div style="font-size:11px;color:var(--ink2)">Classe ${div} · Nível ${p.nivel}${amigo?' · <span style="color:var(--up)">✔ amigo</span>':''}</div></div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        ${amigo?'':`<button onclick="_net.addAmigo('${p.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer">Pedir amizade</button>`}
+        ${amigo?''
+          : mePediu?`<button onclick="_net.aceitarAmizade('${p.id}')" style="padding:7px 10px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>`
+          : jaPedi?`<div style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink3);font:600 12px system-ui;text-align:center">⏳ pedido enviado</div>`
+          : `<button onclick="_net.addAmigo('${p.id}','${nomeEsc}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer">Pedir amizade</button>`}
         <button onclick="_net.desafiarUid('${p.id}','${nomeEsc}',${p.nivel},${p.nivelb||1200})" style="padding:7px 10px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Desafiar</button>
       </div></div>`;
   }).join('') || (_busca.termo?`<p style="color:var(--ink2);font-size:13px;margin-top:12px">Ninguém encontrado por “${_busca.termo}”.</p>`:'');
