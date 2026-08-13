@@ -206,22 +206,86 @@ async function netCarregarAmigos(){
   salvar();
 }
 
-async function netAddAmigo(uid){
+/* 13/08 — AMIZADE DEIXOU DE NASCER DE UM LADO SÓ.
+   Antes isto era um upsert direto em `amizades`, e o `or` da policy antiga
+   (`auth.uid() = a or auth.uid() = b`) deixava eu virar seu amigo sem você
+   tocar em nada. Não era cosmético: amigo se desafia em QUALQUER classe, e a
+   `patch_envios_ins` usa a amizade como porteiro de quem recebe patch —
+   prometendo no comentário uma mutualidade que não existia.
+   Agora vira pedido, e quem fecha é quem RECEBE (migração 25).
+
+   `upsert` e não `insert`: a PK é (de,para) e 'recusado' é linha viva, não
+   linha apagada. Reabrir um pedido é voltar pra 'pendente', e a policy
+   `amizade_pedidos_reabrir` permite exatamente essa transição. */
+async function netPedirAmizade(uid){
+  if(!MEU_UID || uid === MEU_UID) return;
+  const { error } = await sb.from('amizade_pedidos')
+    .upsert({ de: MEU_UID, para: uid, estado: 'pendente' }, { onConflict: 'de,para' });
+  if(error){
+    console.error('[net] pedir amizade', error);
+    if(window.toast) toast('Não deu pra enviar o pedido agora. Tente de novo.');
+    return;                      // não mexe no estado local se o banco recusou
+  }
+  /* NÃO entra em `_meusAmigos()`: a amizade não existe ainda, e escrever aqui
+     faria a tela afirmar o que não aconteceu — a mesma armadilha do toast que
+     confirma o que não persistiu. */
+  if(window.render) render();
+  if(window.netRenderBusca) netRenderBusca();
+  if(window.toast) toast('Pedido enviado. Vocês viram amigos quando <b>'
+    + _nomeDe(uid).split(' ')[0] + '</b> aceitar.');
+}
+window.netPedirAmizade = netPedirAmizade;
+/* o nome antigo continua ligado: `_net.addAmigo` está chumbado no onclick do
+   botão da busca, e trocar rótulo sem trocar a chave falha em silêncio */
+const netAddAmigo = netPedirAmizade;
+window.netAddAmigo = netPedirAmizade;
+
+/* Aceitar é duas escritas sem transação. A ordem importa: fecha a amizade
+   PRIMEIRO e apaga o pedido depois — se falhar no meio, sobra pedido órfão
+   (inofensivo, some no próximo aceite) em vez de pedido apagado sem amizade
+   (que deixaria os dois sem caminho de volta). */
+async function netAceitarAmizade(uid){
   if(!MEU_UID || uid === MEU_UID) return;
   const [a, b] = _par(MEU_UID, uid);
   const { error } = await sb.from('amizades')
     .upsert({ a, b, criada_por: MEU_UID }, { onConflict: 'a,b', ignoreDuplicates: true });
   if(error){
-    console.error('[net] add amigo', error);
-    if(window.toast) toast('Não deu pra adicionar agora. Tente de novo.');
-    return;                      // não mexe no estado local se o banco recusou
+    console.error('[net] aceitar amizade', error);
+    if(window.toast) toast('Não deu pra aceitar agora. Tente de novo.');
+    return;
   }
+  await sb.from('amizade_pedidos').delete().eq('de', uid).eq('para', MEU_UID);
   const meus=_meusAmigos(); if(!meus.includes(uid)){ meus.push(uid); salvar(); }
+  try{ await netCarregarPedidosAmizade(true); }catch(e){}
   if(window.render) render();
-  if(window.netRenderBusca) netRenderBusca();
   if(window.toast) toast('Amigos. Agora <b>os dois</b> podem se desafiar em qualquer classe.');
 }
-window.netAddAmigo = netAddAmigo;
+window.netAceitarAmizade = netAceitarAmizade;
+
+async function netRecusarAmizade(uid){
+  if(!MEU_UID) return;
+  const { error } = await sb.from('amizade_pedidos')
+    .update({ estado: 'recusado' }).eq('de', uid).eq('para', MEU_UID);
+  if(error){ console.error('[net] recusar amizade', error); return; }
+  try{ await netCarregarPedidosAmizade(true); }catch(e){}
+  if(window.render) render();
+}
+window.netRecusarAmizade = netRecusarAmizade;
+
+/* Os pedidos que ESPERAM a minha resposta. Só os pendentes: 'recusado' é
+   registro, não caixa de entrada. */
+let _pedidosAmizade = null;
+async function netCarregarPedidosAmizade(force){
+  if(_pedidosAmizade && !force) return _pedidosAmizade;
+  if(!MEU_UID) return [];
+  const { data, error } = await sb.from('amizade_pedidos')
+    .select('de,criado_em').eq('para', MEU_UID).eq('estado','pendente');
+  if(error){ console.error('[net] pedidos de amizade', error); _pedidosAmizade = null; return []; }
+  _pedidosAmizade = data || [];
+  return _pedidosAmizade;
+}
+window.netCarregarPedidosAmizade = netCarregarPedidosAmizade;
+window.netPedidosAmizade = ()=> _pedidosAmizade || [];
 
 // busca por nome, email ou ID (prefixo hex do uid). Client-side (base pequena).
 async function netBuscar(termo){
@@ -295,8 +359,15 @@ async function netAtualizarInbox(){
     _inboxStatus[m.id]=m.status;
   });
   _inbox = data.filter(m=> m.status!=='confirmada' && m.status!=='recusado');
-  // badge do ✉ na home = quantas partidas pedem a minha ação
-  if(typeof S!=='undefined'){ S.novidades = _inbox.filter(netAcionavel).length; if(window.render) render(); }
+  /* 13/08: pedido de amizade também pede a minha ação, então entra na mesma
+     conta. Sem isto o pedido chega e o ✉ não acende — e ninguém abre uma caixa
+     que não avisa que tem coisa dentro. */
+  try{ await netCarregarPedidosAmizade(true); }catch(e){}
+  // badge do ✉ na home = quantas coisas pedem a minha ação
+  if(typeof S!=='undefined'){
+    S.novidades = _inbox.filter(netAcionavel).length + (window.netPedidosAmizade ? netPedidosAmizade().length : 0);
+    if(window.render) render();
+  }
   if(desafioVS && window.mostrarDesafioVS) window.mostrarDesafioVS(desafioVS);
   else if(abrirInbox) netAbrirInbox();
   else if(document.getElementById('net-inbox')) netRenderInbox();
@@ -308,6 +379,10 @@ async function netAtualizarInbox(){
 function netAplicarConfirmadas(list){
   if(!S.deltasAplicados) S.deltasAplicados=[];
   let mexeu=false;
+  /* 12/08 (b): a posição TEM que ser lida antes de qualquer delta entrar —
+     depois já é a de chegada, e o painel mostraria "2º → 2º" pra quem subiu. */
+  let posAntes=null; try{ posAntes = posicoes(); }catch(e){}
+  let ultima=null;                       // a partida que vai abrir o painel
   (list||[]).forEach(m=>{
     if(m.status!=='confirmada') return;
     if(!m.delta_criador || !m.delta_adversario) return;
@@ -328,6 +403,7 @@ function netAplicarConfirmadas(list){
       dnivel:meu.dNivel||0, dpts:meu.dPts||0, quando:'agora',
       porPrazo: !!m.fechada_por_prazo });
     S.deltasAplicados.push(m.id); mexeu=true;
+    ultima = { m, meu, euVenci, meuPlacar };
     const nome0 = _nomeDe(_advId(m)).split(' ')[0];
     if(window.toast){
       toast(m.fechada_por_prazo
@@ -337,12 +413,64 @@ function netAplicarConfirmadas(list){
   });
   if(mexeu){
     salvar(); if(window.render) render(); netSyncJogador(S.jogadores[EU]).catch(()=>{});
-    /* A pontuação mudou, então a posição nas comunidades mudou junto: recarrega
-       o espelho que o quadro lê. Assíncrono de propósito — nada aqui pode
-       esperar query, e o placar já está aplicado. */
-    netMeusQuadros(true).catch(()=>{});
     netDestaques(true).catch(()=>{});   // a partida nova entra nos destaques
+    /* A pontuação mudou, então a posição nas comunidades mudou junto: o espelho
+       que o quadro lê precisa recarregar. Quem faz isso agora é o painel, com
+       `await` lá dentro — ele DEPENDE do quadro atualizado. Sem partida pra
+       mostrar (não deveria acontecer, mas é barato garantir), recarrega igual. */
+    if(ultima && posAntes) _abrirOQueMexeu(ultima, posAntes);
+    else netMeusQuadros(true).catch(()=>{});
   }
+}
+
+/* 12/08 (b) — O DERRAMAMENTO PRECISA APARECER NO FLUXO REAL.
+   Até aqui a confirmação de verdade dava um toast e acabou: quem digitou o
+   placar nunca via o que ele moveu — que é justamente o argumento pra topar
+   digitar. A tela `mexeu` já existia e o `netQuadrosDaPartida` também; faltava
+   o fio entre eles.
+
+   POR QUE SAI DAQUI E NÃO DO `netConfirmar`
+   `netAplicarConfirmadas` é o funil único por onde todo delta passa, dos DOIS
+   lados: quem confirma vê na hora, e quem lançou o placar e estava offline vê
+   quando abrir o app. Pendurar no `netConfirmar` deixaria metade das pessoas de
+   fora. A trava de `S.deltasAplicados` já garante que roda uma vez só.
+
+   POR QUE ESPERA O ESPELHO VOLTAR
+   `posicoes()` lê o quadro que vem do servidor, e ele só chega depois do
+   `netMeusQuadros`. Montar o painel antes mostraria "2º → 2º" pra quem acabou
+   de subir — uma tela afirmando que nada mexeu, exatamente onde o produto
+   promete que mexeu. Custa cerca de um segundo, e vale.
+
+   A tela lê `posAntes.comunidade` e `posDepois.comunidade` SEM guarda: campo
+   que falte aqui derruba a tela inteira, então todo o objeto é montado de uma
+   vez, com padrão pra cada peça que pode faltar. */
+async function _abrirOQueMexeu(ultima, posAntes){
+  const { m, meu, euVenci, meuPlacar } = ultima;
+  try{
+    await netMeusQuadros(true);
+    const posDepois = posicoes();
+    const quadros   = await netQuadrosDaPartida(m.id);
+    const eu = S.jogadores[EU];
+    /* pelo esporte DA PARTIDA, não pelo que está aberto na tela: dá pra
+       confirmar um placar de beach com o app mostrando tênis. */
+    const nivelDepois = m.esporte==='beach' ? (eu.nivelB ?? 1200) : (eu.nivel ?? 1200);
+    const dN = meu.dNivel || 0;
+    const divDepois = divisaoDe(nivelDepois), divAntes = divisaoDe(nivelDepois - dN);
+    S.ultimo = {
+      adv: _chaveLocal(_advId(m)), venceu: euVenci, placar: meuPlacar,
+      contexto: _ctxDoTorneio(await _torneioDe(m.torneio_id)),
+      zebra: !!meu.zebra, dNivel: dN, dPts: meu.dPts || 0,
+      nivel: nivelDepois, div: divDepois,
+      posAntes, posDepois,
+      subiuDiv: divAntes !== divDepois && dN > 0,
+      caiuDiv:  divAntes !== divDepois && dN < 0,
+      quadros, esporte: m.esporte || 'tenis',
+    };
+    salvar();
+    if(document.querySelector('#onb.on')) return;   // não atropela quem está se cadastrando
+    aba='inicio'; pilha=[{rota:'mexeu'}];
+    if(window.render) render();
+  }catch(e){ console.error('[net] painel do que mexeu', e); }
 }
 
 /* ---- 2a: desafiar ----------------------------------------------------- */
@@ -731,10 +859,29 @@ function netRenderInbox(){
       <div style="font-size:14px;margin-bottom:${acoes?'12px':'0'}">${txt}</div>
       ${acoes?`<div style="display:flex;gap:8px">${acoes}</div>`:''}</div>`;
   }).join('') || `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Nenhuma partida rolando. Vá no Radar e desafie alguém.</p>`;
+  /* 13/08: pedidos de amizade entram AQUI, não numa tela própria. Esta caixa já
+     é o lugar do "isto espera a sua resposta" — desafio, placar pra confirmar —
+     e pedido de amizade é da mesma natureza. Superfície nova só se o objeto for
+     de outra natureza; este não é. Forma copiada dos pedidos de grupo.
+     Sem avatar de propósito: o render é síncrono e quem pediu pode não estar em
+     `S.jogadores` ainda — o disco com a cor não depende de carregar nada. */
+  const _peds = (window.netPedidosAmizade ? netPedidosAmizade() : []);
+  const pedidosH = !_peds.length ? '' :
+    `<div style="font:700 12px system-ui;color:var(--gold);margin:16px 0 2px;text-transform:uppercase;letter-spacing:.08em">Pedidos de amizade</div>`
+    + _peds.map(p=>`<div style="display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--sup2)">
+        <div style="width:28px;height:28px;border-radius:50%;background:${(S.jogadores[_chaveLocal(p.de)]||{}).cor||'#5C2E3C'};flex:0 0 28px"></div>
+        <div style="flex:1;min-width:0">
+          <b>${_nomeDe(p.de)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.de)}</span>
+          <div style="font-size:11px;color:var(--ink2)">quer ser seu amigo — amigos se desafiam em qualquer classe</div>
+        </div>
+        <button onclick="_net.recusarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 12px system-ui;cursor:pointer">Recusar</button>
+        <button onclick="_net.aceitarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>
+      </div>`).join('');
+
   _sheet('net-inbox', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Suas partidas</div>
       <button onclick="_net.fecharInbox()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
-    </div>${linhas}`);
+    </div>${pedidosH}${linhas}`);
 }
 
 /* ---- UI: desafio + lançar placar (overlay _on) ------------------------ */
@@ -757,7 +904,7 @@ function netRenderOnline(){
       <div style="height:12px"></div>`;
     // 📍 da partida: nasce com o local principal do desafiante, dá pra trocar
     // ou tirar. A quadra é opcional e limitada ao nº real de quadras do local.
-    const ls=_locais||[]; const lSel=_locDe(_on.localId);
+    const ls=_locaisMarcaveis(); const lSel=_locDe(_on.localId);   // clube do ADM + as minhas quadras
     const locH = ls.length ? `
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">📍 Onde</div>
       <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
@@ -778,7 +925,7 @@ function netRenderOnline(){
     const qvm = _on.quando ? (()=>{ const x=new Date(_on.quando);
       return `${x.getFullYear()}-${_p2m(x.getMonth()+1)}-${_p2m(x.getDate())}T${_p2m(x.getHours())}:${_p2m(x.getMinutes())}`; })() : '';
     const eleg=_maoElegiveis();
-    const ls=_locais||[]; const lSel=_locDe(_on.localId);
+    const ls=_locaisMarcaveis(); const lSel=_locDe(_on.localId);   // clube do ADM + as minhas quadras
     let previa='';
     if(_on.sets && _on.advId){
       const eu=S.jogadores[EU]; const adv=S.jogadores[_on.advId];
@@ -875,7 +1022,7 @@ function netRenderBusca(){
       <div style="flex:1;min-width:0"><b>${p.nome}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.id)}</span>
         <div style="font-size:11px;color:var(--ink2)">Classe ${div} · Nível ${p.nivel}${amigo?' · <span style="color:var(--up)">✔ amigo</span>':''}</div></div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        ${amigo?'':`<button onclick="_net.addAmigo('${p.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer">+ Amigo</button>`}
+        ${amigo?'':`<button onclick="_net.addAmigo('${p.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer">Pedir amizade</button>`}
         <button onclick="_net.desafiarUid('${p.id}','${nomeEsc}',${p.nivel},${p.nivelb||1200})" style="padding:7px 10px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Desafiar</button>
       </div></div>`;
   }).join('') || (_busca.termo?`<p style="color:var(--ink2);font-size:13px;margin-top:12px">Ninguém encontrado por “${_busca.termo}”.</p>`:'');
@@ -886,7 +1033,7 @@ function netRenderBusca(){
     <input id="net-bq" value="${_busca.termo}" oninput="_net.buscar(this.value)" placeholder="nome, email ou #ID"
       style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="off"/>
     <button onclick="_net.convidarAmigo()" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Convidar amigo por link</button>
-    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:5px">Manda no WhatsApp — quem abrir vira seu amigo no app.</div>
+    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:5px">Manda no WhatsApp — quem abrir te manda um pedido de amizade.</div>
     ${linhas}`);
   const bq=document.getElementById('net-bq'); if(bq){ bq.focus(); bq.setSelectionRange(bq.value.length,bq.value.length); }
 }
@@ -894,7 +1041,7 @@ function netRenderBusca(){
 // convite de amizade por link (?a=<meu uid>) — quem abre me adiciona
 async function netConvidarAmigo(){
   const url = location.origin + location.pathname + '?a=' + MEU_UID;
-  try{ await navigator.clipboard.writeText(url); if(window.toast) toast('Link copiado! Quem abrir vira seu amigo.'); }
+  try{ await navigator.clipboard.writeText(url); if(window.toast) toast('Link copiado! Quem abrir te manda um pedido.'); }
   catch(e){ prompt('Copie o link e mande pro amigo:', url); }
 }
 
@@ -2236,10 +2383,14 @@ async function netCopiarLinkTorneio(id){
 async function netEntrarPorLink(){
   if(!MEU_UID) return;
   const p = new URLSearchParams(location.search);
-  // convite de AMIZADE (?a=<uid de quem convidou>)
+  /* convite de AMIZADE (?a=<uid de quem convidou>)
+     13/08: abrir o link não fecha mais a amizade — manda um pedido pra quem
+     convidou. Custa um toque a mais pra ele, e é o certo: link circula em
+     grupo e vai parar em qualquer um, então quem convidou confirma quem de
+     fato apareceu. */
   const aUid = p.get('a');
   if(aUid){ history.replaceState(null,'',location.pathname);
-    if(aUid!==MEU_UID){ try{ window.aplicarJogadoresReais && aplicarJogadoresReais(await netAdversarios()); }catch(e){} await netAddAmigo(aUid); }
+    if(aUid!==MEU_UID){ try{ window.aplicarJogadoresReais && aplicarJogadoresReais(await netAdversarios()); }catch(e){} await netPedirAmizade(aUid); }
     return; }
   // convite de GRUPO (?g=<token>)
   const gTok = p.get('g');
@@ -2267,23 +2418,49 @@ let _locais = null;      // todos os locais ativos, com o nome da cidade colado
 let _meusLocais = null;  // [{local_id, principal}] — os MEUS
 let _mapaLoc = null;     // player_id → {local_id, cidade_id, regiao_id} (view player_cidade)
 
+/* 13/08: o embed do PostgREST volta objeto ou array conforme a cardinalidade
+   que ele infere da relação. Tolerar as duas formas é mais barato que depender
+   da inferência dele continuar a mesma. */
+const _endDe = (e)=> (Array.isArray(e) ? (e[0]||{}) : (e||{})).endereco || null;
+
 async function netLocais(force){
   if(_locais && !force) return _locais;
   const [ls, cs, rs] = await Promise.all([
-    sb.from('locais').select('id,nome,tipo,quadras,cidade_id,regiao_id,endereco').eq('ativo',true).order('nome'),
+    /* 13/08: o endereço saiu de `locais` e virou linha própria em
+       `locais_endereco`, com fechadura própria (migração 25). Vem embutido:
+       quem não tem direito simplesmente não recebe a linha e o campo fica
+       null — sem erro e sem tela quebrada. */
+    sb.from('locais')
+      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,locais_endereco(endereco)')
+      .eq('ativo',true).order('nome'),
     sb.from('cidades').select('id,nome,uf'),
     sb.from('regioes').select('id,nome,cidade_id'),
   ]);
+  /* 13/08: `ls.data || []` transformava QUALQUER erro em lista vazia — e lista
+     vazia aqui não é erro, é a frase "Nenhum clube cadastrado ainda". Pior: a
+     guarda do topo trata [] como cache bom e congela o vazio pela sessão
+     inteira, e o filtro "Minha cidade" do radar passa a comparar contra null e
+     ESVAZIA o radar de quem declarou clube. Tudo isso sem uma linha de erro na
+     tela. Erro tem que deixar `_locais` nulo, pra próxima chamada tentar de
+     novo. Onde o vazio tem significado de produto, o erro precisa de caminho
+     próprio. */
+  if(ls.error){ console.error('[net] locais', ls.error); _locais = null; return []; }
   const cid = {}; (cs.data||[]).forEach(c=>cid[c.id]=c);
   const reg = {}; (rs.data||[]).forEach(r=>reg[r.id]=r);
   /* O NOME da região vem colado aqui, e não numa consulta na hora de desenhar:
      o render do radar é síncrono (não pode esperar query) e precisa do rótulo
      pro chip. Mesma razão pela qual a cidade já vinha colada. */
-  _locais = (ls.data||[]).map(l=>({ ...l,
+  _locais = ls.data.map(l=>({ ...l,
+    endereco: _endDe(l.locais_endereco),
     cidade: cid[l.cidade_id] ? `${cid[l.cidade_id].nome}/${cid[l.cidade_id].uf}` : '',
     regiao: reg[l.regiao_id] ? reg[l.regiao_id].nome : null }));
   return _locais;
 }
+
+/* 13/08: onde dá pra marcar jogo. A migração 25 só aceita `local_id` de clube
+   do ADM ou de quadra SUA — porque quem escolhe o local escolhe quem enxerga o
+   endereço dele. Filtrar aqui é cortesia: quem manda é o trigger. */
+const _locaisMarcaveis = ()=> (_locais||[]).filter(l=> l.origem !== 'jogador' || l.dono_id === MEU_UID);
 const _locDe   = (id)=> (_locais||[]).find(l=>l.id===id) || null;
 const _locNome = (id)=> { const l=_locDe(id); return l ? l.nome : null; };
 
@@ -2625,11 +2802,22 @@ async function _admCarregarCidades(){
 async function _admCarregarLocais(){
   if(!_adm.loc.cidade_id){ _adm.locais=[]; _adm.regioes=[]; return; }
   const [ls, rs] = await Promise.all([
-    sb.from('locais').select('id,nome,tipo,quadras,ativo,endereco,regiao_id')
+    sb.from('locais').select('id,nome,tipo,quadras,ativo,regiao_id,locais_endereco(endereco)')
       .eq('cidade_id', _adm.loc.cidade_id).order('nome'),
     sb.from('regioes').select('id,nome').eq('cidade_id', _adm.loc.cidade_id).order('nome'),
   ]);
-  _adm.locais  = ls.data || [];
+  /* 13/08: mesma armadilha do netLocais, e aqui é pior — no ADM a lista vazia
+     vira "Nenhum local nessa cidade ainda" com o banco cheio, e como o <select>
+     de região mora dentro da linha do local, some também o jeito de classificar
+     clube por região. `null` distingue "não carregou" de "cidade vazia": os
+     dois são o mesmo pixel hoje, e foi isso que deixou o defeito passar. */
+  /* Bandeira em vez de `null`: cinco pontos leem `_adm.locais` sem guarda, e
+     trocar o vazio silencioso por um crash seria piorar. A lista continua
+     sendo array sempre; quem distingue "não carregou" de "cidade sem local" é
+     `_adm.locaisErro`, e é o render que fala a diferença. */
+  _adm.locaisErro = !!ls.error;
+  if(ls.error){ console.error('[adm] locais', ls.error); _adm.locais = []; }
+  else _adm.locais = ls.data.map(l=>({ ...l, endereco: _endDe(l.locais_endereco) }));
   _adm.regioes = rs.data || [];
   // trocou de cidade? a região escolhida no formulário é de outra cidade e não
   // vale mais — deixar ela lá gravaria um local em região de cidade errada.
@@ -2731,16 +2919,35 @@ async function _admSalvarLocal(){
   // endereço obrigatório (11/08): o nome serve pra quem já conhece o clube;
   // quem chega pelo desafio precisa saber AONDE ir
   if(!endereco){ alert('Coloca o endereço — é ele que diz aonde ir pra quem não conhece o clube.'); return; }
-  const { error } = await sb.from('locais').insert({
-    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras, endereco,
+  /* 13/08 (migração 25): o endereço não mora mais em `locais` — virou linha em
+     `locais_endereco`, que é o que a fechadura enxerga. São duas escritas, e a
+     coluna velha NÃO recebe cópia de propósito: duas casas pro mesmo fato
+     divergem na primeira vez que alguém escreve numa e esquece a outra, e a
+     migração 26 apaga a coluna (um insert que a mencionasse quebraria ali).
+     Como não há transação pelo PostgREST, a compensação é explícita: local sem
+     endereço é exatamente o estado que a tela existe pra impedir, então se a
+     segunda escrita falhar o local recém-criado é desfeito. */
+  const novo = await sb.from('locais').insert({
+    nome, cidade_id:_adm.loc.cidade_id, tipo:_adm.loc.tipo, quadras:_adm.loc.quadras,
     // opcional de propósito: clube em cidade que ainda não tem região dividida
     // entra sem, e é classificado depois pela lista
     regiao_id: _adm.loc.regiao_id || null
-  });
-  if(error){
+  }).select('id').single();
+  if(novo.error){
+    const error = novo.error;
     alert(error.message.includes('duplicate') || error.code === '23505'
       ? 'Já existe um local com esse nome nessa cidade.'
       : 'Não deu pra cadastrar: '+error.message);
+    return;
+  }
+  const end = await sb.from('locais_endereco').insert({ local_id:novo.data.id, endereco });
+  if(end.error){
+    const volta = await sb.from('locais').delete().eq('id', novo.data.id);
+    alert('O clube foi criado mas o endereço não gravou: '+end.error.message
+      + (volta.error
+          ? `\n\n⚠️ E não deu pra desfazer (${volta.error.message}) — "${nome}" ficou cadastrado SEM endereço. Apaga ele na lista antes de tentar de novo.`
+          : '\n\nNada foi cadastrado. Pode tentar de novo.'));
+    await _admCarregarLocais(); netRenderAdm();
     return;
   }
   if(window.toast) toast(`📍 ${nome} cadastrado.`);
@@ -2903,7 +3110,12 @@ function netRenderAdm(){
         <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}${l.endereco?' · '+_admEsc(l.endereco):''}</div>
         <select onchange="_net.admLocalRegiao('${l.id}',this.value)"
           style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.regiao_id?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.regiao_id?'#fff':'var(--gold)'};font:600 12px system-ui;margin-top:7px">${regOps(l.regiao_id)}</select>
-      </div>`).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum local nessa cidade ainda.</p>`;
+      </div>`).join('')
+      /* 13/08: "não carregou" e "cidade vazia" eram o mesmo pixel, e é assim
+         que um erro de consulta se disfarça de estado legítimo. */
+      || (_adm.locaisErro
+        ? `<p style="color:var(--dn);font-size:12px;margin-top:8px">Não deu pra carregar os locais. Veja o console e tente de novo — <b>isto não quer dizer que a cidade está vazia</b>.</p>`
+        : `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum local nessa cidade ainda.</p>`);
 
     const semReg = _adm.locais.filter(l=>!l.regiao_id).length;
 
@@ -2959,6 +3171,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   lancar:netLancarPlacar, digitou:_onDigitou, enviar:_onEnviar, confirmar:netConfirmar, contestar:netContestar,
   abrirInbox:netAbrirInbox, fecharInbox:netFecharInbox, fechar:netFecharOnline,
   abrirBusca:netAbrirBusca, fecharBusca:netFecharBusca, buscar:_onBuscar, addAmigo:netAddAmigo, desafiarUid:netDesafiarUid,
+  aceitarAmizade:netAceitarAmizade, recusarAmizade:netRecusarAmizade,
   abrirTorneios:netAbrirTorneios, fecharTorneios:netFecharTorneios, criarTorneio:netCriarTorneioUI, fecharTnew:netFecharTnew,
   tset:_tset, tcriar:_tcriar, verTorneio:netVerTorneio, fecharTver:netFecharTver, entrarTorneio:netEntrarTorneio, sairTorneio:netSairTorneio,
   tclasse:_tclasse, tcatadd:_tcatadd, tcatdel:_tcatdel, tcatset:_tcatset, tcatclasse:_tcatclasse,
