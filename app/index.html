@@ -616,9 +616,14 @@ button,input,select{font:inherit;color:inherit}
 #onb .onb-brand{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:20px}
 /* 10/08: o "P" de placeholder virou o símbolo da marca. Sem o círculo laranja
    por baixo: o R já é laranja, e laranja sobre laranja some. Sobre o preto da
-   marca o símbolo lê sozinho — é o que o próprio logo vertical faz. */
-#onb .onb-mark{width:78px;height:78px;display:flex;align-items:center;justify-content:center}
-#onb .onb-mark img{width:100%;height:100%;object-fit:contain}
+   marca o símbolo lê sozinho — é o que o próprio logo vertical faz.
+   13/08: na abertura o símbolo sozinho não bastava — o nome da marca não
+   aparecia ESCRITO em nenhum lugar do app, e esta é a única tela onde alguém
+   ainda não sabe como o app se chama. Entra o lockup horizontal (o lettering
+   já é branco no arquivo, então lê sobre o preto). Altura livre: o arquivo é
+   3,43:1 e travar num quadrado de 78px o deixaria com 23px de altura útil. */
+#onb .onb-mark{width:min(272px,74%);display:flex;align-items:center;justify-content:center}
+#onb .onb-mark img{width:100%;height:auto;display:block}
 #onb .onb-brand h1{font-family:var(--f-disp);font-size:29px;text-transform:uppercase;letter-spacing:.03em}
 #onb .onb-brand p{font-size:13px;color:var(--ink2);max-width:290px;line-height:1.5}
 #onb .onb-acts{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
@@ -764,7 +769,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=44"></script>
+<script src="net.js?v=45"></script>
 
 <script>
 /* =========================================================================
@@ -2815,7 +2820,7 @@ function renderOnb(){
   if(onb.step===0){
     body=`
       <div class="onb-brand">
-        <div class="onb-mark"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
+        <div class="onb-mark"><img src="../marcas/ranket-horizontal.png" alt="Ranket"></div>
         <h1>Marque · Jogue · Suba</h1>
         <p>O app onde cada jogo mexe no seu ranking — e o que mexeu vira o motivo do próximo.</p>
       </div>
