@@ -3193,7 +3193,13 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
   abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
   locToggle:_locToggle, locPrincipal:_locPrincipal, locSalvar:_locSalvar,
-  onLocal:_onLocal, onQuadra:_onQuadra, gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus,
+  /* 13/08: `onQuando` ficou de fora quando o campo de data entrou (mig 21) e os
+     irmãos dela — `onLocal` e `onQuadra` — foram exportados. A função existia,
+     só não estava no `_net`, então o `onchange` do datetime-local morria em
+     silêncio nas DUAS folhas que o usam (desafiar e lançar na mão): o horário
+     escolhido nunca chegava em `_on.quando` e a partida saía sem hora. */
+  onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando,
+  gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus,
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
   admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
