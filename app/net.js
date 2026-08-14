@@ -348,7 +348,7 @@ function netParsePlacar(txt){
 let _canal = null;
 let _inbox = [];
 const _expirando = {};   // guarda de reentrada do vencimento do cinturão
-let _inboxStatus = {};   // matchId → último status visto (detecta transições novas)
+let _inboxStatus = {};   // matchId → última chave de estado vista (ver _chaveEstado)
 
 function netSubscribe(){
   if(_canal || !MEU_UID) return;
@@ -359,11 +359,25 @@ function netSubscribe(){
 
 // precisa da MINHA ação?  (desafio pra mim · aceito sem placar · placar pra confirmar)
 function netAcionavel(m){
-  if(m.status==='desafiado') return m.adversario_id===MEU_UID;
+  /* 13/08 (mig 25): com proposta na mesa a vez é de quem NÃO propôs — e isso
+     inclui o CRIADOR, que em todo outro caso de 'desafiado' só espera. Sem esta
+     linha a contraproposta chegava e o ✉ não acendia pra ele: ninguém abre uma
+     caixa que não avisa que tem coisa dentro, e o combinado ficava parado
+     esperando uma resposta que o outro não sabia que devia. */
+  if(m.status==='desafiado') return m.prop_por ? m.prop_por!==MEU_UID
+                                               : m.adversario_id===MEU_UID;
   if(m.status==='aceito')    return true;                    // qualquer um dos dois lança
   if(m.status==='pendente')  return m.placar_por !== MEU_UID; // o outro confirma
   return false;
 }
+/* O que conta como "novidade que exige a minha ação". Era só `m.status`, e a
+   contraproposta NÃO muda o status (segue 'desafiado') — então ela nunca era
+   vista como transição nova, nem pra quem tinha a vez. A rodada entra na chave
+   porque cada ida e volta é um aviso diferente: proposta 2 chegando por cima da
+   1 tem que acender de novo. */
+const _chaveEstado = (m)=> (m.status==='desafiado' && m.prop_por)
+  ? `desafiado:prop${m.prop_rodadas||0}:${m.prop_por}`
+  : m.status;
 
 async function netAtualizarInbox(){
   if(!MEU_UID) return;
@@ -386,12 +400,15 @@ async function netAtualizarInbox(){
   netAplicarConfirmadas(data);                 // mexe no meu nível se fechou partida
   let abrirInbox=false, desafioVS=null;
   data.forEach(m=>{
+    const chave=_chaveEstado(m);
     const prev=_inboxStatus[m.id];
-    if(netAcionavel(m) && prev!==m.status){          // transição nova que exige ação
-      if(m.status==='desafiado' && m.adversario_id===MEU_UID) desafioVS=m;   // desafio → tela VS
+    if(netAcionavel(m) && prev!==chave){             // transição nova que exige ação
+      // só o desafio CRU vai pra tela VS; contraproposta é conversa sobre um
+      // desafio que já existe, e a tela VS o apresentaria como se fosse novo
+      if(m.status==='desafiado' && m.adversario_id===MEU_UID && !m.prop_por) desafioVS=m;
       else abrirInbox=true;                                                   // resto → caixa
     }
-    _inboxStatus[m.id]=m.status;
+    _inboxStatus[m.id]=chave;
   });
   _inbox = data.filter(m=> m.status!=='confirmada' && m.status!=='recusado');
   /* 13/08: pedido de amizade também pede a minha ação, então entra na mesma
@@ -516,12 +533,32 @@ function netDesafiar(id){
   // o 📍 nasce preenchido com o MEU local principal — quem marca sabe onde
   // joga; trocar é exceção, não formulário (decisão de 11/08)
   const meu = window.__meusLocais || {};
+  /* o principal só entra se AINDA for marcável: quem já tinha a quadra
+     particular de outro salvada como principal (a lista de "Onde você joga"
+     oferecia isso) nasceria com um local que a trava (0) recusa, e o desafio
+     morreria no envio. Esconder da lista conserta daqui pra frente; isto
+     conserta quem já escolheu. */
+  const princ = meu.principal && _locaisMarcaveis().some(l=>l.id===meu.principal)
+    ? meu.principal : null;
   _on = { step:'desafio', advId:id, adv:{id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB},
-          localId: meu.principal || null, quadra: null, quando: null };
+          localId: princ, quadra: null, quando: null,
+          quadraPor: null, bolaPor: null };
   netRenderOnline();
 }
 window.netDesafiar = netDesafiar;
-function _onLocal(v){ _on.localId = v || null; _on.quadra = null; netRenderOnline(); }
+/* Tirar o local zera quem leva a quadra: sem lugar o seletor some da tela, e
+   um `quadraPor` cheio por trás de um campo invisível é estado fantasma — o
+   mesmo tipo de bug que o `value=` preenchido de volta no datetime evita. */
+function _onLocal(v){ _on.localId = v || null; _on.quadra = null;
+  if(!_on.localId) _on.quadraPor = null;
+  netRenderOnline(); }
+/* 'eu' | 'ele' | null — vira uuid só na hora de gravar. Clicar no que já está
+   escolhido desmarca: a escolha é opcional e precisa ter volta. */
+function _onQuadraPor(v){ _on.quadraPor = (_on.quadraPor===v) ? null : v; netRenderOnline(); }
+function _onBolaPor(v){   _on.bolaPor   = (_on.bolaPor===v)   ? null : v; netRenderOnline(); }
+const _porUid = (lado)=> lado==='eu' ? MEU_UID : lado==='ele' ? (_on.advId||null) : null;
+const _quadraPorUid = ()=> _porUid(_on.quadraPor);
+const _bolaPorUid   = ()=> _porUid(_on.bolaPor);
 function _onQuadra(v){
   const l=_locDe(_on.localId); const max=l?l.quadras:60;
   const n=parseInt(v,10);
@@ -544,12 +581,51 @@ async function _onConfirmarDesafio(){
       formato:'md3', dupla:false, status:'desafiado', cantada:null,
       local_id: _on.localId || null, quadra: _on.quadra || null,
       quando: _on.quando || null,
+      // só entram na criação: a trava (5) do trigger congela os dois no
+      // UPDATE, e daí em diante eles só mudam pela contraproposta
+      quadra_por: _quadraPorUid(), bola_por: _bolaPorUid(),
     });
     if(error) throw error;
     netFecharOnline();
     if(window.toast) toast(`Desafio enviado pra ${adv.nome.split(' ')[0]} — ele aceita no app dele.`);
     netAtualizarInbox();
   }catch(e){ alert('Não deu pra desafiar: '+(e.message||e)); }
+}
+
+/* ---- contraproposta: abrir e enviar (mig 25) ---------------------------
+   Reaproveita a folha do desafio inteira — os campos combinados são os mesmos
+   quatro, e quem propõe outro dia está respondendo o mesmo formulário. Nasce
+   preenchida com o que está na mesa hoje: contraproposta é edição do
+   combinado, não formulário em branco. */
+function netAbrirContra(matchId){
+  const m = _inbox.find(x=>x.id===matchId); if(!m){ alert('Partida não encontrada.'); return; }
+  const uid = _advId(m);
+  const j = S.jogadores[_chaveLocal(uid)] || { nome:_nomeDe(uid) };
+  // se já há proposta na mesa, o ponto de partida é ELA; senão, o combinado
+  const base = m.prop_por ? 'prop_' : '';
+  const lado = (uidCol)=> uidCol ? (uidCol===MEU_UID?'eu':'ele') : null;
+  _on = { step:'contra', matchId, advId:uid, adv:{ id:uid, nome:j.nome },
+          localId: m[base+'local_id'] || null,
+          quadra:  m[base+'quadra']   || null,
+          quando:  m[base+'quando']   || null,
+          quadraPor: lado(m[base+'quadra_por']),
+          bolaPor:   lado(m[base+'bola_por']),
+          rodadas: m.prop_rodadas||0 };
+  netRenderOnline();
+}
+async function _onEnviarContra(){
+  try{
+    const { error } = await sb.rpc('contraproposta_por', {
+      p_match: _on.matchId, p_quando: _on.quando || null,
+      p_local: _on.localId || null, p_quadra: _on.quadra || null,
+      p_quadra_por: _quadraPorUid(), p_bola_por: _bolaPorUid(),
+    });
+    if(error) throw error;
+    const nome0=_on.adv.nome.split(' ')[0];
+    netFecharOnline();
+    if(window.toast) toast(`Proposta enviada — ${nome0} responde no app dele.`);
+    netAtualizarInbox();
+  }catch(e){ alert('Não deu pra propor: '+(e.message||e)); netAtualizarInbox(); }
 }
 
 /* ---- lançar na mão (11/08, migração 24) --------------------------------
@@ -612,6 +688,33 @@ async function netAceitar(matchId){
 async function netRecusar(matchId){
   const { error } = await sb.from('matches').update({ status:'recusado' }).eq('id',matchId);
   if(error){ alert('Erro: '+error.message); return; }
+  netAtualizarInbox();
+}
+
+/* ---- 2a-bis: presença (mig 25) ----------------------------------------
+   O valor mandado é só um carimbo de intenção — a trava (7) do trigger
+   sobrescreve com `now()` do servidor. É de propósito: hora de chegada que o
+   aparelho escolhe é hora que o aparelho pode mentir. */
+async function netCheckin(matchId){
+  const m = _inbox.find(x=>x.id===matchId); if(!m) return;
+  const campo = _souCriador(m) ? 'checkin_criador' : 'checkin_adversario';
+  const { error } = await sb.from('matches')
+    .update({ [campo]: new Date().toISOString() }).eq('id',matchId);
+  if(error){ alert('Não deu pra fazer check-in: '+error.message); return; }
+  if(window.toast) toast('✅ Check-in feito — tá na quadra.');
+  netAtualizarInbox();
+}
+
+/* ---- 2a-ter: contraproposta (mig 25) ----------------------------------
+   Aceitar a proposta é o mesmo ato que aceitar o desafio — só que o combinado
+   que passa a valer é o proposto. Quem faz a troca é a função, em bloco: ela
+   copia os `prop_*` pro combinado, limpa a mesa e põe o status em 'aceito'.
+   As mensagens de erro dela já são texto de gente ("a vez é do outro jogador",
+   "limite de idas e voltas; aceite ou recuse") — passam direto, sem tradução. */
+async function netAceitarContra(matchId){
+  const { error } = await sb.rpc('contraproposta_aceitar', { p_match: matchId });
+  if(error){ alert('Não deu pra aceitar: '+error.message); netAtualizarInbox(); return; }
+  if(window.toast) toast('Combinado! Agora é só jogar e lançar o placar.');
   netAtualizarInbox();
 }
 
@@ -819,9 +922,12 @@ function netFecharInbox(){ const el=document.getElementById('net-inbox'); if(el)
 const _wrap = (inner)=>`<div style="width:100%;max-width:460px;background:var(--sup);border:1px solid var(--linha);
     border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));color:var(--ink);
     font-family:system-ui,sans-serif;max-height:82vh;overflow:auto">${inner}</div>`;
-const _btn = (txt,onclick,tipo)=>`<button onclick="${onclick}" style="flex:1;padding:13px;border-radius:12px;
+/* `extra` (13/08) sobrescreve o flex pra um botão ocupar a linha inteira —
+   é o que separa "Propor outro dia" da dupla Recusar/Aceitar sem espremer
+   três rótulos numa fileira só. */
+const _btn = (txt,onclick,tipo,extra)=>`<button onclick="${onclick}" style="flex:1;padding:13px;border-radius:12px;
     border:1px solid var(--linha2);font:600 14px system-ui;cursor:pointer;
-    background:${tipo==='ok'?'#2C5A00':tipo==='no'?'var(--dn-bg)':'var(--sup2)'};color:#fff">${txt}</button>`;
+    background:${tipo==='ok'?'#2C5A00':tipo==='no'?'var(--dn-bg)':'var(--sup2)'};color:#fff;${extra||''}">${txt}</button>`;
 const _sheet = (id, inner)=>{
   let el=document.getElementById(id);
   if(!el){ el=document.createElement('div'); el.id=id;
@@ -838,22 +944,77 @@ function netAbrirInbox(){ netRenderInbox(); }
    informação, não campo (11/08): as linhas só aparecem quando a partida tem.
    Data ABSOLUTA, não contagem: "faltam 2 dias" mente nas bordas (o floor e o
    ceil erram de jeitos diferentes); a data não mente nunca. */
-const _pinDe = (m)=>{
+/* `pref` (13/08, migração 25): as mesmas quatro informações existem em duas
+   versões na linha — o COMBINADO (`quando`, `local_id`, `quadra`, `quadra_por`)
+   e a PROPOSTA na mesa (`prop_*`). Um render só pros dois, porque o que a
+   contraproposta pede é justamente pôr um do lado do outro: quem compara
+   "estava assim / passa a ser" não pode estar lendo dois formatos diferentes. */
+const _pinDe = (m, pref='')=>{
+  const F = (c)=> m[pref+c];
   let h='';
-  if(m.quando){
-    const d=new Date(m.quando), p=(n)=>String(n).padStart(2,'0');
+  const quando = F('quando');
+  if(quando){
+    const d=new Date(quando), p=(n)=>String(n).padStart(2,'0');
     const dias=['dom','seg','ter','qua','qui','sex','sáb'];
     h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">🗓 ${dias[d.getDay()]} ${p(d.getDate())}/${p(d.getMonth()+1)} · ${d.getHours()}h${d.getMinutes()?p(d.getMinutes()):''}</div>`;
   }
-  const l = m.local_id && _locDe(m.local_id);
-  if(l) h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:${m.quando?'3px':'6px'}">📍 ${l.nome}${m.quadra?' · Quadra '+m.quadra:''}${l.endereco?`<span style="color:var(--ink3)"> — ${l.endereco}</span>`:''}</div>`;
+  const l = F('local_id') && _locDe(F('local_id'));
+  if(l) h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:${quando?'3px':'6px'}">📍 ${l.nome}${F('quadra')?' · Quadra '+F('quadra'):''}${l.endereco?`<span style="color:var(--ink3)"> — ${l.endereco}</span>`:''}</div>`;
+  /* Os dois combinados de responsabilidade, cada um com o SEU verbo: quadra se
+     reserva, bola se leva — ninguém carrega uma quadra. São fatos separados
+     de propósito (colunas separadas, mig 27) porque caem em pessoas
+     diferentes: no clube a quadra já costuma estar reservada e mesmo assim
+     alguém tem que levar bola.
+     Escritos na 2ª pessoa quando sou eu: a obrigação é minha, e "Você leva a
+     bola" cobra melhor que o meu próprio nome escrito na tela. */
+  const linha = (txt)=>{ h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:${h?'3px':'6px'}">${txt}</div>`; };
+  const qp = F('quadra_por');
+  if(qp) linha(`🏟 ${qp===MEU_UID?'<b>Você reserva</b> a quadra':_nomeDe(qp).split(' ')[0]+' reserva a quadra'}`);
+  const bp = F('bola_por');
+  if(bp) linha(`🎾 ${bp===MEU_UID?'<b>Você leva</b> a bola':_nomeDe(bp).split(' ')[0]+' leva a bola'}`);
+  /* segue devolvendo vazio quando não há nada: este render também roda no card
+     de placar já lançado, e "a combinar" numa partida que já aconteceu é ruído.
+     Quem precisa do texto do vazio é a contraproposta, que pede o dito lá. */
   return h;
+};
+const _pinOuVazio = (m, pref='')=> _pinDe(m, pref)
+  || `<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">a combinar</div>`;
+
+/* As três condições que `contraproposta_por` levanta exceção — repetidas aqui
+   só pra ESCONDER o botão, não pra validar: quem valida é a função. O teto de
+   3 é dela; `prop_rodadas` nulo em linha velha conta como zero. */
+const _podeContrapor = (m)=> m.status==='desafiado'
+  && (m.prop_rodadas||0) < 3
+  && m.prop_por !== MEU_UID;
+
+/* ---- presença (mig 25) ------------------------------------------------
+   Qual das duas colunas é minha depende de que lado da partida eu sou. O
+   banco defende o resto: a trava (7) do trigger força o valor a `now()`,
+   recusa reescrita e proíbe assinar a do outro — o cliente só oferece. */
+const _meuCheckin   = (m)=> _souCriador(m) ? m.checkin_criador    : m.checkin_adversario;
+const _outroCheckin = (m)=> _souCriador(m) ? m.checkin_adversario : m.checkin_criador;
+const _checkinDe = (m)=>{
+  const meu=_meuCheckin(m), dele=_outroCheckin(m);
+  if(!meu && !dele) return '';
+  const nome0=_nomeDe(_advId(m)).split(' ')[0];
+  const [cor,txt] = (meu && dele) ? ['var(--up)', `✅ Vocês dois estão na quadra`]
+                  : meu           ? ['var(--ink2)', `✅ Você fez check-in — falta ${nome0}`]
+                  :                 ['var(--ink2)', `✅ ${nome0} já está na quadra`];
+  return `<div style="font-size:11.5px;color:${cor};margin-top:6px">${txt}</div>`;
 };
 function netRenderInbox(){
   const linhas = _inbox.map(m=>{
     const outro=_nomeDe(_advId(m)).split(' ')[0];
     let txt='', acoes='';
-    if(m.status==='desafiado' && m.adversario_id===MEU_UID){
+    /* `&& !m.prop_por` é o que faz este ramo NÃO engolir a contraproposta.
+       Sem ele, o caso "eu propus → ele contrapropôs → é minha vez" caía aqui
+       (sou o adversário, afinal) e eu via o desafio ORIGINAL, sem sinal de que
+       havia proposta na mesa. Pior: o "Aceitar" daqui é `netAceitar`, um update
+       cru pra 'aceito' — a trava (4) deixa passar porque sou mesmo o
+       adversário, e o combinado velho valeria com a proposta descartada em
+       silêncio e os `prop_*` sujos numa partida já aceita. Proposta na mesa
+       sempre manda no card. */
+    if(m.status==='desafiado' && m.adversario_id===MEU_UID && !m.prop_por){
       const uid=_advId(m); const j=S.jogadores[_chaveLocal(uid)]||{nome:outro};
       const amigo=netEhAmigo(uid);
       const divTxt=(window.divisaoDe&&j.nivel!=null)?('Classe '+divisaoDe(j.nivel)):'';
@@ -871,12 +1032,34 @@ function netRenderInbox(){
            radar e nunca chegou à tela — e quem não sabe que é de graça acaba
            aceitando jogo que não quer, ou some sem responder. -->
       <div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Recusar não custa nada — não mexe no seu nível nem na sua reputação.</div>`;
-      acoes=`${_btn('Recusar',`_net.recusar('${m.id}')`,'no')}${_btn('Aceitar',`_net.aceitar('${m.id}')`,'ok')}`;
+      acoes=`${_podeContrapor(m)?_btn('Propor outro dia',`_net.abrirContra('${m.id}')`,null,'flex:1 0 100%'):''}${_btn('Recusar',`_net.recusar('${m.id}')`,'no')}${_btn('Aceitar',`_net.aceitar('${m.id}')`,'ok')}`;
+    /* 13/08 (mig 25): a contraproposta inverte de quem é a vez, e o criador —
+       que antes só esperava — passa a ter o que responder. Por isso estes dois
+       ramos vêm ANTES do "aguardando": quem tem proposta na mesa não está
+       aguardando nada. */
+    } else if(m.status==='desafiado' && m.prop_por && m.prop_por!==MEU_UID){
+      txt=`<b>${outro}</b> quer jogar em outro dia ou lugar`
+        + `<div style="font-size:11px;color:var(--ink3);margin-top:9px;text-transform:uppercase;letter-spacing:.06em">Estava assim</div>`
+        + `<div style="opacity:.55">${_pinOuVazio(m)}</div>`
+        + `<div style="font-size:11px;color:var(--gold);margin-top:9px;text-transform:uppercase;letter-spacing:.06em">Passa a ser</div>`
+        + _pinOuVazio(m,'prop_')
+        + (m.prop_rodadas>=3?`<div style="font-size:11.5px;color:var(--ink3);margin-top:9px">Já foram três idas e voltas — agora é aceitar ou deixar pra lá.</div>`:'');
+      /* Recusar só aparece pra quem RECEBEU o desafio: a trava (4) do trigger
+         só deixa o adversário pôr 'recusado'. Do lado do criador o botão só
+         devolveria erro, e botão que não funciona não é oferta. */
+      acoes=`${_podeContrapor(m)?_btn('Propor outro',`_net.abrirContra('${m.id}')`,null,'flex:1 0 100%'):''}`
+        + `${m.adversario_id===MEU_UID?_btn('Recusar',`_net.recusar('${m.id}')`,'no'):''}`
+        + `${_btn('Aceitar',`_net.aceitarContra('${m.id}')`,'ok')}`;
+    } else if(m.status==='desafiado' && m.prop_por===MEU_UID){
+      txt=`Você propôs outro combinado pra <b>${outro}</b> — falta ele responder`
+        + _pinOuVazio(m,'prop_');
     } else if(m.status==='desafiado'){
       txt=`Aguardando <b>${outro}</b> aceitar seu desafio` + _pinDe(m);
     } else if(m.status==='aceito'){
-      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m);
-      acoes=`${_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok')}`;
+      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m) + _checkinDe(m);
+      /* "Cheguei" só enquanto eu não assinei: o check-in não se desfaz (trava 7),
+         então oferecer de novo é oferecer um erro. */
+      acoes=`${_meuCheckin(m)?'':_btn('Cheguei',`_net.checkin('${m.id}')`)}${_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok')}`;
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
       const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
@@ -892,7 +1075,7 @@ function netRenderInbox(){
     }
     return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
       <div style="font-size:14px;margin-bottom:${acoes?'12px':'0'}">${txt}</div>
-      ${acoes?`<div style="display:flex;gap:8px">${acoes}</div>`:''}</div>`;
+      ${acoes?`<div style="display:flex;gap:8px;flex-wrap:wrap">${acoes}</div>`:''}</div>`;
   }).join('') || `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Nenhuma partida rolando. Vá no Radar e desafie alguém.</p>`;
   /* 13/08: pedidos de amizade entram AQUI, não numa tela própria. Esta caixa já
      é o lugar do "isto espera a sua resposta" — desafio, placar pra confirmar —
@@ -923,7 +1106,12 @@ function netRenderInbox(){
 function _onDigitou(v){ _on.placarTxt=v; _on.sets=netParsePlacar(v); netRenderOnline(); }
 function netRenderOnline(){
   let body='';
-  if(_on.step==='desafio'){
+  /* 13/08 (mig 25): a contraproposta divide esta folha com o desafio em vez de
+     ganhar uma própria. São os mesmos quatro campos combinados — quem propõe
+     outro dia está respondendo o mesmo formulário, só que já preenchido. Muda
+     o título, o texto e o botão; o corpo é o mesmo. */
+  if(_on.step==='desafio' || _on.step==='contra'){
+    const ehContra = _on.step==='contra';
     // 🗓 quando: dia e hora são a primeira coisa que dois jogadores combinam
     // (pedido de 11/08). Opcional — desafio sem hora vale como "a combinar";
     // obrigar aqui emperraria o registro, que é o elo frágil do ciclo.
@@ -940,6 +1128,22 @@ function netRenderOnline(){
     // 📍 da partida: nasce com o local principal do desafiante, dá pra trocar
     // ou tirar. A quadra é opcional e limitada ao nº real de quadras do local.
     const ls=_locaisMarcaveis(); const lSel=_locDe(_on.localId);   // clube do ADM + as minhas quadras
+    /* Os dois combinados de responsabilidade (mig 27). Um par de botões cada,
+       porque os dois valores possíveis são os dois jogadores — é o que as
+       constraints `matches_quadra_por_participa` e `matches_bola_por_participa`
+       aceitam, então a tela não oferece um terceiro caminho que o banco
+       recusaria.
+       A QUADRA só aparece depois do local escolhido: sem lugar não há quadra
+       pra reservar, e perguntar antes é perguntar no vazio. A BOLA aparece
+       sempre — leva-se bola pra qualquer lugar, inclusive pro "a combinar". */
+    const _par = (nome, atual, fn, rotulo) => `
+      <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">${rotulo} <span style="color:var(--ink3)">(opcional)</span></div>
+      <div style="display:flex;gap:8px">
+        ${[['eu','Eu'],['ele',_on.adv.nome.split(' ')[0]]].map(([v,n])=>
+          `<button onclick="_net.${fn}('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${atual===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('')}
+      </div>`;
+    const qpH = _par('quadra', _on.quadraPor, 'onQuadraPor', '🏟 Quem reserva a quadra');
+    const bpH = _par('bola',   _on.bolaPor,   'onBolaPor',   '🎾 Quem leva a bola');
     const locH = ls.length ? `
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">📍 Onde</div>
       <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
@@ -948,12 +1152,18 @@ function netRenderOnline(){
       </select>
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
         style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}
+      ${lSel?qpH:''}
       <div style="height:14px"></div>` : '';
-    body = `<div style="font:700 17px system-ui;margin-bottom:2px">Desafiar ${_on.adv.nome}</div>
-      <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.</div>
-      ${qdoH}${locH}
-      <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${_btn('Desafiar','_net.confirmarDesafio()','ok')}</div>
-      <div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`;
+    body = `<div style="font:700 17px system-ui;margin-bottom:2px">${ehContra?`Propor outro combinado`:`Desafiar ${_on.adv.nome}`}</div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">${ehContra
+        ? `${_on.adv.nome.split(' ')[0]} recebe a proposta e aceita (ou propõe de volta). Dá pra ir e voltar até três vezes — depois é aceitar ou deixar pra lá.${_on.rodadas?` <b>${_on.rodadas} de 3 já foram.</b>`:''}`
+        : `Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.`}</div>
+      ${qdoH}${locH}${bpH}
+      <div style="height:16px"></div>
+      <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${ehContra
+        ? _btn('Propor','_net.enviarContra()','ok')
+        : _btn('Desafiar','_net.confirmarDesafio()','ok')}</div>
+      ${ehContra?'':`<div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`}`;
   }
   else if(_on.step==='mao'){
     const _p2m=(n)=>String(n).padStart(2,'0');
@@ -2601,7 +2811,12 @@ async function _locSalvar(){
 }
 function netRenderMeusLocais(){
   const TIPO={clube:'clube',condominio:'condomínio',publico:'quadra pública',academia:'academia',outro:''};
-  const linhas=(_locais||[]).map(l=>{
+  /* `_locaisMarcaveis()` e não `_locais` cru: a lista mostrava também as quadras
+     PARTICULARES dos outros, e marcar uma delas como principal quebrava o
+     Desafiar inteiro — o desafio nasce com `local_id` = principal, e a trava (0)
+     do trigger recusa local que não é do clube nem meu. Escolha que o banco vai
+     negar não é escolha; é um erro esperando a pessoa chegar. */
+  const linhas=(_locaisMarcaveis()).map(l=>{
     const on=_loc.sel.includes(l.id), pr=_loc.principal===l.id;
     return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--sup2)">
       <button onclick="_net.locToggle('${l.id}')" style="width:24px;height:24px;border-radius:7px;border:1px solid ${on?'#2C5A00':'var(--linha2)'};background:${on?'#2C5A00':'var(--bg)'};color:#fff;font:700 13px system-ui;cursor:pointer;flex:0 0 24px">${on?'✓':''}</button>
@@ -3222,6 +3437,12 @@ window.netAbrirAdm = netAbrirAdm;
 window.netAbrirTorneios = netAbrirTorneios;
 window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>MEU_UID,
   desafiar:netDesafiar, confirmarDesafio:_onConfirmarDesafio, aceitar:netAceitar, recusar:netRecusar,
+  /* mig 25 — presença e contraproposta. Os cinco entram AQUI e não em outro
+     lugar: o `onclick` do HTML só enxerga o que está neste mapa, e função que
+     fica de fora morre em silêncio (foi o que aconteceu com `onQuando`). */
+  checkin:netCheckin, aceitarContra:netAceitarContra,
+  abrirContra:netAbrirContra, enviarContra:_onEnviarContra,
+  onQuadraPor:_onQuadraPor, onBolaPor:_onBolaPor,
   lancar:netLancarPlacar, digitou:_onDigitou, enviar:_onEnviar, confirmar:netConfirmar, contestar:netContestar,
   abrirInbox:netAbrirInbox, fecharInbox:netFecharInbox, fechar:netFecharOnline,
   abrirBusca:netAbrirBusca, fecharBusca:netFecharBusca, buscar:_onBuscar, addAmigo:netAddAmigo, desafiarUid:netDesafiarUid,
