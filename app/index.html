@@ -130,7 +130,11 @@ button,input,select{font:inherit;color:inherit}
   display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--ink2);
   position:relative;overflow:hidden;box-shadow:0 0 0 2px var(--camisa,var(--linha2));
 }
-.av img{position:absolute;left:50%;top:-14%;transform:translateX(-50%);width:250%;display:block}
+/* 14/08: era `.av img` com width:250% e top:-14% iguais pros nove — o mesmo
+   deslocamento fixo que a nota do ROSTO diz ter sido abandonado por dar rosto
+   borrado e descentralizado. O círculo agora usa o retângulo medido dentro de
+   cada sprite, igual ao seletor do vestiário. */
+.av .ro{position:absolute;inset:0;background-repeat:no-repeat}
 .av.g{width:52px;height:52px;flex:0 0 52px;font-size:16px;box-shadow:0 0 0 2.5px var(--camisa,var(--linha2))}
 .av.gg{width:76px;height:76px;flex:0 0 76px;box-shadow:0 0 0 3px var(--camisa,var(--linha2))}
 .av.eu{background:var(--marca);color:#FFFEFD}
@@ -421,7 +425,15 @@ button,input,select{font:inherit;color:inherit}
 #fone.noturno .ln.eu{background:rgba(201,102,60,.15)}
 #fone.noturno .selo{background:rgba(30,23,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-color:rgba(122,106,92,.22)}
 #fone.noturno .sets b{background:rgba(30,23,20,.62)}
-#fone.noturno .chip{background:rgba(30,23,20,.60);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+/* 14/08 — o `:not(.on)` é o conserto, e a razão é de especificidade.
+   Este seletor tem ID (1,2,0) e o `.chip.on` tem só classes (0,2,0), então no
+   modo noturno o fundo translúcido escuro ganhava do fundo claro do chip
+   SELECIONADO — que continuava com `color:var(--acc-ink)`, quase preto. Dava
+   preto sobre preto: 1,05:1 medido, contra os 4,5:1 que o WCAG AA pede pra
+   texto pequeno. Fora do noturno o mesmo chip dá 19,07:1.
+   O vidro fosco existe pra o chip NÃO escolhido se dissolver na cena; o
+   escolhido precisa do oposto, então ele fica de fora da regra. */
+#fone.noturno .chip:not(.on){background:rgba(30,23,20,.60);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #fone.noturno .abas{background:rgba(21,16,13,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 #fone.noturno #toast{background:rgba(36,28,24,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 /* o hero deixa a quadra aparecer e ganha um respiro de luz lime no topo, como a celebra */
@@ -682,6 +694,15 @@ button,input,select{font:inherit;color:inherit}
   font:600 8.5px var(--f-ui);letter-spacing:.02em;text-align:center;color:var(--ink2);font-style:normal;
   text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #trofeus .tr-peca.nao em{color:var(--ink3)}
+/* 14/08 — a etiqueta do cinturão SOBE em vez de descer.
+   Ela mora na prateleira de cima, e o `top:100%` das outras a jogava pra baixo,
+   na mesma faixa por onde sobem as peças da 1ª prateleira. Na aba Selos essa
+   prateleira está sempre cheia (12 de 12), e era por isso que só ali o
+   "Sem dono na sua comunidade" aparecia atravessado nas peças.
+   Não era camada velha não limpa: `#tr-camadas` é reescrito inteiro a cada
+   render. Era colisão de layout mesmo. Acima do cinturão não há nada, então é
+   pra lá que a etiqueta cabe. */
+#trofeus .tr-peca.coroa em{top:auto;bottom:100%;margin:0 0 5px}
 #trofeus .tr-peca.sel::after{content:"";position:absolute;inset:-6px -4px 12px;border:1px solid var(--gold);border-radius:8px}
 #trofeus .tr-det{position:absolute;left:0;right:0;bottom:0;z-index:5;border-top:1px solid var(--linha);
   background:rgba(12,9,8,.9);backdrop-filter:blur(10px);padding:14px 18px calc(16px + env(safe-area-inset-bottom))}
@@ -769,7 +790,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=46"></script>
+<script src="net.js?v=47"></script>
 
 <script>
 /* =========================================================================
@@ -993,6 +1014,27 @@ function _pintarMagenta(ctx,W,H,alvo){
 const chaveBoneco = (j, comLogos) =>
   [j.bon, roupaAtual(j), j.cor||'#C9663C',
    comLogos ? (j.escudo||'none') : '-', comLogos ? (j.patroc||'none') : '-'].join('|');
+
+/* 14/08 — POSES DE REAÇÃO QUE EXISTEM EM MAGENTA.
+   O painel "O que mexeu" desenhava a reação com <img> cru apontando pra
+   `bonecos/`, que é a pasta das poses NÃO pintáveis — e por isso a camisa saía
+   branca, contrariando a regra de que a cor é o identificador do jogador em
+   todo o app. A pose pintável já existia (`bonecos-t/m1-comemorando.png`); o
+   que faltava era passar pelo mesmo caminho de todo o resto.
+
+   A lista é explícita, e não uma tentativa de carregar-e-ver, porque
+   `pintarChave` monta a chave antes de tocar o disco: chave apontando pra
+   arquivo que não existe cai no fallback `{bon}.png`, que NÃO existe pro m5 nem
+   pra f4 — daí figura nenhuma, e um 404 por render. Quem não tem a pose usa o
+   próprio sprite vestido, que é neutro mas está pintado.
+   Gerou pose nova em magenta? Acrescenta aqui. */
+const POSES_PINTAVEIS = new Set(['m1-comemorando']);
+const chaveReacao = (j, venceu)=>{
+  const pose = venceu ? 'comemorando' : 'cabisbaixo';
+  const peca = POSES_PINTAVEIS.has(`${j.bon}-${pose}`) ? pose : roupaAtual(j);
+  // sem escudo nem patrocinador: é retrato de reação, não a vitrine do uniforme
+  return [j.bon, peca, j.cor||'#C9663C', '-', '-'].join('|');
+};
 
 const _pintado = new Map();
 async function pintarChave(k){
@@ -1336,9 +1378,15 @@ function avatar(id, tam){
   const j=S.jogadores[id];
   const cls = 'av'+(tam?' '+tam:'')+(id===EU?' eu':'');
   const aro = j.cor ? `style="--camisa:${corAro(j.cor)}"` : '';
-  // `bonecos/` só tem pose "parado" de m1–m4 e f1–f3; m5 e f4 nasceram no elenco
-  // de 06/08 e nunca ganharam essa pose. Cai pro sprite do elenco em vez de furo.
-  const img = j.bon ? `<img src="bonecos/${j.bon}-parado.png" onerror="this.onerror=null;this.src='../bonecos-t/${j.bon}.png'" alt="">` : '';
+  /* 14/08: usava `bonecos/{bon}-parado.png` com fallback pra `bonecos-t/{bon}.png`.
+     Os dois caminhos davam 404 justamente pros dois bonecos que o fallback
+     existia pra socorrer — m5 e f4 não têm nem a pose "parado" nem o sprite
+     base, só os vestidos. O avatar deles vinha furado.
+     `estiloRosto` resolve as duas coisas de uma vez: sai sempre do `-camiseta`,
+     que existe pros nove, e enquadra pelo retângulo do rosto MEDIDO dentro de
+     cada sprite em vez de um deslocamento fixo — que é a lei que o resto do app
+     já segue pro escudo, pro patrocinador e pro seletor do vestiário. */
+  const img = j.bon ? `<i class="ro" style="${estiloRosto(j.bon)}"></i>` : '';
   return `<div class="${cls}" ${aro}>${img || j.ap}</div>`;
 }
 const CTX_NOME={amistoso:'Amistoso',copa_panela:'Copa da comunidade',copa_circuito:'Copa de circuito',publico:'Circuito aberto',oficial:'Open'};
@@ -1868,7 +1916,7 @@ mexeu(){
   };
   return {titulo:'O que mexeu', html:`
     <div class="celebra">
-      <img class="reacao" src="bonecos/${S.jogadores[EU].bon==='m1'?(u.venceu?'m1-comemorando':'m1-cabisbaixo'):S.jogadores[EU].bon+'-parado'}.png" alt="">
+      <img class="reacao bcv" data-k="${chaveReacao(S.jogadores[EU], u.venceu)}" alt="">
       <h2>${u.venceu?'Você venceu':'Você perdeu'}</h2>
       <p>${nome(u.adv)} · ${u.placar}${u.zebra?' · <b style="color:var(--up)">zebra</b>':''}</p>
       <div class="big" style="color:${u.dNivel>=0?'var(--up)':'var(--dn)'}">${u.dNivel>0?'+':''}${u.dNivel}</div>
@@ -2520,7 +2568,7 @@ function desenharTrofeus(){
   // cinturão sozinho no topo, em TODA aba — é a coroa da sala (Título em disputa)
   const yC=yDe(TR_PRATELEIRAS[0]);
   camadas.push(`<div class="tr-prat" style="bottom:${Th-yC}px">
-    <button class="tr-peca ${temCint?'tem':'nao'} ${trSel==='cint'?'sel':''}" onclick="selTrofeu('cint')">
+    <button class="tr-peca coroa ${temCint?'tem':'nao'} ${trSel==='cint'?'sel':''}" onclick="selTrofeu('cint')">
       <img data-src="../trofeus/cinturao.png" style="height:78px" alt=""><em>${temCint?'Cinturão da Comunidade':'Sem dono na sua comunidade'}</em></button>
   </div>`);
 

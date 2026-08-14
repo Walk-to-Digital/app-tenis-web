@@ -3071,7 +3071,10 @@ async function _admCarregarCidades(){
 async function _admCarregarLocais(){
   if(!_adm.loc.cidade_id){ _adm.locais=[]; _adm.regioes=[]; return; }
   const [ls, rs] = await Promise.all([
-    sb.from('locais').select('id,nome,tipo,quadras,ativo,regiao_id,locais_endereco(endereco)')
+    // `origem` entra (14/08) porque a policy `locais_endereco_adm` só alcança
+    // clube do ADM — a quadra particular de um jogador aparece na lista da
+    // cidade e não pode oferecer campo de endereço que a RLS vai recusar
+    sb.from('locais').select('id,nome,tipo,quadras,ativo,regiao_id,origem,locais_endereco(endereco)')
       .eq('cidade_id', _adm.loc.cidade_id).order('nome'),
     sb.from('regioes').select('id,nome').eq('cidade_id', _adm.loc.cidade_id).order('nome'),
   ]);
@@ -3287,6 +3290,40 @@ async function _admLocalRegiao(localId, regiaoId){
   await netLocais(true); await netMapaLocais(true);
 }
 
+/* Endereço de clube JÁ CADASTRADO (14/08). Mesma lacuna que a região tinha: o
+   `_admSalvarLocal` só grava endereço no CADASTRO, então clube que entrou antes
+   de 11/08 — quando o campo virou obrigatório — ficou sem endereço e sem
+   nenhuma tela pra ganhar um. Consertar por SQL na mão resolvia uma vez e
+   deixava a próxima igual.
+
+   `upsert` e não `insert`: o clube pode nunca ter tido linha em
+   `locais_endereco` (nasceu sem) ou já ter uma (está corrigindo). `local_id` é
+   a PK, então o onConflict resolve os dois casos num caminho só — e um caminho
+   só é o que impede as duas casas do mesmo fato divergirem.
+
+   Vazio é recusado em vez de apagar a linha: endereço em branco é exatamente o
+   estado que a tela de cadastro existe pra impedir, e "quem chega pelo desafio
+   precisa saber aonde ir" não fica menos verdade na edição. */
+async function _admSalvarEndereco(localId, valor){
+  const l = _adm.locais.find(x=>x.id===localId); if(!l) return;
+  const endereco = (valor||'').trim();
+  if(endereco === (l.endereco||'')) return;          // não gasta escrita à toa
+  if(!endereco){
+    alert('O endereço não pode ficar vazio — é ele que diz aonde ir pra quem não conhece o clube.');
+    netRenderAdm();                                   // devolve o valor antigo ao campo
+    return;
+  }
+  const { error } = await sb.from('locais_endereco')
+    .upsert({ local_id: localId, endereco }, { onConflict: 'local_id' });
+  if(error){ alert('Não deu pra gravar o endereço: '+error.message); netRenderAdm(); return; }
+  l.endereco = endereco;
+  if(window.toast) toast(`📍 Endereço de ${l.nome} atualizado.`);
+  netRenderAdm();
+  // o app inteiro guarda o endereço no cache de locais; sem recarregar, o card
+  // da partida segue mostrando o velho até o próximo boot
+  await netLocais(true); await netMapaLocais(true);
+}
+
 function netRenderAdm(){
   const abaBtn=(id,txt)=>`<button onclick="_net.admAba('${id}')" style="flex:1;padding:10px;border-radius:10px;
     border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;
@@ -3375,8 +3412,19 @@ function netRenderAdm(){
 
     const jaTem = _adm.locais.map(l=>`
       <div style="padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
-        <b>${_admEsc(l.nome)}</b>
-        <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}${l.endereco?' · '+_admEsc(l.endereco):''}</div>
+        <b>${_admEsc(l.nome)}</b>${l.origem!=='adm'?' <span style="font-size:10px;color:var(--ink3);font-weight:400">· quadra particular</span>':''}
+        <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}</div>
+        ${l.origem==='adm' ? `
+        <!-- 14/08: endereço editável. Só pra clube do ADM — a policy
+             locais_endereco_adm não alcança quadra particular, e campo que a
+             RLS vai recusar é erro esperando a pessoa chegar. A borda dourada
+             marca quem está SEM endereço: é o estado que a regra "quem chega
+             pelo desafio precisa saber aonde ir" existe pra não deixar passar,
+             e sem marcação ele se esconde numa lista longa. -->
+        <input value="${_admEsc(l.endereco||'')}" placeholder="Endereço — aonde ir pra quem não conhece"
+          onchange="_net.admSalvarEndereco('${l.id}', this.value)"
+          style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.endereco?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.endereco?'#fff':'var(--gold)'};font:600 12px system-ui;margin-top:7px">`
+        : `<div style="font-size:11px;color:var(--ink3);margin-top:7px">📍 endereço protegido — só o dono edita</div>`}
         <select onchange="_net.admLocalRegiao('${l.id}',this.value)"
           style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.regiao_id?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.regiao_id?'#fff':'var(--gold)'};font:600 12px system-ui;margin-top:7px">${regOps(l.regiao_id)}</select>
       </div>`).join('')
@@ -3463,7 +3511,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
   admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal,
   admRegSet:_admRegSet, admCriarRegiao:_admCriarRegiao, admApagarRegiao:_admApagarRegiao,
-  admLocalRegiao:_admLocalRegiao,
+  admLocalRegiao:_admLocalRegiao, admSalvarEndereco:_admSalvarEndereco,
   meusQuadros:netMeusQuadros, quadrosDaPartida:netQuadrosDaPartida, destaques:netDestaques,
   locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
   abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
