@@ -790,7 +790,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=48"></script>
+<script src="net.js?v=49"></script>
 
 <script>
 /* =========================================================================
@@ -1715,7 +1715,10 @@ radar(){
       <div class="rot">Quem tá no app <span>classes ${permitidas.join(' · ')}</span></div>
       ${chipsLoc}
       ${disp.length ? disp.map(x=>`
-        <div class="card clic" onclick="netDesafiar('${x.id}')">
+        <!-- 16/08: era netDesafiar() direto. Tocar numa pessoa é consulta,
+             não compromisso: agora abre a ficha, e Desafiar / Pedir amizade
+             moram lá dentro, com pesos diferentes. -->
+        <div class="card clic" onclick="netVerJogador('${x.id}')">
           <div class="linha-item">
             ${avatar(x.id)}
             <div class="txt"><b>${nome(x.id)}</b><small>Classe ${divDe(x.j)} · Nível ${nivelDe(x.j)}</small></div>
@@ -1954,17 +1957,25 @@ comunidade(){
   const ordem=ordena(tabelaPontos().comunidade);
   return {titulo:S.comunidade.nome, dir:`${S.comunidade.membros.length} membros`, html:`
     <div class="sec">
-      <div class="card clic" onclick="netAbrirGrupos()">
+      <!-- 16/08: os dois primeiros cards da aba passam a ser a PORTA, não um
+           menu. As páginas de Comunidades e Torneios já existiam desde sempre
+           (netAbrirGrupos / netAbrirTorneios), com "Suas comunidades" +
+           "Comunidades abertas" e "Seus torneios" + "Torneios abertos" com o
+           botão de entrar — mas estavam dois toques fundo, atrás de um card
+           que parecia um item de lista qualquer. Ninguém achava.
+           Agora abrem em destaque, e o texto diz o que tem lá dentro em vez de
+           descrever o que a pessoa poderia fazer. -->
+      <div class="card clic" onclick="netAbrirGrupos()" style="border-color:var(--linha2)">
         <div class="linha-item">
           <div class="av">▣</div>
-          <div class="txt"><b>Comunidades</b><small>Crie a sua, mande o link pros amigos ou peça pra entrar numa aberta</small></div>
+          <div class="txt"><b>Minhas comunidades</b><small>As que você participa e as abertas pra pedir entrada</small></div>
           <div class="seta">›</div>
         </div>
       </div>
-      <div class="card clic" onclick="netAbrirTorneios()">
+      <div class="card clic" onclick="netAbrirTorneios()" style="border-color:var(--linha2)">
         <div class="linha-item">
           <div class="av">🏆</div>
-          <div class="txt"><b>Torneios</b><small>Mata-mata · crie um, convide a galera ou entre num aberto</small></div>
+          <div class="txt"><b>Meus torneios</b><small>Os seus e os torneios abertos pra se inscrever</small></div>
           <div class="seta">›</div>
         </div>
       </div>

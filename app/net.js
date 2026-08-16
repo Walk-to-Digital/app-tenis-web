@@ -538,6 +538,72 @@ async function _abrirOQueMexeu(ultima, posAntes){
 }
 
 /* ---- 2a: desafiar ----------------------------------------------------- */
+/* ---- 16/08: O PERFIL DO JOGADOR — tocar é consulta, não compromisso -------
+   Até aqui, tocar no card do radar chamava `netDesafiar()` DIRETO: o toque
+   mais natural da tela era o único que já assumia um compromisso. Não dava pra
+   olhar quem é a pessoa antes de desafiar, e não havia lugar nenhum pra pedir
+   amizade — a função existia desde 13/08 e não tinha porta.
+
+   Agora o toque abre a ficha, e as duas ações moram DENTRO dela, com pesos
+   diferentes: Desafiar é o botão cheio, Pedir amizade é o de contorno. A
+   diferença importa porque as duas custam coisas diferentes — desafio marca
+   um jogo, pedido de amizade abre o desafio fora da janela de ±1 classe.
+
+   Pré-requisito do perfil público com URL própria, que é outra pendência. */
+function netVerJogador(id){
+  if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  const j = S.jogadores && S.jogadores[id];
+  if(!j){ alert('Jogador não encontrado.'); return; }
+
+  const eu    = S.jogadores[EU];
+  const amigo = (eu.amigos||[]).includes(id);
+  const advN  = (S.esporte==='beach') ? (j.nivelB ?? 1200) : (j.nivel ?? 1200);
+  const v = calcular(nivelDe(eu), advN, true,  'amistoso','md3',false, eu.calibrando, eu.cal);
+  const d = calcular(nivelDe(eu), advN, false, 'amistoso','md3',false, eu.calibrando, eu.cal);
+
+  /* NÃO tem "onde ele joga" nesta ficha, e a ausência é deliberada. O dado
+     existe em `player_locais`, mas o cliente não carrega o de terceiros — só o
+     meu (`__meusLocais`). Botar a linha aqui exigiria uma consulta nova, e
+     inventar um valor de fallback seria preencher com estatística um campo que
+     existe pra ser fato. Fica de fora até ter fonte. */
+  const primeiro = (j.nome||'').split(' ')[0] || 'ele';
+  _sheet('net-perfil', `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font:700 17px system-ui">Jogador</div>
+      <button onclick="_net.fecharPerfil()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
+      <div style="width:52px;height:52px;border-radius:50%;background:${j.cor||'var(--sup2)'};flex:0 0 52px"></div>
+      <div style="min-width:0">
+        <b style="font-size:17px">${j.nome||'Jogador'}</b>
+        <div style="font-size:12px;color:var(--ink2)">Classe ${divDe(j)} · Nível ${advN}${amigo?' · <span style="color:var(--up)">amigo</span>':''}</div>
+      </div>
+    </div>
+
+    <div style="border:1px solid var(--linha);border-radius:12px;padding:12px;margin-top:14px">
+      <div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">O que está em jogo</div>
+      <div style="display:flex;gap:16px">
+        <div><span style="font:700 17px system-ui;color:var(--up)">${v.dNivel>0?'+':''}${v.dNivel}</span>
+          <span style="font-size:11px;color:var(--ink2)"> se vencer</span></div>
+        <div><span style="font:700 17px system-ui;color:var(--dn)">${d.dNivel}</span>
+          <span style="font-size:11px;color:var(--ink2)"> se perder</span></div>
+      </div>
+      ${v.zebra?'<div style="font-size:11px;color:var(--up);margin-top:6px">Zebra — ele está acima da sua faixa, a vitória multiplica os pontos.</div>':''}
+    </div>
+
+    <button onclick="_net.fecharPerfil();netDesafiar('${id}')"
+      style="width:100%;margin-top:14px;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 15px system-ui;cursor:pointer">Desafiar ${primeiro}</button>
+
+    ${amigo
+      ? `<p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px;line-height:1.5">Vocês já são amigos — dá pra desafiar em qualquer classe, sem a janela de ±1.</p>`
+      : `<button onclick="_net.pedirAmizade('${id}','${(j.nome||'').replace(/'/g,"\\'")}')"
+          style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:none;color:#fff;font:700 14px system-ui;cursor:pointer">Pedir pra ser amigo</button>
+         <p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px;line-height:1.5">Amizade é mútua: ele recebe o pedido e decide. Sendo amigos, vocês se desafiam em qualquer classe.</p>`}
+  `);
+}
+function netFecharPerfil(){ const el=document.getElementById('net-perfil'); if(el) el.remove(); }
+window.netVerJogador = netVerJogador;
+
 function netDesafiar(id){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
   const j = S.jogadores && S.jogadores[id];
@@ -1068,10 +1134,32 @@ function netRenderInbox(){
     } else if(m.status==='desafiado'){
       txt=`Aguardando <b>${outro}</b> aceitar seu desafio` + _pinDe(m);
     } else if(m.status==='aceito'){
-      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m) + _checkinDe(m);
+      /* 16/08: o placar só existe depois que OS DOIS assinaram presença.
+         Antes, "Lançar placar" aparecia junto com "Cheguei" e não exigia nada —
+         dava pra lançar placar de partida que ninguém foi jogar, e se o outro
+         não respondesse em 72h o resultado fechava sozinho valendo metade. O
+         check-in dos dois é o que faz o placar pressupor um jogo.
+
+         NÃO tem prazo, e isso é o desenho: quem faltou pode tocar em "Cheguei"
+         dias depois e o placar destrava na hora. Um prazo aqui transformaria
+         "esqueci de tocar num botão" em "a partida não existiu" — e como o
+         relógio das 72h só começa no lançamento, ela nem venceria: ficaria
+         presa pra sempre, sem placar e sem vencimento.
+
+         A tela DIZ de quem está esperando. Regra que só existe no código não
+         muda comportamento — se o botão só some, a pessoa acha que quebrou. */
+      const faltaMim   = !_meuCheckin(m);
+      const faltaOutro = !_outroCheckin(m);
+      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m) + _checkinDe(m)
+        + (faltaMim||faltaOutro
+            ? `<div style="font-size:11px;color:var(--ink3);margin-top:7px;line-height:1.45">O placar abre quando os dois tocarem em <b>Cheguei</b>${
+                faltaMim && faltaOutro ? ' — falta você e ' + outro
+                : faltaMim ? ' — falta você' : ' — falta ' + outro}. Não tem prazo: dá pra assinar depois do jogo.</div>`
+            : '');
       /* "Cheguei" só enquanto eu não assinei: o check-in não se desfaz (trava 7),
          então oferecer de novo é oferecer um erro. */
-      acoes=`${_meuCheckin(m)?'':_btn('Cheguei',`_net.checkin('${m.id}')`)}${_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok')}`;
+      acoes=`${faltaMim?_btn('Cheguei',`_net.checkin('${m.id}')`):''}`
+        + `${(!faltaMim && !faltaOutro)?_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok'):''}`;
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
       const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
@@ -1116,6 +1204,41 @@ function netRenderInbox(){
 
 /* ---- UI: desafio + lançar placar (overlay _on) ------------------------ */
 function _onDigitou(v){ _on.placarTxt=v; _on.sets=netParsePlacar(v); netRenderOnline(); }
+
+/* 16/08: os placares prontos.
+   Digitar "6-3 6-4" num teclado de celular, de pé na quadra, suado, é o ponto
+   mais frágil do ciclo — e o registro é o elo frágil por definição. Toque
+   substitui digitação nos casos que cobrem quase tudo: em tênis, set que
+   termina fora do tie-break só pode acabar em 6-0 a 6-4, 7-5 ou 7-6.
+
+   O campo de texto CONTINUA valendo e não vira somente-leitura: existe 8-6 em
+   set longo, existe super tie-break, existe o placar que o app não previu.
+   Botão que substitui o teclado ajuda; botão que confisca o teclado atrapalha
+   justamente no caso raro, que é quando a pessoa mais precisa. */
+const _PLACARES = ['6-0','6-1','6-2','6-3','6-4','7-5','7-6'];
+
+function _addSet(s){
+  const atual = (_on.placarTxt||'').trim();
+  _onDigitou(atual ? atual + ' ' + s : s);
+}
+function _tiraSet(){
+  const p = (_on.placarTxt||'').trim().split(/\s+/).filter(Boolean);
+  p.pop();
+  _onDigitou(p.join(' '));
+}
+
+/* Uma linha de botões. `inverte` troca os lados: a mesma lista serve pro set
+   ganho e pro perdido, porque "seus games primeiro" é a única convenção que a
+   tela promete e ela não muda. */
+function _linhaPlacares(rotulo, inverte){
+  const bts = _PLACARES.map(s=>{
+    const [a,b] = s.split('-');
+    const v = inverte ? `${b}-${a}` : s;
+    return `<button onclick="_net.addSet('${v}')" style="flex:1;min-width:0;padding:9px 0;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 12px system-ui;cursor:pointer">${v}</button>`;
+  }).join('');
+  return `<div style="font-size:11px;color:var(--ink2);margin:10px 0 5px">${rotulo}</div>
+    <div style="display:flex;gap:5px">${bts}</div>`;
+}
 function netRenderOnline(){
   let body='';
   /* 13/08 (mig 25): a contraproposta divide esta folha com o desafio em vez de
@@ -1162,6 +1285,7 @@ function netRenderOnline(){
         <option value="" ${!_on.localId?'selected':''}>A combinar</option>
         ${ls.map(l=>`<option value="${l.id}" ${_on.localId===l.id?'selected':''}>${l.nome}</option>`).join('')}
       </select>
+      ${_endLinha(lSel)}
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
         style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}
       ${lSel?qpH:''}
@@ -1219,6 +1343,7 @@ function netRenderOnline(){
         <option value="" ${!_on.localId?'selected':''}>Não lembro / outro lugar</option>
         ${ls.map(l=>`<option value="${l.id}" ${_on.localId===l.id?'selected':''}>${l.nome}</option>`).join('')}
       </select>
+      ${_endLinha(lSel)}
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
         style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}`:''}
       <div style="display:flex;gap:8px;margin-top:14px">${_btn('Cancelar','_net.fechar()')}${(_on.sets&&_on.advId)?_btn('Lançar placar','_net.maoEnviar()','ok'):''}</div>`;
@@ -1237,9 +1362,12 @@ function netRenderOnline(){
       </div>${c.zebra?'<p style="text-align:center;color:var(--up);font-size:12px">Zebra — multiplicador nos pontos.</p>':''}`;
     }
     body=`<div style="font:700 17px system-ui;margin-bottom:2px">Placar vs ${_on.adv.nome}</div>
-      <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Seus games primeiro. Ex: <b>6-3 6-4</b></div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Seus games primeiro. Toque nos sets ou digite.</div>
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
         style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+      ${_linhaPlacares('Set que VOCÊ ganhou', false)}
+      ${_linhaPlacares('Set que você PERDEU', true)}
+      ${(_on.placarTxt||'').trim() ? `<button onclick="_net.tiraSet()" style="width:100%;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--linha2);background:none;color:var(--ink2);font:600 12px system-ui;cursor:pointer">← apagar o último set</button>` : ''}
       ${previa}
       <div style="display:flex;gap:8px;margin-top:8px">${_btn('Voltar','_net.fechar()')}${sets?_btn('Enviar placar','_net.enviar()','ok'):''}</div>`;
   }
@@ -2740,6 +2868,28 @@ const _locaisMarcaveis = ()=> (_locais||[]).filter(l=> l.origem !== 'jogador' ||
 const _locDe   = (id)=> (_locais||[]).find(l=>l.id===id) || null;
 const _locNome = (id)=> { const l=_locDe(id); return l ? l.nome : null; };
 
+/* 16/08: o endereço embaixo do seletor de local.
+   `_locais` já traz `endereco` normalizado do `locais_endereco` (mig 25), e a
+   RLS decide quem recebe a linha: clube do ADM é público, quadra particular
+   alheia só depois que o desafio chega. Então a tela não filtra nada — mostra
+   o que veio.
+
+   O que ela NÃO pode fazer é confundir os dois vazios. `endereco` ausente aqui
+   significa uma de duas coisas bem diferentes: o clube não tem endereço
+   cadastrado, ou eu não tenho direito de ver ainda. Dizer "sem endereço" nos
+   dois casos ensinaria que a quadra do outro não tem endereço — e ela tem, eu
+   é que não posso ver. Por isso quadra particular que não é minha tem texto
+   próprio. É o mesmo cuidado do `x.data || []`: vazio por regra e vazio por
+   ausência não podem ser o mesmo pixel. */
+function _endLinha(l){
+  if(!l) return '';
+  const box = (txt, cor) => `<div style="font-size:11px;color:${cor};margin-top:6px;line-height:1.45">${txt}</div>`;
+  if(l.endereco) return box(`📍 ${l.endereco}`, 'var(--ink2)');
+  if(l.origem === 'jogador' && l.dono_id !== MEU_UID)
+    return box('📍 O endereço aparece pra ele quando o desafio chegar.', 'var(--ink3)');
+  return box('📍 Sem endereço cadastrado ainda.', 'var(--ink3)');
+}
+
 async function netMeusLocais(force){
   if(_meusLocais && !force) return _meusLocais;
   if(!MEU_UID) return [];
@@ -3504,6 +3654,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   abrirContra:netAbrirContra, enviarContra:_onEnviarContra,
   onQuadraPor:_onQuadraPor, onBolaPor:_onBolaPor,
   lancar:netLancarPlacar, digitou:_onDigitou, enviar:_onEnviar, confirmar:netConfirmar, contestar:netContestar,
+  addSet:_addSet, tiraSet:_tiraSet,   // 16/08: placares prontos
+  verJogador:netVerJogador, fecharPerfil:netFecharPerfil, pedirAmizade:netPedirAmizade,  // 16/08: perfil no radar
   abrirInbox:netAbrirInbox, fecharInbox:netFecharInbox, fechar:netFecharOnline,
   abrirBusca:netAbrirBusca, fecharBusca:netFecharBusca, buscar:_onBuscar, addAmigo:netAddAmigo, desafiarUid:netDesafiarUid,
   aceitarAmizade:netAceitarAmizade, recusarAmizade:netRecusarAmizade,
