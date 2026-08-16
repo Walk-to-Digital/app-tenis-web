@@ -130,7 +130,7 @@ button,input,select{font:inherit;color:inherit}
   display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--ink2);
   position:relative;overflow:hidden;box-shadow:0 0 0 2px var(--camisa,var(--linha2));
 }
-/* 14/08: era `.av img` com width:250% e top:-14% iguais pros nove — o mesmo
+/* 15/08: era `.av img` com width:250% e top:-14% iguais pros nove — o mesmo
    deslocamento fixo que a nota do ROSTO diz ter sido abandonado por dar rosto
    borrado e descentralizado. O círculo agora usa o retângulo medido dentro de
    cada sprite, igual ao seletor do vestiário. */
@@ -425,7 +425,7 @@ button,input,select{font:inherit;color:inherit}
 #fone.noturno .ln.eu{background:rgba(201,102,60,.15)}
 #fone.noturno .selo{background:rgba(30,23,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-color:rgba(122,106,92,.22)}
 #fone.noturno .sets b{background:rgba(30,23,20,.62)}
-/* 14/08 — o `:not(.on)` é o conserto, e a razão é de especificidade.
+/* 15/08 — o `:not(.on)` é o conserto, e a razão é de especificidade.
    Este seletor tem ID (1,2,0) e o `.chip.on` tem só classes (0,2,0), então no
    modo noturno o fundo translúcido escuro ganhava do fundo claro do chip
    SELECIONADO — que continuava com `color:var(--acc-ink)`, quase preto. Dava
@@ -694,7 +694,7 @@ button,input,select{font:inherit;color:inherit}
   font:600 8.5px var(--f-ui);letter-spacing:.02em;text-align:center;color:var(--ink2);font-style:normal;
   text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #trofeus .tr-peca.nao em{color:var(--ink3)}
-/* 14/08 — a etiqueta do cinturão SOBE em vez de descer.
+/* 15/08 — a etiqueta do cinturão SOBE em vez de descer.
    Ela mora na prateleira de cima, e o `top:100%` das outras a jogava pra baixo,
    na mesma faixa por onde sobem as peças da 1ª prateleira. Na aba Selos essa
    prateleira está sempre cheia (12 de 12), e era por isso que só ali o
@@ -790,7 +790,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=47"></script>
+<script src="net.js?v=48"></script>
 
 <script>
 /* =========================================================================
@@ -1015,7 +1015,7 @@ const chaveBoneco = (j, comLogos) =>
   [j.bon, roupaAtual(j), j.cor||'#C9663C',
    comLogos ? (j.escudo||'none') : '-', comLogos ? (j.patroc||'none') : '-'].join('|');
 
-/* 14/08 — POSES DE REAÇÃO QUE EXISTEM EM MAGENTA.
+/* 15/08 — POSES DE REAÇÃO QUE EXISTEM EM MAGENTA.
    O painel "O que mexeu" desenhava a reação com <img> cru apontando pra
    `bonecos/`, que é a pasta das poses NÃO pintáveis — e por isso a camisa saía
    branca, contrariando a regra de que a cor é o identificador do jogador em
@@ -1378,7 +1378,7 @@ function avatar(id, tam){
   const j=S.jogadores[id];
   const cls = 'av'+(tam?' '+tam:'')+(id===EU?' eu':'');
   const aro = j.cor ? `style="--camisa:${corAro(j.cor)}"` : '';
-  /* 14/08: usava `bonecos/{bon}-parado.png` com fallback pra `bonecos-t/{bon}.png`.
+  /* 15/08: usava `bonecos/{bon}-parado.png` com fallback pra `bonecos-t/{bon}.png`.
      Os dois caminhos davam 404 justamente pros dois bonecos que o fallback
      existia pra socorrer — m5 e f4 não têm nem a pose "parado" nem o sprite
      base, só os vestidos. O avatar deles vinha furado.

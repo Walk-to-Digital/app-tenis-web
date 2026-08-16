@@ -61,8 +61,20 @@ async function netSyncJogador(eu){
     id: MEU_UID,
     nome: eu.nome, ap: eu.ap ?? null, email: eu.email ?? null,
     clube: eu.clube ?? null,
+    /* 16/08: estas quatro viajam por compatibilidade, mas o banco DESCARTA
+       (mig 31): quem move o Nível agora é o servidor, na confirmação da
+       partida. Continuam aqui porque tirá-las não muda nada e mexer no upsert
+       sem necessidade é risco de graça — saem junto com a limpeza que faz o
+       cliente hidratar em vez de somar. */
     nivel: eu.nivel ?? 1200, nivelb: eu.nivelB ?? 1200,
     calibrando: !!eu.calibrando, cal: eu.cal ?? 0,
+    /* 16/08: o carimbo de versão (mig 32). É o que permite MEDIR quantas contas
+       ainda rodam cliente velho — e sem essa medida a Entrega 4 (o servidor
+       RECUSAR em vez de sobrescrever) não pode começar, porque recusar escrita
+       de cliente que ainda está no ar é o app fora do ar pra quem não tocou na
+       tarja. `VERSAO` é global de index.html e só existe depois do boot; o
+       typeof evita que um sync muito cedo mande `undefined` e derrube o upsert. */
+    app_versao: (typeof VERSAO === 'number' && VERSAO) ? VERSAO : null,
     bon: eu.bon ?? null, roupa: eu.roupa ?? null, cor: eu.cor ?? null,
     cena: eu.cena ?? null, escudo: eu.escudo ?? null,
     patroc: eu.patroc ?? null, vestiario: eu.vestiario ?? null,
@@ -3071,7 +3083,7 @@ async function _admCarregarCidades(){
 async function _admCarregarLocais(){
   if(!_adm.loc.cidade_id){ _adm.locais=[]; _adm.regioes=[]; return; }
   const [ls, rs] = await Promise.all([
-    // `origem` entra (14/08) porque a policy `locais_endereco_adm` só alcança
+    // `origem` entra (15/08) porque a policy `locais_endereco_adm` só alcança
     // clube do ADM — a quadra particular de um jogador aparece na lista da
     // cidade e não pode oferecer campo de endereço que a RLS vai recusar
     sb.from('locais').select('id,nome,tipo,quadras,ativo,regiao_id,origem,locais_endereco(endereco)')
@@ -3290,7 +3302,7 @@ async function _admLocalRegiao(localId, regiaoId){
   await netLocais(true); await netMapaLocais(true);
 }
 
-/* Endereço de clube JÁ CADASTRADO (14/08). Mesma lacuna que a região tinha: o
+/* Endereço de clube JÁ CADASTRADO (15/08). Mesma lacuna que a região tinha: o
    `_admSalvarLocal` só grava endereço no CADASTRO, então clube que entrou antes
    de 11/08 — quando o campo virou obrigatório — ficou sem endereço e sem
    nenhuma tela pra ganhar um. Consertar por SQL na mão resolvia uma vez e
@@ -3415,7 +3427,7 @@ function netRenderAdm(){
         <b>${_admEsc(l.nome)}</b>${l.origem!=='adm'?' <span style="font-size:10px;color:var(--ink3);font-weight:400">· quadra particular</span>':''}
         <div style="font-size:11px;color:var(--ink2)">${_admEsc(l.tipo)} · ${l.quadras} ${l.quadras===1?'quadra':'quadras'}</div>
         ${l.origem==='adm' ? `
-        <!-- 14/08: endereço editável. Só pra clube do ADM — a policy
+        <!-- 15/08: endereço editável. Só pra clube do ADM — a policy
              locais_endereco_adm não alcança quadra particular, e campo que a
              RLS vai recusar é erro esperando a pessoa chegar. A borda dourada
              marca quem está SEM endereço: é o estado que a regra "quem chega
