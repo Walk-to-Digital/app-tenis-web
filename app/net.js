@@ -403,6 +403,9 @@ async function netAtualizarInbox(){
   // morto. Não recursa infinito: partida fechada sai de 'pendente' e o
   // `_prazoVencido` para de vê-la na segunda passada.
   if(await netApurarPrazos(data)) return netAtualizarInbox();
+  // 16/08: o W.O. vem depois do prazo e pela mesma razão — se encerrou alguma,
+  // a lista em mãos envelheceu e renderizar dado morto é pior que recarregar.
+  if(await netApurarWO(data))     return netAtualizarInbox();
   // se apareceu alguém que ainda não está no meu elenco (desafiou recém-cadastrado),
   // recarrega os jogadores pra o nome aparecer certo em vez de "Jogador".
   const desconhecido = data.some(m=> !S.jogadores[_chaveLocal(_advId(m))]);
@@ -422,7 +425,10 @@ async function netAtualizarInbox(){
     }
     _inboxStatus[m.id]=chave;
   });
-  _inbox = data.filter(m=> m.status!=='confirmada' && m.status!=='recusado');
+  // 'cancelado' entra aqui junto de 'recusado' por defesa em profundidade: a
+  // query acima já não pede esse status, mas quem mexer nela um dia não vai
+  // lembrar deste filtro — e partida cancelada na caixa é card zumbi.
+  _inbox = data.filter(m=> m.status!=='confirmada' && m.status!=='recusado' && m.status!=='cancelado');
   /* 13/08: pedido de amizade também pede a minha ação, então entra na mesma
      conta. Sem isto o pedido chega e o ✉ não acende — e ninguém abre uma caixa
      que não avisa que tem coisa dentro. */
@@ -470,8 +476,11 @@ function netAplicarConfirmadas(list){
     ultima = { m, meu, euVenci, meuPlacar };
     const nome0 = _nomeDe(_advId(m)).split(' ')[0];
     if(window.toast){
+      /* 16/08: o texto dizia "em 72h" e virou mentira — com o carimbo, o prazo
+         pode ter sido de 24h. O número exato não interessa a quem lê; o que
+         interessa é que venceu e o placar fechou sozinho. */
       toast(m.fechada_por_prazo
-        ? `${nome0} não confirmou em 72h — o placar fechou sozinho valendo <b>metade</b> · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`
+        ? `${nome0} não confirmou no prazo — o placar fechou sozinho valendo <b>metade</b> · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`
         : `Partida com ${nome0} confirmada · Nível ${(meu.dNivel>=0?'+':'')}${meu.dNivel}`);
     }
   });
@@ -650,8 +659,26 @@ function _onQuando(v){
   _on.quando = (d && !isNaN(d)) ? d.toISOString() : null;
 }
 
+/* O atalho precisa REDESENHAR; o input não pode. São dois caminhos porque o
+   efeito colateral é diferente: redesenhar enquanto a pessoa mexe no seletor
+   nativo tiraria o foco dela no meio. Vindo do chip, redesenhar é obrigatório
+   — senão o valor entra no estado e a tela não mostra nada, que é estado
+   invisível virando bug fantasma. */
+function _onQuandoAtalho(v){
+  _onQuando(v);
+  netRenderOnline();
+}
+
 async function _onConfirmarDesafio(){
   const adv=_on.adv;
+  /* 16/08 — a data virou obrigatória (mig 34). A trava de verdade é a do
+     banco; esta aqui é a cortesia de avisar antes, com a palavra da tela em
+     vez do erro do Postgres. Sem ela o app manda `quando: null`, o trigger
+     recusa e a pessoa vê uma mensagem que não foi escrita pra ela. */
+  if(!_on.quando){
+    if(window.toast) toast('Escolha o dia e a hora do jogo.');
+    return;
+  }
   try{
     const { error } = await sb.from('matches').insert({
       criador_id: MEU_UID, adversario_id: adv.id,
@@ -907,12 +934,65 @@ async function netConfirmar(matchId){
    Resolve na LEITURA, como o vencimento do cinturão logo abaixo: quem abrir
    o app primeiro apura. Sem agendador, sem função nova no banco, e testável
    antes de entregar — complexidade que não dá pra testar é risco puro.       */
-const PRAZO_HORAS = 72;
+/* 16/08 — O RELÓGIO PASSA A CONTAR DE QUANDO A PESSOA VIU.
+   Vence em `min(visto + 24h, lançamento + 72h)`.
+
+   O prazo curto é o que o produto quer: 72h é uma eternidade pra confirmar um
+   placar. Mas contar 24h de quem nunca soube que havia placar é cobrar de
+   quem não foi avisado — daí o carimbo `visto_por_adversario_em`, escrito no
+   boot pelo servidor (mig 34).
+
+   O TETO NÃO É DETALHE: sem ele, "não abrir o app" vira estratégia pra quem
+   está perdendo — o relógio nunca começa e a partida nunca fecha. É o irmão
+   exato da regra do cinturão: se o prejuízo pode ser evitado parando, a regra
+   está apontada contra o produto.
+
+   Sem carimbo (cliente velho, ou quem ainda não abriu), cai no teto — que é
+   exatamente o comportamento de antes. O prazo nunca fica MAIOR que era. */
+const PRAZO_TETO_H  = 72;   // do lançamento, sempre
+const PRAZO_VISTO_H = 24;   // de quando o adversário viu
 const _vencendo = {};   // guarda de reentrada, igual ao _expirando do cinturão
+
+/* Os atalhos que tornam a data obrigatória quase gratuita: um toque em vez de
+   abrir o seletor e rolar três rodinhas. Um campo obrigatório sem atalho é
+   atrito no elo frágil do ciclo; com atalho, é o app perguntando o que a
+   pessoa já ia responder.
+
+   "Hoje 19h" só aparece enquanto ainda dá tempo — oferecer um horário que já
+   passou seria oferecer um erro, já que o banco tem piso de data (mig 35). */
+function _atalhosQuando(){
+  const agora = new Date();
+  const em = (dias, h) => { const d = new Date(agora); d.setDate(d.getDate()+dias); d.setHours(h,0,0,0); return d; };
+  const lista = [];
+
+  const hoje19 = em(0, 19);
+  if(hoje19.getTime() > agora.getTime() + 36e5) lista.push({ rot:'Hoje 19h', d: hoje19 });
+
+  lista.push({ rot:'Amanhã 19h', d: em(1, 19) });
+
+  // próximo sábado às 9h — o horário de clube por excelência
+  const faltaSab = (6 - agora.getDay() + 7) % 7 || 7;
+  lista.push({ rot:'Sábado 9h', d: em(faltaSab, 9) });
+
+  return lista.slice(0, 3);
+}
+
+/* Devolve o instante do vencimento em MILISSEGUNDOS — nunca texto.
+   Comparar timestamp como string erra em silêncio: o Postgres devolve
+   `...+00:00` e o `toISOString()` produz `...Z`, e as duas divergem no meio do
+   carimbo sem levantar erro nenhum. */
+function _venceEm(m){
+  if(!m.placar_em) return null;
+  const teto = new Date(m.placar_em).getTime() + PRAZO_TETO_H*3600e3;
+  if(!m.visto_por_adversario_em) return teto;
+  const curto = new Date(m.visto_por_adversario_em).getTime() + PRAZO_VISTO_H*3600e3;
+  return Math.min(curto, teto);
+}
 
 function _prazoVencido(m){
   if(m.status !== 'pendente' || !m.placar_em) return false;
-  return (Date.now() - new Date(m.placar_em).getTime()) > PRAZO_HORAS*3600e3;
+  const vence = _venceEm(m);
+  return vence !== null && Date.now() > vence;
 }
 
 async function _fecharPorPrazo(m){
@@ -937,9 +1017,9 @@ async function _fecharPorPrazo(m){
    pra sempre. A mesma regra, lida de dois jeitos — e nenhum dos dois pode
    descobrir a existência do prazo só depois que ele venceu. */
 function _horasRestantes(m){
-  if(!m.placar_em) return null;
-  const passou = (Date.now() - new Date(m.placar_em).getTime()) / 3600e3;
-  return Math.max(0, PRAZO_HORAS - passou);
+  const vence = _venceEm(m);
+  if(vence === null) return null;
+  return Math.max(0, (vence - Date.now()) / 3600e3);
 }
 /* Mostra o PRAZO, não a contagem regressiva. Contagem tem erro de borda que
    não dá pra esconder: 71,9h restantes viram "2 dias" no floor e "3 dias" no
@@ -949,8 +1029,8 @@ function _horasRestantes(m){
    "quinta, 14h". */
 const _DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
 function _quandoVence(m){
-  if(!m.placar_em) return null;
-  return new Date(new Date(m.placar_em).getTime() + PRAZO_HORAS*3600e3);
+  const t = _venceEm(m);           // o mesmo mínimo que o `_prazoVencido` usa
+  return t === null ? null : new Date(t);
 }
 function _avisoPrazo(m, lado){
   const h = _horasRestantes(m); if(h === null) return '';
@@ -973,7 +1053,149 @@ function _avisoPrazo(m, lado){
   return `<div style="font-size:11.5px;color:${h<=12?'var(--gold)':'var(--ink3)'};margin-top:7px">${txt}</div>`;
 }
 
+/* 16/08 — O CARIMBO. Abrir o app JÁ É ver a pendência: por decisão de 07/08, o
+   botão grande da home mostra a ação mais urgente sozinho, e "lançar placar"
+   é ela quando existe. Então não é preciso rastrear se a pessoa olhou o card.
+
+   Manda a coluna com qualquer valor: o trigger da mig 34 força `now()` do
+   servidor e IGNORA o que vier daqui. Data de presença é prova, e prova que o
+   interessado escreve não é prova. Write-once no banco também — reabrir o app
+   não empurra o próprio relógio pra frente.
+
+   Erro aqui é silencioso de propósito: o carimbo é uma cortesia com quem
+   ainda não viu. Se falhar, a partida cai no teto de 72h, que é a regra de
+   antes — nada quebra, ninguém perde nada. */
+async function netCarimbarVistas(lista){
+  const alvos = (lista||[]).filter(m =>
+    m.status === 'pendente' && m.placar_em &&
+    !m.visto_por_adversario_em &&
+    m.placar_por && m.placar_por !== MEU_UID &&
+    (m.criador_id === MEU_UID || m.adversario_id === MEU_UID));
+  if(!alvos.length) return;
+  try{
+    await sb.from('matches')
+      .update({ visto_por_adversario_em: new Date().toISOString() })
+      .in('id', alvos.map(m => m.id));
+    for(const m of alvos) m.visto_por_adversario_em = new Date().toISOString();
+  }catch(e){ console.error('[net] carimbo', e); }
+}
+
+/* ---- 2d: o W.O. (16/08) ------------------------------------------------
+   Partida marcada que ninguém jogou ficava presa PRA SEMPRE: sem os dois
+   check-ins o placar não abre, e sem prazo ela não vence. Quem foi à quadra
+   ficava com um card zumbi e nenhuma saída.
+
+   Apura na LEITURA, como as 72h e o cinturão — sem agendador. Mas aqui o
+   cliente não decide nada: ele só CHAMA. Quem confere o relógio, os check-ins
+   e quem paga é a `partida_wo` no banco, porque isto mexe em Pontos de outra
+   pessoa e "validação que só existe no cliente é sugestão, não regra".
+
+   O cliente nem tenta adivinhar o resultado: manda e lê o que voltou. */
+const _apurandoWO = {};
+
+/* O custo que a ficha MOSTRA. O que VALE é o que o banco gravou — este número
+   existe só pra a linha do histórico não ficar muda.
+   Reusa o `calcular()` do motor com os dois níveis iguais e derrota: é a mesma
+   conta que a `_wo_cobrar` faz lá, e copiar a tabela de bases pra cá criaria a
+   segunda verdade que diverge na primeira vez que a de lá mudar. */
+function _custoWO(m){
+  try{
+    const ctx = m.contexto || 'amistoso';
+    return calcular(1200, 1200, false, ctx, m.formato, !!m.dupla, false, 0).dPts;
+  }catch(e){ return 0; }
+}
+
+/* Cancelar é a porta de saída que faltava — sem ela, o único jeito de matar
+   uma partida marcada era furando, e a regra do W.O. cobraria por isso.
+
+   O AVISO VEM ANTES. "Regra que só existe no documento não muda
+   comportamento": se o custo aparecesse depois do toque, a pessoa descobriria
+   a regra sendo multada por ela. O número sai da mesma conta do banco — o
+   cliente calcula pra AVISAR, o banco calcula pra VALER. */
+async function netCancelarDesafio(matchId){
+  const m = _inbox.find(x=>x.id===matchId); if(!m) return;
+  const nome0 = _nomeDe(_advId(m)).split(' ')[0];
+
+  if(m.checkin_criador || m.checkin_adversario){
+    if(window.toast) toast('Alguém já assinou presença — esta partida se encerra pelo placar.');
+    return;
+  }
+
+  const horas = m.quando ? (new Date(m.quando).getTime() - Date.now()) / 3600e3 : null;
+  if(horas !== null && horas < 0){
+    if(window.toast) toast('O horário já passou — esta partida se encerra sozinha pelo W.O.');
+    return;
+  }
+
+  const custa = horas !== null && horas < 6;
+  const aviso = custa
+    ? `Faltam menos de 6h pro jogo com ${nome0}. Cancelar agora custa Pontos, igual a não aparecer — o tempo de ele remarcar a quadra já passou.\n\nCancelar mesmo assim?`
+    : `Cancelar o jogo com ${nome0}? Não custa nada — ainda dá tempo de ele se organizar.`;
+  if(!confirm(aviso)) return;
+
+  try{
+    const { data, error } = await sb.rpc('desafio_cancelar', { p_match: matchId });
+    if(error) throw error;
+    if(data && data.custou){
+      if(!S.historico) S.historico=[];
+      S.historico.unshift({ tipo:'cancelada', euFaltei:true, adv:_advId(m),
+        dpts:_custoWO(m), quando:'agora' });
+      if(window.salvar) salvar();
+    }
+    if(window.toast){
+      toast(data && data.custou
+        ? `Jogo com ${nome0} cancelado — os Pontos foram descontados.`
+        : `Jogo com ${nome0} cancelado. Sem custo.`);
+    }
+    netAtualizarInbox();
+  }catch(e){
+    console.error('[net] cancelar', e);
+    if(window.toast) toast('Não deu pra cancelar. Tente de novo.');
+  }
+}
+
+async function netApurarWO(lista){
+  const alvos = (lista||[]).filter(m =>
+    m.status === 'aceito' && m.quando && !m.torneio_id &&
+    Date.now() > new Date(m.quando).getTime() + 12*3600e3 &&
+    !_apurandoWO[m.id]);
+  if(!alvos.length) return 0;
+
+  let fechou = 0;
+  for(const m of alvos){
+    _apurandoWO[m.id] = 1;
+    try{
+      const { data, error } = await sb.rpc('partida_wo', { p_match: m.id });
+      if(error) throw error;
+      if(data && data.wo){
+        fechou++;
+        const nome0 = _nomeDe(_advId(m)).split(' ')[0];
+        // deixa RASTRO na ficha. O débito já saiu do saldo pelo livro-caixa;
+        // sem esta linha o jogador vê o número cair e não acha onde.
+        if(data.custou && data.faltou === MEU_UID){
+          if(!S.historico) S.historico=[];
+          S.historico.unshift({ tipo:'wo', euFaltei:true, adv:_advId(m),
+            dpts:_custoWO(m), quando:'agora' });
+          if(window.salvar) salvar();
+        }
+        if(window.toast){
+          toast(data.ninguem_apareceu
+            ? `A partida com ${nome0} passou sem ninguém assinar presença — encerrada, sem custo pra nenhum dos dois.`
+            : (data.faltou === MEU_UID
+                ? `Você não assinou presença na partida com ${nome0} — ela foi encerrada e os Pontos foram descontados.`
+                : `${nome0} não apareceu — a partida foi encerrada. Você não perdeu nada.`));
+        }
+      }
+    }catch(e){ console.error('[net] wo', e); delete _apurandoWO[m.id]; }
+  }
+  return fechou;
+}
+
 async function netApurarPrazos(lista){
+  // carimba ANTES de apurar: quem está vendo agora não pode ter o prazo
+  // vencido pela leitura que acabou de acontecer.
+  await netCarimbarVistas(lista);
+
   let fechou = 0;
   for(const m of (lista||[])){
     if(!_prazoVencido(m) || _vencendo[m.id]) continue;
@@ -982,7 +1204,7 @@ async function netApurarPrazos(lista){
     catch(e){ console.error('[net] prazo', e); delete _vencendo[m.id]; }
   }
   if(fechou && window.toast){
-    toast(`${fechou===1?'Uma partida passou':'Partidas passaram'} das ${PRAZO_HORAS}h sem confirmação — o placar valeu metade.`);
+    toast(`${fechou===1?'Uma partida passou':'Partidas passaram'} do prazo sem confirmação — o placar valeu metade.`);
   }
   return fechou;
 }
@@ -1140,26 +1362,45 @@ function netRenderInbox(){
          não respondesse em 72h o resultado fechava sozinho valendo metade. O
          check-in dos dois é o que faz o placar pressupor um jogo.
 
-         NÃO tem prazo, e isso é o desenho: quem faltou pode tocar em "Cheguei"
-         dias depois e o placar destrava na hora. Um prazo aqui transformaria
-         "esqueci de tocar num botão" em "a partida não existiu" — e como o
-         relógio das 72h só começa no lançamento, ela nem venceria: ficaria
-         presa pra sempre, sem placar e sem vencimento.
+         ⚠️ 16/08 — ESTE TEXTO MUDOU, E A LIÇÃO É CARA. Até a 34, o check-in só
+         abria o placar: não assinar não custava nada, e a tela prometia por
+         escrito "não tem prazo, dá pra assinar depois do jogo". A 35 pendurou
+         o W.O. no MESMO botão sem reler a garantia — e aí a promessa virou
+         armadilha: os dois jogam de verdade, um assina, o outro não porque o
+         app disse que dava tempo, e 12h depois ele paga e a partida some sem
+         que o jogo possa ser registrado.
 
-         A tela DIZ de quem está esperando. Regra que só existe no código não
-         muda comportamento — se o botão só some, a pessoa acha que quebrou. */
+         Ainda dá pra assinar depois (a trava 7 não tem prazo, e isso continua
+         sendo o desenho — "esqueci de tocar num botão" não pode virar "a
+         partida não existiu"). O que passou a ter prazo é o efeito: assinar
+         depois de 12h do horário destrava o placar mas não conta mais como
+         presença. A tela precisa dizer as duas coisas.
+
+         Regra nova em cima de tela velha é o defeito de sempre: "vocabulário
+         revogado sobrevive na tela depois de morrer na decisão". */
       const faltaMim   = !_meuCheckin(m);
       const faltaOutro = !_outroCheckin(m);
+      const passouJanela = m.quando && Date.now() > new Date(m.quando).getTime() + 12*3600e3;
       txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m) + _checkinDe(m)
         + (faltaMim||faltaOutro
             ? `<div style="font-size:11px;color:var(--ink3);margin-top:7px;line-height:1.45">O placar abre quando os dois tocarem em <b>Cheguei</b>${
                 faltaMim && faltaOutro ? ' — falta você e ' + outro
-                : faltaMim ? ' — falta você' : ' — falta ' + outro}. Não tem prazo: dá pra assinar depois do jogo.</div>`
+                : faltaMim ? ' — falta você' : ' — falta ' + outro}. ${
+                passouJanela
+                  ? 'Ainda dá pra assinar e lançar o placar, mas a janela de presença já fechou.'
+                  : '<b style="color:var(--dn)">Assine até 12h depois do horário</b> — passou disso, quem não assinou conta como falta.'}</div>`
             : '');
       /* "Cheguei" só enquanto eu não assinei: o check-in não se desfaz (trava 7),
-         então oferecer de novo é oferecer um erro. */
+         então oferecer de novo é oferecer um erro.
+
+         "Cancelar" só enquanto NINGUÉM assinou e o horário não passou — são as
+         mesmas duas condições que a `desafio_cancelar` exige no banco. Oferecer
+         o botão fora delas seria oferecer um erro, e depois do horário quem
+         encerra é o relógio do W.O., não o botão. */
       acoes=`${faltaMim?_btn('Cheguei',`_net.checkin('${m.id}')`):''}`
-        + `${(!faltaMim && !faltaOutro)?_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok'):''}`;
+        + `${(!faltaMim && !faltaOutro)?_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok'):''}`
+        + `${(faltaMim && faltaOutro && (!m.quando || new Date(m.quando) > new Date()))
+              ? _btn('Cancelar',`_net.cancelarDesafio('${m.id}')`,'no') : ''}`;
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
       const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
@@ -1247,18 +1488,39 @@ function netRenderOnline(){
      o título, o texto e o botão; o corpo é o mesmo. */
   if(_on.step==='desafio' || _on.step==='contra'){
     const ehContra = _on.step==='contra';
-    // 🗓 quando: dia e hora são a primeira coisa que dois jogadores combinam
-    // (pedido de 11/08). Opcional — desafio sem hora vale como "a combinar";
-    // obrigar aqui emperraria o registro, que é o elo frágil do ciclo.
-    // value= preenchido de volta: trocar o local re-renderiza o sheet, e um
-    // input vazio com _on.quando cheio seria estado invisível — bug fantasma
+    /* 🗓 quando: dia e hora são a primeira coisa que dois jogadores combinam.
+       16/08 — VIROU OBRIGATÓRIO. Reverte 11/08c, e a razão que parecia óbvia
+       ("a combinar não vira jogo") é falsa: o card de 'aceito' abre "Cheguei"
+       → "Lançar placar" sem olhar a data uma vez. A razão que vale é outra —
+       partida sem horário é a única coisa no app que não morre sozinha, e
+       agora existem dois relógios pendurados nele (o W.O. de 12h e o
+       vencimento do placar).
+
+       O atrito é quase nada porque os atalhos respondem por quase todo caso:
+       obrigatório aqui é tocar num chip, não digitar do zero.
+
+       value= preenchido de volta: trocar o local re-renderiza o sheet, e um
+       input vazio com _on.quando cheio seria estado invisível — bug fantasma */
     const _p2=(n)=>String(n).padStart(2,'0');
-    const qv = _on.quando ? (()=>{ const x=new Date(_on.quando);
-      return `${x.getFullYear()}-${_p2(x.getMonth()+1)}-${_p2(x.getDate())}T${_p2(x.getHours())}:${_p2(x.getMinutes())}`; })() : '';
+    const _fmtLocal=(d)=>`${d.getFullYear()}-${_p2(d.getMonth()+1)}-${_p2(d.getDate())}T${_p2(d.getHours())}:${_p2(d.getMinutes())}`;
+    const qv = _on.quando ? _fmtLocal(new Date(_on.quando)) : '';
+    // min/max espelham as travas do banco: piso de agora (mig 35) e teto de
+    // 90 dias (mig 34). A tela avisa antes; o banco é quem garante.
+    const agora = new Date();
+    const teto  = new Date(agora.getTime() + 90*864e5);
+    const atalhos = _atalhosQuando().map(a=>`
+      <button type="button" onclick="_net.onQuandoAtalho('${_fmtLocal(a.d)}')"
+        style="flex:1;padding:9px 6px;border-radius:10px;font:600 12px system-ui;cursor:pointer;
+               border:1px solid ${qv===_fmtLocal(a.d)?'var(--lime)':'var(--linha2)'};
+               background:${qv===_fmtLocal(a.d)?'rgba(131,224,0,.12)':'transparent'};
+               color:${qv===_fmtLocal(a.d)?'var(--lime)':'var(--ink2)'}">${a.rot}</button>`).join('');
     const qdoH = `
-      <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🗓 Quando <span style="color:var(--ink3)">(opcional — sem data vale "a combinar")</span></div>
+      <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🗓 Quando ${qv?'':'<span style="color:var(--dn)">— escolha o dia e a hora</span>'}</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">${atalhos}</div>
       <input type="datetime-local" value="${qv}" onchange="_net.onQuando(this.value)"
-        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;color-scheme:dark"/>
+        min="${_fmtLocal(agora)}" max="${_fmtLocal(teto)}"
+        style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:#fff;font:600 14px system-ui;color-scheme:dark;
+               border:1px solid ${qv?'var(--linha2)':'var(--dn)'}"/>
       <div style="height:12px"></div>`;
     // 📍 da partida: nasce com o local principal do desafiante, dá pra trocar
     // ou tirar. A quadra é opcional e limitada ao nº real de quadras do local.
@@ -3685,7 +3947,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
      só não estava no `_net`, então o `onchange` do datetime-local morria em
      silêncio nas DUAS folhas que o usam (desafiar e lançar na mão): o horário
      escolhido nunca chegava em `_on.quando` e a partida saía sem hora. */
-  onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando,
+  onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
+  cancelarDesafio:netCancelarDesafio,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus,
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,

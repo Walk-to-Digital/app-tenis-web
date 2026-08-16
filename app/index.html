@@ -790,7 +790,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=49"></script>
+<script src="net.js?v=50"></script>
 
 <script>
 /* =========================================================================
@@ -1158,7 +1158,16 @@ function calcular(meu, advNivel, venceu, ctx, formato, dupla, calibrando, cal){
     const df = faixa(advNivel) - faixa(meu);
     mult = df>=2 ? 3 : df===1 ? 1.8 : 1;   // multiplicador de zebra
   }
-  const dPts = Math.round(venceu ? base*mult : base*0.2);  // derrota rende 20%
+  /* 16/08 — A DERROTA DEBITA: -50% da base. Antes rendia +20%.
+     A partida ainda injeta líquido positivo (público: +24 contra -12), então
+     jogar muito e ganhar metade continua subindo — mas quem só perde cai.
+
+     EM CALIBRAGEM NÃO DEBITA. Quem calibra está fora do quadro público desde
+     31/07 (não tem saldo a proteger), e novato abrindo o app em -36 é o pior
+     momento possível pra cobrar. Nas 8 primeiras a derrota rende os mesmos
+     +20% de sempre — não é um terceiro comportamento, é o antigo preservado
+     onde ele fazia sentido. */
+  const dPts = Math.round(venceu ? base*mult : (calibrando ? base*0.2 : base*-0.5));
   return {dNivel, dPts, zebra: venceu && mult>1};
 }
 
@@ -1172,28 +1181,67 @@ function divisaoDe(n){ return n>=1750?'A' : n>=1500?'B' : n>=1250?'C' : 'D' }
    janela de ±1 divisão virasse ±1 categoria, o pool de adversários despencaria
    — e densidade já é o gargalo nº 1 do produto.
 
-   Bordas: D começa no piso do Nível (800) e A não tem teto. Nos dois a régua
-   usa a mesma largura das classes do meio, senão "subir uma categoria" mediria
-   esforços diferentes dependendo de onde a pessoa está.
-
    O campo no dado continua `div`/`divB` — só a palavra na tela mudou. Renomear
    a coluna obrigaria migração e não muda nada pra ninguém. */
 const CLASSE_FAIXA = { D:[PISO_NIVEL,1250], C:[1250,1500], B:[1500,1750], A:[1750,2000] };
+
+/* 16/08 — LARGURA FIXA, contada DO TETO PRA BAIXO. Conserta o bug B2.
+
+   O comentário que estava aqui prometia que "nos dois a régua usa a mesma
+   largura das classes do meio" — e o código fazia `(teto-piso)/4`, que dá
+   112,5 na D (faixa de 450) contra 62,5 nas outras (faixa de 250). Ou seja:
+   subir uma categoria na D custava ~7 vitórias contra ~4 na A. O degrau mais
+   caro do app ficava exatamente na classe onde mora quem abandona primeiro,
+   e ninguém decidiu isso — é resíduo de 09/08, quando o piso do Nível desceu
+   de 1000 pra 800 e a faixa da D não foi re-derivada.
+
+   A largura agora é constante e a contagem parte do TETO, que é a borda que
+   importa: é pra ela que a pessoa está subindo.
+
+   Consequência assumida: a classe D tem 450 pontos e 4 × 62,5 cobrem 250, então
+   a categoria de baixo da D é um porão largo (800 a 1062,5). Três das quatro
+   ficam iguais às das outras classes, e o porão quase não tem morador — cair de
+   1150 (onde a calibragem D aterrissa) até 800 exige perder ~22 partidas
+   seguidas contra iguais. Alargar a régua toda pra "resolver" isso foi medido
+   em 16/08 e descartado: não muda densidade e põe veterano abaixo de novato. */
+const LARG_CAT = 62.5;
 
 /* A categoria é medida DENTRO da classe que está sendo exibida — por isso a
    classe entra como parâmetro em vez de ser recalculada aqui.
    O motivo é concreto: `j.div` é campo guardado e `divisaoDe(j.nivel)` é
    calculado, e os dois podem discordar (o jogador semente nasce com div 'C' e
    Nível 1200, que é faixa D). Calculando a categoria pela faixa do Nível e
-   colando na classe guardada, sai "C1" pra quem está abaixo do piso da C —
-   duas fontes brigando numa etiqueta só. Fora da faixa, cai na categoria da
-   ponta, que é o comportamento honesto. */
+   colando na classe guardada, sai categoria de topo pra quem está abaixo do
+   piso da C — duas fontes brigando numa etiqueta só. Fora da faixa, cai na
+   categoria da ponta, que é o comportamento honesto. */
+/* `ceil`, não `floor`: a fronteira fecha EMBAIXO, igual à de `divisaoDe`
+   (`n>=1750?'A'`). Com floor, quem estivesse exatamente no piso da categoria
+   cairia na de baixo — e a barra apareceria 100% cheia sem promover ninguém.
+   Assim a categoria k ocupa [teto − k×62,5, teto − (k−1)×62,5), e o teto da
+   classe pertence à categoria 1. */
 function categoriaDe(n, cl){
-  const [piso,teto] = CLASSE_FAIXA[cl || divisaoDe(n)] || CLASSE_FAIXA.C;
-  return Math.min(4, Math.max(1, 4 - Math.floor((n - piso) / ((teto-piso)/4))));
+  const [,teto] = CLASSE_FAIXA[cl || divisaoDe(n)] || CLASSE_FAIXA.C;
+  return Math.min(4, Math.max(1, Math.ceil((teto - n) / LARG_CAT)));
 }
-// 'C3' — a etiqueta que aparece na vitrine
-const classeDe = (j)=> divDe(j) + categoriaDe(nivelDe(j), divDe(j));
+
+/* 16/08 — a categoria se escreve por SUFIXO, não por número.
+   `C1 > C2 > C3 > C4` exigia saber que menor é melhor; `C+++ > C++ > C+ > C`
+   só admite uma leitura. É render: o dado continua sendo o número. */
+const CAT_SUFIXO = { 1:'+++', 2:'++', 3:'+', 4:'' };
+const catNome = (cl, cat)=> cl + CAT_SUFIXO[cat];
+// 'C+' — a etiqueta que aparece na vitrine
+const classeDe = (j)=> catNome(divDe(j), categoriaDe(nivelDe(j), divDe(j)));
+
+/* 16/08 — o Pontos de temporada pode ser NEGATIVO agora que a derrota debita.
+   Até aqui o painel imprimia `+${dPts}` com a cor de alta, fixos — e isso
+   passou despercebido por cinco dias porque o número nunca tinha sido
+   negativo. Sozinho, o débito faria a tela mostrar "+-12" em verde.
+
+   Positivo sobe em lime, negativo cai em vermelho (11/08: o laranja é a marca
+   e não pode significar queda), zero é neutro — porque zero não é derrota nem
+   vitória, é a partida que não moveu nada. */
+const sinalPts = (v)=> `${v>0?'+':''}${v}`;
+const corPts   = (v)=> v>0 ? 'var(--up)' : v<0 ? 'var(--dn)' : 'inherit';
 
 function aplicar(p){
   const eu = S.jogadores[EU];
@@ -1417,12 +1465,15 @@ inicio(){
      é isso que faz ela existir. A classe continua sendo o que pareia. */
   const cat = categoriaDe(nivelDe(eu), divDe(eu));
   const [cPiso,cTeto] = CLASSE_FAIXA[divDe(eu)];
-  const largCat = (cTeto-cPiso)/4;
-  const catPiso = cPiso + (4-cat)*largCat;
-  const progCat = Math.max(4, Math.min(100, Math.round((nivelDe(eu)-catPiso)/largCat*100)));
-  const faltamCat = Math.max(0, Math.ceil(catPiso + largCat - nivelDe(eu)));
+  /* 16/08: as bordas da categoria saem do TETO pra baixo, com largura fixa —
+     mesmo critério do `categoriaDe`. A de baixo (cat 4) usa o piso real da
+     classe, senão o porão da D (800→1062,5) ficaria fora de qualquer barra. */
+  const catTeto = cTeto - (cat-1)*LARG_CAT;
+  const catPiso = cat===4 ? cPiso : catTeto - LARG_CAT;
+  const progCat = Math.max(4, Math.min(100, Math.round((nivelDe(eu)-catPiso)/(catTeto-catPiso)*100)));
+  const faltamCat = Math.max(0, Math.ceil(catTeto - nivelDe(eu)));
   // degrau seguinte: a categoria de cima, ou a base da classe de cima
-  const proxDegrau = cat>1 ? divDe(eu)+(cat-1) : (acima ? acima+'4' : null);
+  const proxDegrau = cat>1 ? catNome(divDe(eu), cat-1) : (acima ? catNome(acima, 4) : null);
 
   // botão gigante = a ação do ciclo agora (o "JOGAR", mas honesto)
   let bt;
@@ -1798,7 +1849,7 @@ registrar(){
             <div class="txt"><b>${nome(a.adv)}</b><small>${a.placar} · enviado agora</small></div>
             <span class="pil gh">Pendente</span>
           </div>
-          <p class="nota" style="margin-top:11px">${nome(a.adv).split(' ')[0]} confirma no app dele. Se não responder em 72h, o placar vale metade; se ele contestar, resolve por concessão — quem concede encerra.</p>
+          <p class="nota" style="margin-top:11px">${nome(a.adv).split(' ')[0]} confirma no app dele. Ele tem 24h a partir de quando abrir o app, e no máximo 3 dias — passou disso, o placar vale metade. Se ele contestar, resolve por concessão: quem concede encerra.</p>
         </div>
         <p class="nota" style="text-align:center">Nada mexeu ainda. O ciclo só fecha quando o placar é confirmado.</p>
       </div>`};
@@ -1834,7 +1885,7 @@ registrar(){
       </div>
       <div class="sec">
         <button class="btn gh" onclick="netAbrirMao()">Jogou fora do app? Lançar na mão</button>
-        <p class="nota" style="margin-top:9px">Partida lançada na mão não conta em circuito aberto — só nas fechadas. O adversário confirma, com o mesmo prazo de 72h.</p>
+        <p class="nota" style="margin-top:9px">Partida lançada na mão não conta em circuito aberto — só nas fechadas. O adversário confirma, com o mesmo prazo: 24h depois de ele abrir o app, no máximo 3 dias.</p>
       </div>`};
   }
   return {titulo:'Registrar', dir:`${_esp.length} pendente${_esp.length>1?'s':''}`, html:`${propostasH}
@@ -1859,7 +1910,7 @@ registrar(){
            placar, quando, onde — e a coluna de origem que a regra do circuito
            aberto vai ler. O adversário confirma, com o prazo de 72h. -->
       <button class="btn gh" onclick="netAbrirMao()">Jogou fora do app? Lançar na mão</button>
-      <p class="nota" style="margin-top:9px">Partida lançada na mão não conta em circuito aberto — só nas fechadas. O adversário confirma, com o mesmo prazo de 72h.</p>
+      <p class="nota" style="margin-top:9px">Partida lançada na mão não conta em circuito aberto — só nas fechadas. O adversário confirma, com o mesmo prazo: 24h depois de ele abrir o app, no máximo 3 dias.</p>
     </div>`};
 },
 
@@ -1930,12 +1981,12 @@ mexeu(){
       <div class="mexeu">
         <div class="l">
           <div class="i"><div class="t">Pontos de temporada</div><div class="d">${CTX_NOME[u.contexto]}${u.zebra?' · multiplicador de zebra':''}</div></div>
-          <div class="v" style="color:var(--up)">+${u.dPts}</div>
+          <div class="v" style="color:${corPts(u.dPts)}">${sinalPts(u.dPts)}</div>
         </div>
         ${linhaPos('Quadro da comunidade', u.posAntes.comunidade, u.posDepois.comunidade)}
         ${quadros.map(q=>`<div class="l">
           <div class="i"><div class="t">${q.nome}</div><div class="d">a partida contou aqui</div></div>
-          <div class="v" style="color:var(--up)">+${q.pontos}</div>
+          <div class="v" style="color:${corPts(q.pontos)}">${sinalPts(q.pontos)}</div>
         </div>`).join('')}
       </div>
       ${u.subiuDiv?`<div class="card" style="border-color:var(--up)"><div class="linha-item">
@@ -2059,7 +2110,13 @@ comunidade(){
 /* ---------------- FICHA ---------------- */
 ficha(){
   const eu=S.jogadores[EU];
-  const v=S.historico.filter(h=>h.venceu).length;
+  /* 16/08: o histórico passou a receber partidas que NÃO aconteceram (W.O. e
+     cancelamento em cima da hora). Elas precisam aparecer — o Ponto sai do
+     saldo e sumir sem linha é o oposto de livro-caixa — mas não podem contar
+     como jogo nem como derrota. Entrada sem `tipo` é partida jogada, que é o
+     que todo o histórico anterior é. */
+  const jogadas = S.historico.filter(h=>!h.tipo);
+  const v=jogadas.filter(h=>h.venceu).length;
   return {titulo:'Ficha', html:`
     <div class="hero">
       <div class="cab-hero">
@@ -2092,9 +2149,9 @@ ficha(){
       </div>
 
       <div class="stats">
-        <div><div class="v">${S.historico.length}</div><div class="k">Jogos</div></div>
+        <div><div class="v">${jogadas.length}</div><div class="k">Jogos</div></div>
         <div><div class="v">${v}</div><div class="k">Vitórias</div></div>
-        <div><div class="v">${S.historico.length?Math.round(v/S.historico.length*100):0}%</div><div class="k">Aprov.</div></div>
+        <div><div class="v">${jogadas.length?Math.round(v/jogadas.length*100):0}%</div><div class="k">Aprov.</div></div>
       </div>
     </div>
 
@@ -2125,8 +2182,27 @@ ficha(){
 
     <div class="sec">
       <div class="rot">Histórico</div>
-      ${S.historico.map(h=>`
-        <div class="card"><div class="linha-item">
+      ${S.historico.map(h=>{
+        /* 16/08: partida que NÃO aconteceu entra aqui de propósito. O Ponto foi
+           debitado do saldo, e saldo que cai sem linha correspondente é o
+           oposto de "Pontos são livro-caixa" — o jogador veria o número mudar
+           sem nenhum lugar que explicasse. Mostra o débito em Pontos, nunca um
+           delta de Nível: partida que não aconteceu não move Elo, e imprimir
+           "0 NÍVEL" ao lado dela leria como jogo empatado. */
+        if(h.tipo){
+          const rot = h.tipo==='wo'
+            ? (h.euFaltei ? 'Você não apareceu' : `${nome(h.adv).split(' ')[0]} não apareceu`)
+            : 'Cancelada em cima da hora';
+          return `<div class="card" style="opacity:.82"><div class="linha-item">
+            ${avatar(h.adv)}
+            <div class="txt"><b style="color:var(--ink2)">${rot} · ${nome(h.adv)}</b><small>partida não aconteceu · ${h.quando}</small></div>
+            <div style="text-align:right">
+              <div style="font-family:var(--f-disp);font-size:16px;font-weight:700;color:${h.dpts<0?'var(--dn)':'var(--ink3)'}">${h.dpts>0?'+':''}${h.dpts||0}</div>
+              <div style="font-size:9px;color:var(--ink3);letter-spacing:.1em">PONTOS</div>
+            </div>
+          </div></div>`;
+        }
+        return `<div class="card"><div class="linha-item">
           ${avatar(h.adv)}
           <div class="txt"><b>${h.venceu?'Vitória':'Derrota'} · ${nome(h.adv)}</b><small>${h.placar} · ${h.quando}${h.porPrazo?' · <span style="color:var(--gold)">valeu metade</span>':''}</small></div>
           <div style="text-align:right">
@@ -2135,7 +2211,8 @@ ficha(){
                  de um número reduzido, sem explicação, lê como erro do motor. -->
             <div style="font-size:9px;color:${h.porPrazo?'var(--gold)':'var(--ink3)'};letter-spacing:.1em">${h.porPrazo?'½ NÍVEL':'NÍVEL'}</div>
           </div>
-        </div></div>`).join('') || '<div class="card"><p class="nota">Nenhuma partida ainda. Marque um jogo pra começar.</p></div>'}
+        </div></div>`;
+      }).join('') || '<div class="card"><p class="nota">Nenhuma partida ainda. Marque um jogo pra começar.</p></div>'}
     </div>
 
     <div class="sec">
@@ -2187,7 +2264,7 @@ function previa(par){
   const c=calcular(nivelDe(S.jogadores[EU]), nivelDe(S.jogadores[par.adv]), r, par.contexto, par.formato, par.dupla, S.jogadores[EU].calibrando, S.jogadores[EU].cal);
   return `<div class="stats" style="margin:12px 0">
     <div><div class="v" style="color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div class="k">Nível</div></div>
-    <div><div class="v" style="color:var(--up)">+${c.dPts}</div><div class="k">Pontos</div></div>
+    <div><div class="v" style="color:${corPts(c.dPts)}">${sinalPts(c.dPts)}</div><div class="k">Pontos</div></div>
     <!-- 12/08: saiu a peça "Quadros". Antes ela contava S.circuitos.length+1 e
          dava sempre 2, com o circuito fake dentro. O número verdadeiro depende
          de em quantas comunidades os DOIS jogadores estão, e isso só se sabe
