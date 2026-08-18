@@ -95,13 +95,45 @@ async function netSyncJogador(eu){
       "escolher adversário" da partida online. */
 async function netAdversarios(){
   if(!MEU_UID) return [];
+  /* 18/08 (mig 41 e 42): `banido_em` e `livre_ate` viajam junto. O elenco
+     NÃO filtra banido de propósito — o inbox precisa do nome dele pra desenhar
+     a partida em aberto, e `_nomeDe` lê daqui. Quem esconde é o RADAR e a
+     BUSCA, que são as duas superfícies onde aparecer = ser oferecido. */
   const { data, error } = await sb.from('players')
-    .select('id, nome, ap, nivel, nivelb, bon, cor')
+    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate')
     .neq('id', MEU_UID)
     .order('nome');
   if(error){ console.error('[net] lista falhou', error); return []; }
   return data;
 }
+/* os dois predicados que radar e busca aplicam. Ficam aqui, nomeados, pra que
+   uma terceira superfície um dia use os mesmos em vez de reinventar. */
+const _banido = (p)=> !!(p && p.banido_em);
+const _livreAgora = (p)=> !!(p && p.livre_ate && new Date(p.livre_ate) > new Date());
+window._banido = _banido; window._livreAgora = _livreAgora;
+
+/* 18/08 (mig 42): liga/desliga "tô livre hoje". Manda o FIM DO DIA e deixa o
+   banco recortar — o trigger `players_b_livre` limita ao fim de hoje em Salvador
+   de qualquer jeito, então mandar 23:59:59 local é só o app dizendo o que ele
+   quer, não o que vai valer. `null` desliga.
+   `.select('livre_ate')` traz o que FICOU, não o que foi mandado: é o valor
+   recortado pelo trigger que vai pro elenco local, senão a tela mostraria o
+   pedido em vez do fato. */
+async function netLivreHoje(ligar){
+  if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  let valor = null;
+  if(ligar){ const f = new Date(); f.setHours(23,59,59,0); valor = f.toISOString(); }
+  const { data, error } = await sb.from('players')
+    .update({ livre_ate: valor }).eq('id', MEU_UID).select('livre_ate').single();
+  if(error){ alert('Não deu pra mudar: '+error.message); return; }
+  if(typeof S!=='undefined' && S.jogadores && S.jogadores[EU]){
+    S.jogadores[EU].livreAte = data ? data.livre_ate : null;
+    if(window.salvar) salvar();
+    if(window.render) render();
+  }
+  if(window.toast) toast(ligar ? '🎾 Você está no topo do radar até meia-noite.' : 'Desligado.');
+}
+window.netLivreHoje = netLivreHoje;
 
 /* Badge de status no canto — o Nuno valida vendo. Verde = conectou e sincronizou. */
 function netBadge(estado, txt){
@@ -134,6 +166,16 @@ async function netBoot(eu){
     // app a partir dele e pula o cadastro — em qualquer aparelho. Só sobe o
     // local quando é a primeira vez (não sobrescreve conta real com o default).
     const { data: meuRow } = await sb.from('players').select('*').eq('id',uid).maybeSingle();
+    /* 18/08 (mig 41): CONTA BANIDA PARA AQUI. Antes de hidratar, antes de
+       carregar elenco, antes de ligar o tempo-real. A coluna existe pra isso;
+       sem esta linha, banir seria escrever num campo que ninguém lê — o
+       `matches.cantada` da moderação. A tela é própria e sem fechar clicando
+       fora, pelo mesmo motivo da declaração de idade: não é opcional. */
+    if(meuRow && meuRow.banido_em){
+      netBadge('off', 'conta suspensa');
+      netTelaBanido(meuRow);
+      return null;
+    }
     const contaReal = meuRow && meuRow.nome && meuRow.nome!=='Você';
     if(contaReal && window.hidratarJogador){ window.hidratarJogador(meuRow); }
     // 11/08: conta anterior à migração 15 não tem declaração de idade nenhuma —
@@ -367,9 +409,11 @@ window.netPedidosAmizade = ()=> _pedidosAmizade || [];
 async function netBuscar(termo){
   termo=(termo||'').trim().toLowerCase();
   if(!termo) return [];
-  const { data } = await sb.from('players').select('id,nome,ap,email,nivel,nivelb,bon,cor').neq('id',MEU_UID);
+  const { data } = await sb.from('players').select('id,nome,ap,email,nivel,nivelb,bon,cor,banido_em').neq('id',MEU_UID);
   const idHex = termo.replace(/[^a-f0-9]/g,'');
-  return (data||[]).filter(p=>
+  // 18/08 (mig 41): banido não é achável. Nem por ID exato — buscar é o
+  // caminho pra pedir amizade e desafiar, e nenhum dos dois pode chegar nele.
+  return (data||[]).filter(p=> !_banido(p)).filter(p=>
     (p.nome||'').toLowerCase().includes(termo) ||
     (p.email||'').toLowerCase().includes(termo) ||
     (idHex.length>=2 && p.id.replace(/-/g,'').toLowerCase().startsWith(idHex))
@@ -1520,9 +1564,14 @@ function netRenderInbox(){
     } else if(m.status==='pendente'){
       txt=`Aguardando <b>${outro}</b> confirmar o placar` + _avisoPrazo(m, 'esperar');
     }
+    /* 18/08 (mig 40): a conversa da partida. Em todo card vivo — desafiado,
+       aceito, pendente — porque é nesses que existe o que combinar. É de
+       contorno e ao lado das ações, não entre elas: falar não é decidir. */
+    const viva = ['desafiado','aceito','pendente'].includes(m.status);
+    const conversar = viva ? `<button onclick="_net.abrirChatPartida('${m.id}')" title="conversar" style="flex:0 0 auto;padding:11px 13px;border-radius:12px;border:1px solid var(--linha2);background:none;color:var(--ink2);font:600 13px system-ui;cursor:pointer">💬</button>` : '';
     return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
-      <div style="font-size:14px;margin-bottom:${acoes?'12px':'0'}">${txt}</div>
-      ${acoes?`<div style="display:flex;gap:8px;flex-wrap:wrap">${acoes}</div>`:''}</div>`;
+      <div style="font-size:14px;margin-bottom:${(acoes||conversar)?'12px':'0'}">${txt}</div>
+      ${(acoes||conversar)?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">${acoes}${conversar}</div>`:''}</div>`;
   }).join('') || `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Nenhuma partida rolando. Vá no Radar e desafie alguém.</p>`;
   /* 13/08: pedidos de amizade entram AQUI, não numa tela própria. Esta caixa já
      é o lugar do "isto espera a sua resposta" — desafio, placar pra confirmar —
@@ -2350,6 +2399,16 @@ async function netVerGrupo(gid){
   const nvq=(await sb.from('players').select('id,nivel,nivelb').in('id',ms.map(p=>p.player_id))).data||[];
   const nivelG={}; nvq.forEach(p=>nivelG[p.id]= g.esporte==='beach'?(p.nivelb??1200):(p.nivel??1200));
   const ptsG = await netRanking('grupo:'+gid, g.esporte);
+  /* 18/08 (mig 39): V/D, saldo de games e as últimas 3, vindos do agregado —
+     a `quadro_stats` lê as partidas por baixo da RLS e devolve só os números.
+     Falha aqui NÃO derruba a tela: o quadro sempre existiu sem essas colunas,
+     então erro vira colunas ausentes, não comunidade inacessível. */
+  const statsG = {};
+  try{
+    const st = await sb.rpc('quadro_stats', { p_grupo: gid, p_esporte: g.esporte||'tenis' });
+    if(st.error) console.error('[net] quadro_stats', st.error);
+    else (st.data||[]).forEach(s=> statsG[s.player_id]=s);
+  }catch(e){ console.error('[net] quadro_stats', e); }
   ms.sort((a,b)=> ((ptsG[b.player_id]||0)-(ptsG[a.player_id]||0))
                 || ((nivelG[b.player_id]||0)-(nivelG[a.player_id]||0)));
   const linha=(p,i)=>{
@@ -2362,12 +2421,24 @@ async function netVerGrupo(gid){
         : `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','admin')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px system-ui;cursor:pointer">virar admin</button>`;
       if(souGestor && p.papel!=='admin') acoes += ` <button onclick="_net.removerMembro('${gid}','${p.player_id}')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink2);font:600 10px system-ui;cursor:pointer">remover</button>`;
     }
+    /* as colunas da 39. `st` ausente é gente que nunca teve partida confirmada
+       neste esporte — a linha diz só pontos e Nível, como sempre disse, em vez
+       de inventar um 0×0 que parece resultado. As três bolinhas são as últimas
+       partidas, a mais recente primeiro. */
+    const st = statsG[p.player_id];
+    const ultimas = st && st.ultimas
+      ? ' · ' + st.ultimas.split('').map(r=>`<span style="color:${r==='V'?'var(--up)':'var(--dn)'}">${r==='V'?'●':'○'}</span>`).join('')
+      : '';
+    const colunas = st
+      ? `<div style="font-size:11px;color:var(--ink2)"><b style="color:var(--up)">${st.vitorias}V</b> <b style="color:var(--dn)">${st.derrotas}D</b> · games ${st.sets_pro>=st.sets_contra?'+':''}${st.sets_pro-st.sets_contra}${ultimas}</div>`
+      : '';
     return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
       <div style="width:22px;text-align:center;font:700 12px system-ui;color:${i===0?'var(--gold)':'var(--ink2)'};flex:0 0 22px">${i+1}º</div>
       ${_discoUid(p.player_id, 28)}
       <div style="flex:1;min-width:0"><b>${_nomeDe(p.player_id)}</b>
         ${ehDono?'<span style="color:var(--gold);font-size:11px"> dono</span>':p.papel==='admin'?'<span style="color:var(--up);font-size:11px"> admin</span>':''}
-        <div style="font-size:11px;color:var(--ink2)"><b style="color:var(--up)">${ptsG[p.player_id]||0}</b> pts · Nível ${nivelG[p.player_id]??'—'}</div></div>
+        <div style="font-size:11px;color:var(--ink2)"><b style="color:var(--up)">${ptsG[p.player_id]||0}</b> pts · Nível ${nivelG[p.player_id]??'—'}</div>
+        ${colunas}</div>
       ${acoes}</div>`;
   };
   // pedidos pendentes — só o gestor vê
@@ -2393,8 +2464,13 @@ async function netVerGrupo(gid){
       ? `<div style="text-align:center;color:var(--gold);font-size:13px;margin-top:14px">Pedido enviado — aguardando o gestor aprovar.</div>`
       : `<button onclick="_net.pedirEntrar('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">${(pd&&pd.estado==='recusado')?'Não rolou · pedir de novo':'Pedir pra entrar'}</button>`;
   }
+  /* 18/08 (mig 37): a conversa. Vem ANTES dos patches de propósito — é o que
+     traz a pessoa de volta à comunidade no dia em que ela não jogou, e a folha
+     se lê de cima pra baixo. Só membro vê o botão porque só membro atravessa a
+     policy: oferecer a porta pra quem a fechadura vai negar é oferecer um erro. */
+  const chatBtn = meu ? `<button onclick="_net.abrirChat('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:14px">💬 Conversa da comunidade</button>` : '';
   // patches da comunidade (migração 22) — todo membro cria e manda
-  const patchesBtn = meu ? `<button onclick="_net.abrirPatches('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:14px">◈ Patches da comunidade — criar e mandar</button>` : '';
+  const patchesBtn = meu ? `<button onclick="_net.abrirPatches('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">◈ Patches da comunidade — criar e mandar</button>` : '';
   const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
   const link = souGestor ? `<button onclick="_net.copiarLinkGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
     <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">O link é o seu convite: quem abrir entra direto, sem pedido.</div>
@@ -2457,9 +2533,174 @@ async function netVerGrupo(gid){
     ${casaH}
     ${cinturaoH}
     ${ms.map(linha).join('')||'<p style="color:var(--ink2);font-size:13px">Ninguém ainda.</p>'}
-    ${pedidosH}${entrar}${patchesBtn}${sair}${link}`);
+    ${pedidosH}${entrar}${chatBtn}${patchesBtn}${sair}${link}`);
 }
 function netFecharGver(){ const el=document.getElementById('net-gver'); if(el) el.remove(); }
+
+/* =========================================================================
+   A CONVERSA DA COMUNIDADE (18/08, migração 37)
+   Folha própria e não bloco dentro do `net-gver`: aquela já carrega ranking,
+   cinturão, pedidos, patches, casa, convite e sair. Conversa empilhada ali
+   embaixo nasceria abaixo da dobra, que é o mesmo que não existir.
+
+   ⚠️ TODO texto de mensagem passa por `_admEsc`. É o primeiro campo do app onde
+   alguém escreve texto longo e livre, e o banco guarda cru de propósito — quem
+   transforma em HTML é esta tela. Interpolar direto aqui é um XSS de uma linha.
+   ========================================================================= */
+let _chat = null;
+
+/* 18/08 (mig 40): a MESMA folha serve às duas salas — a da comunidade (37) e a
+   da partida (40). O que muda é a tabela, a coluna da sala e quem pode apagar;
+   o render, o envio, o carimbo de hora e o escape são um só. `_chat.sala`
+   guarda os três, e o resto do código pergunta a ele em vez de saber. */
+const _SALAS = {
+  grupo:   { tabela:'grupo_mensagens',   coluna:'grupo_id', titulo:'Conversa' },
+  partida: { tabela:'partida_mensagens', coluna:'match_id', titulo:'Combinar' },
+};
+
+async function netAbrirChat(gid){
+  if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  _chat = { sala:_SALAS.grupo, id:gid, nome:'', msgs:[], rascunho:'', carregando:true, aberta:true };
+  netRenderChat();
+  const g = (await sb.from('grupos').select('nome,dono_id').eq('id',gid).maybeSingle()).data;
+  if(!g){ netFecharChat(); alert('Comunidade não encontrada.'); return; }
+  _chat.nome = g.nome; _chat.dono_id = g.dono_id;
+  await _chatCarregar();
+}
+
+/* A conversa da partida. `aberta` é o que a policy `partida_msg_ins` cobra —
+   status vivo — e a tela precisa saber ANTES de oferecer o campo: partida
+   confirmada ainda deixa ler, mas escrever seria oferecer um erro. O nome da
+   sala é o do outro, porque a sala é a partida e a partida é com ele. */
+async function netAbrirChatPartida(matchId){
+  if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  const m = _inbox.find(x=>x.id===matchId)
+         || (await sb.from('matches').select('id,criador_id,adversario_id,status').eq('id',matchId).maybeSingle()).data;
+  if(!m){ alert('Partida não encontrada.'); return; }
+  const aberta = ['desafiado','aceito','pendente'].includes(m.status);
+  _chat = { sala:_SALAS.partida, id:matchId, nome:_nomeDe(_advId(m)), msgs:[], rascunho:'',
+            carregando:true, aberta, dono_id:null };
+  netRenderChat();
+  await _chatCarregar();
+}
+
+/* Busca as mais NOVAS e inverte pra desenhar: a conversa se lê de cima pra
+   baixo, mas o que interessa é o fim. Pedir `criado_em asc` com limit traria as
+   50 PRIMEIRAS mensagens da sala — as de meses atrás. */
+async function _chatCarregar(){
+  if(!_chat) return;
+  const r = await sb.from(_chat.sala.tabela)
+    .select('id,autor_id,texto,criado_em')
+    .eq(_chat.sala.coluna, _chat.id)
+    .order('criado_em', {ascending:false})
+    .limit(50);
+  if(!_chat) return;                       // fechou enquanto a consulta voltava
+  if(r.error){
+    console.error('[net] chat', r.error);
+    _chat.erro = r.error.message; _chat.carregando = false; netRenderChat(); return;
+  }
+  _chat.msgs = (r.data||[]).slice().reverse();
+  _chat.carregando = false;
+  /* autor que não está no elenco local viraria "Jogador" — acontece com quem
+     saiu da comunidade e deixou o que escreveu. Mesmo remendo do inbox. */
+  const faltando = _chat.msgs.some(m=> !S.jogadores[_chaveLocal(m.autor_id)]);
+  if(faltando && window.aplicarJogadoresReais){
+    try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){}
+  }
+  netRenderChat();
+}
+
+function netFecharChat(){ _chat=null; const el=document.getElementById('net-chat'); if(el) el.remove(); }
+function _chatDigitou(v){ if(_chat) _chat.rascunho = v; }   // sem re-render: perderia o cursor
+
+async function _chatEnviar(){
+  if(!_chat) return;
+  const txt = (_chat.rascunho||'').trim();
+  if(!txt) return;
+  if(txt.length > 500){ alert('A mensagem passa de 500 caracteres.'); return; }
+  const campo = document.getElementById('net-chat-in');
+  if(campo) campo.disabled = true;                    // trava o toque duplo
+  const { error } = await sb.from(_chat.sala.tabela)
+    .insert({ [_chat.sala.coluna]:_chat.id, autor_id:MEU_UID, texto:txt });
+  if(campo) campo.disabled = false;
+  if(error){ alert('Não deu pra enviar: '+error.message); return; }
+  _chat.rascunho = '';
+  await _chatCarregar();
+}
+
+async function _chatApagar(id){
+  if(!_chat) return;
+  if(!confirm('Apagar esta mensagem? Ela some pra todo mundo.')) return;
+  const { error } = await sb.from(_chat.sala.tabela).delete().eq('id', id);
+  if(error){ alert('Não deu pra apagar: '+error.message); return; }
+  await _chatCarregar();
+}
+
+/* "14:32" pra hoje, "sáb 14:32" pra esta semana, "12/08 14:32" pro resto.
+   Data absoluta e nunca "há 2 horas": contagem mente nas bordas, e a mesma
+   decisão já vale pro card da partida. */
+function _chatHora(iso){
+  const d = new Date(iso), agora = new Date();
+  const p = (n)=>String(n).padStart(2,'0');
+  const hm = `${d.getHours()}:${p(d.getMinutes())}`;
+  const mesmoDia = d.toDateString() === agora.toDateString();
+  if(mesmoDia) return hm;
+  const dias = (agora - d) / 864e5;
+  if(dias < 7) return `${['dom','seg','ter','qua','qui','sex','sáb'][d.getDay()]} ${hm}`;
+  return `${p(d.getDate())}/${p(d.getMonth()+1)} ${hm}`;
+}
+
+function netRenderChat(){
+  if(!_chat) return;
+  const podeApagar = (m)=> m.autor_id===MEU_UID || _chat.dono_id===MEU_UID || window.__ehAdm;
+  const bolhas = _chat.msgs.map((m,i)=>{
+    const meu = m.autor_id===MEU_UID;
+    const anterior = _chat.msgs[i-1];
+    // o nome só aparece quando TROCA de autor: repetir em toda linha de uma
+    // sequência do mesmo cara é ruído que empurra a conversa pra baixo
+    const mostraNome = !meu && (!anterior || anterior.autor_id!==m.autor_id);
+    return `<div style="display:flex;flex-direction:column;align-items:${meu?'flex-end':'flex-start'};margin-top:${mostraNome?'12px':'4px'}">
+      ${mostraNome?`<div style="font-size:10.5px;color:var(--ink3);margin:0 0 3px 10px">${_admEsc(_nomeDe(m.autor_id))}</div>`:''}
+      <div style="max-width:82%;padding:9px 12px;border-radius:14px;
+                  background:${meu?'#2C5A00':'var(--sup2)'};color:${meu?'#fff':'var(--ink)'};
+                  font-size:13.5px;line-height:1.42;word-break:break-word;white-space:pre-wrap">${_admEsc(m.texto)}</div>
+      <div style="font-size:10px;color:var(--ink3);margin:3px 8px 0">${_chatHora(m.criado_em)}${
+        podeApagar(m)?` · <span onclick="_net.chatApagar('${m.id}')" style="cursor:pointer;text-decoration:underline">apagar</span>`:''}</div>
+    </div>`;
+  }).join('');
+
+  const corpo = _chat.carregando ? `<div style="color:var(--ink3);font-size:12.5px;padding:18px 0;text-align:center">Carregando a conversa…</div>`
+    : _chat.erro ? `<div style="color:var(--dn);font-size:12.5px;padding:18px 0;text-align:center">Não deu pra ler a conversa.<br><span style="color:var(--ink3);font-size:11px">${_admEsc(_chat.erro)}</span></div>`
+    : bolhas || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
+
+  const ehPartida = _chat.sala === _SALAS.partida;
+  /* o campo só existe enquanto a sala está ABERTA — na partida encerrada a
+     policy recusaria o insert, e campo que devolve erro não é campo */
+  const entrada = _chat.aberta ? `
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <textarea id="net-chat-in" rows="1" maxlength="500" placeholder="${ehPartida?'Tô chegando, atrasei 10, leva bola…':'Escreve aí…'}"
+        oninput="_net.chatDigitou(this.value);this.style.height='auto';this.style.height=Math.min(96,this.scrollHeight)+'px'"
+        style="flex:1;padding:11px 13px;border-radius:14px;border:1px solid var(--linha2);background:var(--bg);color:#fff;
+               font:400 13.5px system-ui;resize:none;max-height:96px;line-height:1.4">${_admEsc(_chat.rascunho||'')}</textarea>
+      <button onclick="_net.chatEnviar()" style="flex:0 0 auto;padding:11px 16px;border-radius:14px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer">Enviar</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--ink3);margin-top:7px">Mensagem não se edita — se errou, apaga e manda de novo. ${ehPartida?'Só vocês dois leem, e a conversa fecha com a partida.':'Só quem é da comunidade lê.'}</div>`
+  : `<div style="font-size:11.5px;color:var(--ink3);text-align:center;padding:10px 0 2px">A partida encerrou — a conversa fica, mas não recebe mais mensagem.</div>`;
+
+  _sheet('net-chat', `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="min-width:0">
+        <div style="font:700 17px system-ui">${_chat.sala.titulo}</div>
+        <div style="font-size:11.5px;color:var(--ink2)">${ehPartida?'com ':''}${_admEsc(_chat.nome||'')}</div>
+      </div>
+      <button onclick="_net.fecharChat()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer;flex:0 0 auto">×</button></div>
+
+    <div id="net-chat-lista" style="max-height:46vh;overflow-y:auto;margin:12px 0 10px;padding-right:2px">${corpo}</div>
+    ${entrada}`);
+
+  // o fim da conversa é o que interessa: abre no rodapé, não no topo
+  const lista = document.getElementById('net-chat-lista');
+  if(lista) lista.scrollTop = lista.scrollHeight;
+}
 async function netDefinirCasa(gid, v){
   const { error } = await sb.from('grupos').update({ local_id: v||null }).eq('id', gid);
   if(error){ alert('Erro ao definir a casa: '+error.message); return; }
@@ -2577,6 +2818,11 @@ async function netCriarTorneio(d){
     tipo:d.tipo||'aberto',
     classes: d.tipo==='restrito' ? d.classes : null,
     categorias: d.tipo==='multi' ? d.cats : null,
+    // 18/08 (mig 38): `|| null` e não string vazia — o campo `date` do HTML
+    // devolve '' quando ninguém escolheu, e '' num `date` do Postgres é erro de
+    // sintaxe, não null. Torneio sem data marcada é estado válido.
+    comeca_em:  d.comeca_em  || null,
+    termina_em: d.termina_em || null,
   }).select().single();
   if(error) throw error;
   await sb.from('torneio_participantes').insert({ torneio_id:data.id, player_id:MEU_UID });
@@ -2670,6 +2916,35 @@ const _FASES = {
   'em-andamento': ['Em andamento', 'var(--gold)'],
   'concluido':    ['Encerrado', 'var(--ink3)'],
 };
+
+/* 18/08 (mig 38): a data no card.
+   `comeca_em` vem como 'AAAA-MM-DD' e é lida como DIA, não como instante. Um
+   `new Date('2026-08-20')` seria interpretado como meia-noite UTC e, no fuso do
+   Brasil, viraria 19/08 21h — o torneio apareceria um dia antes pra todo mundo.
+   Por isso a data é partida na mão e montada com `new Date(a, m-1, d)`, que é
+   local. É o mesmo motivo pelo qual a coluna é `date` e não `timestamptz`. */
+function _dataLocal(iso){
+  if(!iso) return null;
+  const p = String(iso).slice(0,10).split('-').map(Number);
+  return (p.length===3 && p.every(Number.isFinite)) ? new Date(p[0], p[1]-1, p[2]) : null;
+}
+const _DIA = ['dom','seg','ter','qua','qui','sex','sáb'];
+function _torneioQuando(t){
+  const ini = _dataLocal(t.comeca_em), fim = _dataLocal(t.termina_em);
+  if(!ini && !fim) return '';
+  const p = (n)=>String(n).padStart(2,'0');
+  const curto = (d)=>`${p(d.getDate())}/${p(d.getMonth()+1)}`;
+  let txt;
+  if(ini && fim && +ini !== +fim)      txt = `${curto(ini)} a ${curto(fim)}`;
+  else if(ini)                          txt = `${_DIA[ini.getDay()]} ${curto(ini)}`;
+  else                                  txt = `até ${curto(fim)}`;
+  /* "hoje" e "amanhã" ganham destaque porque são a única informação da lista
+     que caduca em horas. O resto fica em cinza igual ao resto do card. */
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const dias = ini ? Math.round((ini - hoje)/864e5) : null;
+  const realce = dias===0 ? ['var(--lime)','hoje'] : dias===1 ? ['var(--gold)','amanhã'] : null;
+  return `<div style="font-size:11px;color:${realce?realce[0]:'var(--ink2)'};margin-top:3px">🗓 ${realce?realce[1]+' · ':''}${txt}</div>`;
+}
 function _faseSelo(t){
   const f = _FASES[t.status] || _FASES['inscricoes'];
   return `<span style="flex:0 0 auto;padding:2px 8px;border-radius:99px;background:var(--sup2);`
@@ -2686,6 +2961,7 @@ async function netAbrirTorneios(){
       <div style="width:34px;height:34px;border-radius:9px;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">🏆</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:7px"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.nome}</b>${_faseSelo(t)}</div>
+        ${_torneioQuando(t)}
         <div style="font-size:11px;color:var(--ink2);margin-top:2px">${esp} · mata-mata · ${n}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos${regra} · ${t.aberto?'aberto':'fechado'}</div></div>
       ${entrar?`<button onclick="event.stopPropagation();_net.entrarTorneio('${t.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:'<span style="color:var(--ink2)">›</span>'}
     </div>`;
@@ -2694,7 +2970,18 @@ async function netAbrirTorneios(){
      ia no fim da linha densa com a palavra crua do banco ("em-andamento"). Agora
      separa por fase e o selo diz em português. A ordem é a da urgência: o que
      está rolando agora vem primeiro, o que já acabou vai pro fim. */
-  const porFase = (lista, st)=> lista.filter(t=> (t.status||'inscricoes')===st);
+  /* 18/08 (mig 38): dentro de cada fase, a data manda — quem tem dia marcado
+     vem primeiro, do mais próximo pro mais distante, e os sem data caem no fim
+     na ordem de criação (que era a ordem única de antes). A leitura de quem
+     abre a lista é "quando eu jogo", não "quando alguém criou". */
+  const porFase = (lista, st)=> lista
+    .filter(t=> (t.status||'inscricoes')===st)
+    .slice().sort((a,b)=>{
+      if(a.comeca_em && b.comeca_em) return a.comeca_em < b.comeca_em ? -1 : a.comeca_em > b.comeca_em ? 1 : 0;
+      if(a.comeca_em) return -1;
+      if(b.comeca_em) return 1;
+      return 0;                       // os dois sem data: mantém a ordem que veio
+    });
   const grupo = (rot, lista, entrar)=> lista.length
     ? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">${rot}</div>`
       + lista.map(t=>card(t,entrar)).join('')
@@ -2751,6 +3038,27 @@ function netCriarTorneioUI(){
     <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem joga</div><div style="display:flex;gap:8px">${seg('tipo',[['aberto','Todas as divisões'],['restrito','Só algumas'],['multi','Categorias']])}</div>
     ${extra}
     <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem entra</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (convite)'],[true,'Aberto']])}</div>
+
+    <!-- 18/08 (mig 38): a data. As duas OPCIONAIS de propósito — torneio da
+         comunidade nasce como "vou fazer um torneio" antes de ter dia, e
+         obrigar aqui empurraria todo mundo a chutar uma data pra conseguir
+         criar. Chute vira dado errado que a lista trata como verdade. -->
+    <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Quando acontece <span style="color:var(--ink3)">(opcional)</span></div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1">
+        <div style="font-size:10.5px;color:var(--ink3);margin-bottom:4px">Começa</div>
+        <input type="date" value="${_tnew.comeca_em||''}" onchange="_net.tset('comeca_em',this.value)"
+          style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;color-scheme:dark"/>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:10.5px;color:var(--ink3);margin-bottom:4px">Termina</div>
+        <input type="date" value="${_tnew.termina_em||''}" min="${_tnew.comeca_em||''}" onchange="_net.tset('termina_em',this.value)"
+          style="width:100%;padding:11px;border-radius:11px;border:1px solid ${(_tnew.comeca_em&&_tnew.termina_em&&_tnew.termina_em<_tnew.comeca_em)?'var(--dn)':'var(--linha2)'};background:var(--bg);color:#fff;font:600 13px system-ui;color-scheme:dark"/>
+      </div>
+    </div>
+    ${(_tnew.comeca_em&&_tnew.termina_em&&_tnew.termina_em<_tnew.comeca_em)
+      ? '<div style="font-size:11px;color:var(--dn);margin-top:6px">O fim está antes do começo — o banco vai recusar.</div>'
+      : '<div style="font-size:11px;color:var(--ink3);margin-top:6px">Só o dia. A hora de cada partida é combinada dentro do torneio.</div>'}
     ${_tnew.id?'<div style="font-size:11px;color:var(--ink3);margin-top:10px">As regras podem mudar enquanto as inscrições estão abertas. Quando a chave montar, congelam.</div>':''}
     <button onclick="_net.tcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">${_tnew.id?'Salvar regras':'Criar torneio'}</button>`);
   const el=document.getElementById('tn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
@@ -2776,6 +3084,8 @@ async function _tcriar(){
         tipo:_tnew.tipo||'aberto',
         classes: _tnew.tipo==='restrito' ? _tnew.classes : null,
         categorias: _tnew.tipo==='multi' ? _tnew.cats : null,
+        comeca_em:  _tnew.comeca_em  || null,
+        termina_em: _tnew.termina_em || null,
       }).eq('id',_tnew.id).eq('status','inscricoes');
       if(error) throw error;
       const id=_tnew.id; _tnew=null;
@@ -2798,7 +3108,12 @@ async function netEditarTorneio(id){
   if(!t){ alert('Torneio não encontrado.'); return; }
   if(t.status!=='inscricoes'){ alert('A chave já montou — as regras estão congeladas.'); return; }
   _tnew = { id:t.id, nome:t.nome, esporte:t.esporte, tamanho:t.tamanho, aberto:!!t.aberto,
-    tipo:t.tipo||'aberto', classes:t.classes||[], cats:t.categorias||[] };
+    tipo:t.tipo||'aberto', classes:t.classes||[], cats:t.categorias||[],
+    // 18/08: sem trazer as datas de volta, abrir "editar regras" e salvar
+    // APAGARIA a data já marcada — o update manda `|| null` e o campo vazio
+    // venceria. Formulário de edição que nasce sem o valor atual não é
+    // formulário, é sorteio.
+    comeca_em:t.comeca_em||'', termina_em:t.termina_em||'' };
   netFecharTver(); netCriarTorneioUI();
 }
 
@@ -3225,6 +3540,7 @@ let _locais = null;      // todos os locais ativos, com o nome da cidade colado
    atualização do inbox pediria a lista de novo pelo mesmo id que nunca vem. */
 const _locTentados = new Set();
 let _meusLocais = null;  // [{local_id, principal}] — os MEUS
+let _cidades = [];       // cidades cadastradas, pro cadastro de quadra particular
 let _mapaLoc = null;     // player_id → {local_id, cidade_id, regiao_id} (view player_cidade)
 
 /* 13/08: o embed do PostgREST volta objeto ou array conforme a cardinalidade
@@ -3240,7 +3556,9 @@ async function netLocais(force){
        quem não tem direito simplesmente não recebe a linha e o campo fica
        null — sem erro e sem tela quebrada. */
     sb.from('locais')
-      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,locais_endereco(endereco)')
+      // 18/08: `telefone` entra (existe desde a mig 28 e nunca foi lido) — é o
+      // que faltava pro perfil do clube ter o que mostrar.
+      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,telefone,locais_endereco(endereco)')
       .eq('ativo',true).order('nome'),
     sb.from('cidades').select('id,nome,uf'),
     sb.from('regioes').select('id,nome,cidade_id'),
@@ -3256,6 +3574,10 @@ async function netLocais(force){
   if(ls.error){ console.error('[net] locais', ls.error); _locais = null; return []; }
   const cid = {}; (cs.data||[]).forEach(c=>cid[c.id]=c);
   const reg = {}; (rs.data||[]).forEach(r=>reg[r.id]=r);
+  // 18/08: a lista de cidades já vinha nesta consulta e era jogada fora depois
+  // de colar o rótulo. O cadastro de quadra particular precisa dela pra perguntar
+  // em que cidade fica — sem isso seria mais uma consulta pelo mesmo dado.
+  _cidades = (cs.data||[]).slice().sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
   /* O NOME da região vem colado aqui, e não numa consulta na hora de desenhar:
      o render do radar é síncrono (não pode esperar query) e precisa do rótulo
      pro chip. Mesma razão pela qual a cidade já vinha colada. */
@@ -3387,7 +3709,11 @@ function netRenderMeusLocais(){
     const on=_loc.sel.includes(l.id), pr=_loc.principal===l.id;
     return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--sup2)">
       <button onclick="_net.locToggle('${l.id}')" style="width:24px;height:24px;border-radius:7px;border:1px solid ${on?'#2C5A00':'var(--linha2)'};background:${on?'#2C5A00':'var(--bg)'};color:#fff;font:700 13px system-ui;cursor:pointer;flex:0 0 24px">${on?'✓':''}</button>
-      <div style="flex:1;min-width:0"><b style="font-size:14px">${l.nome}</b>
+      <!-- 18/08: o nome virou porta pro perfil do clube (item 30). O toque no
+           nome NÃO pode marcar/desmarcar — quem quer ver o clube não quer mudar
+           onde joga, e o checkbox continua sendo o único jeito de marcar. -->
+      <div onclick="_net.verLocal('${l.id}')" style="flex:1;min-width:0;cursor:pointer">
+        <b style="font-size:14px">${l.nome}</b> <span style="color:var(--ink3);font-size:11px">›</span>
         <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+l.cidade:''}</div>
         ${l.endereco?`<div style="font-size:10.5px;color:var(--ink3)">${l.endereco}</div>`:''}</div>
       ${on?`<button onclick="_net.locPrincipal('${l.id}')" style="padding:6px 10px;border-radius:9px;border:1px solid ${pr?'var(--gold-bg)':'var(--linha2)'};background:${pr?'var(--gold-bg)':'var(--sup2)'};color:${pr?'var(--gold)':'var(--ink2)'};font:600 11px system-ui;cursor:pointer">${pr?'★ principal':'tornar principal'}</button>`:''}
@@ -3396,9 +3722,146 @@ function netRenderMeusLocais(){
   _sheet('net-locais', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">📍 Onde você joga</div>
       <button onclick="_net.fecharLocais()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:var(--ink2);margin:4px 0 8px">Marque os lugares onde você costuma jogar. O <b>principal</b> vira o endereço dos seus desafios e diz sua cidade — dá pra jogar em mais de um.</div>
-    ${linhas || '<p style="color:var(--ink2);font-size:13px;margin:14px 0">Nenhum clube cadastrado ainda. Fala com o ADM do app pra incluir o seu — por enquanto dá pra jogar sem local.</p>'}
-    <button onclick="_net.locSalvar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:16px">Salvar</button>`);
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 8px">Marque os lugares onde você costuma jogar. O <b>principal</b> vira o endereço dos seus desafios e diz sua cidade — dá pra jogar em mais de um. Toque no nome pra ver o clube por dentro.</div>
+    ${linhas || '<p style="color:var(--ink2);font-size:13px;margin:14px 0">Nenhum clube cadastrado ainda. Fala com o ADM do app pra incluir o seu — ou cadastre sua quadra aqui embaixo.</p>'}
+    <!-- 18/08 (item 31): a quadra particular tinha coluna, fechadura e policies
+         desde a migração 25 e nunca teve porta. Aqui é o lugar dela: quem abre
+         "onde você joga" e não acha o próprio lugar é exatamente quem precisa. -->
+    <button onclick="_net.criarQuadra()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 13px system-ui;cursor:pointer;margin-top:14px">+ Cadastrar minha quadra</button>
+    <button onclick="_net.locSalvar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:8px">Salvar</button>`);
+}
+
+/* =========================================================================
+   ITEM 30 (18/08) — O PERFIL DO CLUBE
+   `telefone` ganhou coluna na migração 28 e nunca teve onde aparecer; o
+   endereço vive em `locais_endereco` com fechadura própria desde a 25. A tela
+   é a leitura que faltava pro par ficar completo.
+
+   O endereço só aparece pra quem a policy `locais_endereco_sel` deixou ver —
+   quando não veio, a folha DIZ que não veio em vez de fingir que não existe.
+   ========================================================================= */
+function netVerLocal(id){
+  const l = _locDe(id);
+  if(!l){ alert('Local não encontrado.'); return; }
+  const TIPO={clube:'Clube',condominio:'Condomínio',publico:'Quadra pública',academia:'Academia',outro:'Quadra'};
+  const meu = l.dono_id === MEU_UID;
+  const linha = (ic, txt, cor)=>`<div style="display:flex;gap:9px;align-items:flex-start;margin-top:10px">
+      <span style="flex:0 0 18px;font-size:13px">${ic}</span>
+      <div style="flex:1;min-width:0;font-size:12.5px;color:${cor||'var(--ink)'};line-height:1.45">${txt}</div></div>`;
+  /* o telefone vira link de discar: ver um número que não disca em tela de
+     celular é pedir pra pessoa decorar e digitar em outro app. */
+  const tel = (l.telefone||'').trim();
+  const telLink = tel ? `<a href="tel:${_admEsc(tel.replace(/[^\d+]/g,''))}" style="color:var(--lime);text-decoration:none">${_admEsc(tel)}</a>` : '';
+  _sheet('net-local', `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div style="min-width:0">
+        <div style="font:700 17px system-ui">${_admEsc(l.nome)}</div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:2px">${TIPO[l.tipo]||'Quadra'}${l.cidade?' · '+_admEsc(l.cidade):''}${l.regiao?' · '+_admEsc(l.regiao):''}</div>
+      </div>
+      <button onclick="_net.fecharLocal()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer;flex:0 0 auto">×</button></div>
+
+    <div style="border:1px solid var(--linha);border-radius:12px;padding:12px 13px;margin-top:14px">
+      ${linha('🎾', `<b>${l.quadras}</b> quadra${l.quadras>1?'s':''}`)}
+      ${l.endereco
+        ? linha('📍', _admEsc(l.endereco))
+        : (l.origem==='jogador' && !meu
+            ? linha('📍', 'O endereço aparece pra você quando o desafio chegar.', 'var(--ink3)')
+            : linha('📍', 'Sem endereço cadastrado ainda.', 'var(--ink3)'))}
+      ${tel ? linha('📞', telLink) : linha('📞', 'Sem telefone cadastrado.', 'var(--ink3)')}
+    </div>
+
+    ${l.origem==='jogador'
+      ? `<p style="font-size:11px;color:var(--ink3);margin-top:12px;line-height:1.5">${meu
+          ? 'Quadra sua. O endereço só aparece pra quem você desafiar.'
+          : 'Quadra particular de outro jogador.'}</p>`
+      : ''}`);
+}
+function netFecharLocal(){ const el=document.getElementById('net-local'); if(el) el.remove(); }
+
+/* =========================================================================
+   ITEM 31 (18/08) — CADASTRAR A PRÓPRIA QUADRA
+   As policies `locais_jogador_ins` / `locais_endereco_ins` (mig 25) exigem
+   `origem='jogador'` e `dono_id = auth.uid()`. O endereço é OBRIGATÓRIO aqui e
+   não é zelo: quadra particular sem endereço não serve pra marcar jogo, e o
+   desafio nasce com o local principal — cadastrar sem endereço só criaria uma
+   linha que decepciona depois.
+
+   O desfazer copia o do ADM: se o endereço não gravar, o local volta atrás.
+   Sem isso sobraria um local mudo que a pessoa nem sabe que criou.
+   ========================================================================= */
+let _qnova = null;
+function netCriarQuadra(){
+  const meu = window.__meusLocais || {};
+  _qnova = { nome:'', tipo:'condominio', quadras:1, endereco:'',
+             cidade_id: meu.cidadeId || (_cidades[0]||{}).id || null };
+  netRenderCriarQuadra();
+}
+function netFecharQnova(){ _qnova=null; const el=document.getElementById('net-qnova'); if(el) el.remove(); }
+function _qset(campo, v){ if(!_qnova) return; _qnova[campo] = (campo==='quadras') ? Math.max(1, Math.min(20, +v||1)) : v; netRenderCriarQuadra(); }
+function netRenderCriarQuadra(){
+  const q=_qnova; if(!q) return;
+  const TIPOS=[['condominio','Condomínio'],['clube','Clube'],['publico','Pública'],['academia','Academia'],['outro','Outra']];
+  const pronto = q.nome.trim() && q.endereco.trim() && q.cidade_id;
+  const seg = TIPOS.map(([v,n])=>`<button onclick="_net.qset('tipo','${v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px system-ui;cursor:pointer;background:${q.tipo===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
+  _sheet('net-qnova', `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font:700 17px system-ui">Cadastrar minha quadra</div>
+      <button onclick="_net.fecharQnova()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b>: não entra na busca dos outros, e o endereço só aparece pra quem você desafiar.</div>
+
+    <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">Nome</div>
+    <input value="${_admEsc(q.nome)}" oninput="_net.qset('nome',this.value)" placeholder="Ex.: Quadra do Ed. Aurora" maxlength="60"
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui" autocomplete="off"/>
+
+    <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Tipo</div>
+    <div style="display:flex;gap:6px">${seg}</div>
+
+    <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Endereço <span style="color:var(--dn)">— obrigatório</span></div>
+    <input value="${_admEsc(q.endereco)}" oninput="_net.qset('endereco',this.value)" placeholder="Rua, número e bairro" maxlength="160"
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid ${q.endereco.trim()?'var(--linha2)':'var(--dn)'};background:var(--bg);color:#fff;font:600 14px system-ui" autocomplete="off"/>
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <div style="flex:1">
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Cidade</div>
+        <select onchange="_net.qset('cidade_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui">
+          ${_cidades.map(c=>`<option value="${c.id}" ${q.cidade_id===c.id?'selected':''}>${_admEsc(c.nome)}/${_admEsc(c.uf)}</option>`).join('')
+            || '<option value="">nenhuma cidade cadastrada</option>'}
+        </select>
+      </div>
+      <div style="flex:0 0 96px">
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Quadras</div>
+        <input type="number" min="1" max="20" value="${q.quadras}" oninput="_net.qset('quadras',this.value)"
+          style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui"/>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px">
+      ${_btn('Cancelar','_net.fecharQnova()')}
+      ${pronto?_btn('Cadastrar','_net.qsalvar()','ok'):''}
+    </div>
+    ${pronto?'':'<p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px">Falta o nome ou o endereço.</p>'}`);
+}
+async function _qsalvar(){
+  const q=_qnova; if(!q) return;
+  const nome=q.nome.trim(), endereco=q.endereco.trim();
+  if(!nome || !endereco || !q.cidade_id) return;
+  const novo = await sb.from('locais').insert({
+    nome, cidade_id:q.cidade_id, tipo:q.tipo, quadras:q.quadras,
+    origem:'jogador', dono_id:MEU_UID,
+  }).select('id').single();
+  if(novo.error){ alert('Não deu pra cadastrar: '+novo.error.message); return; }
+  const end = await sb.from('locais_endereco').insert({ local_id:novo.data.id, endereco });
+  if(end.error){
+    const volta = await sb.from('locais').delete().eq('id', novo.data.id);
+    alert('A quadra foi criada mas o endereço não gravou: '+end.error.message
+      + (volta.error
+          ? `\n\n⚠️ E não deu pra desfazer (${volta.error.message}) — "${nome}" ficou cadastrada SEM endereço.`
+          : '\n\nNada foi cadastrado. Pode tentar de novo.'));
+    return;
+  }
+  netFecharQnova();
+  await netLocais(true); await netMeusLocais(true);
+  if(window.toast) toast(`📍 <b>${nome}</b> cadastrada. Marque ela em "onde você joga".`);
+  // a folha de trás está com a lista velha em mãos: redesenha com a quadra nova
+  if(document.getElementById('net-locais')) netAbrirMeusLocais();
 }
 
 /* ---- meus troféus (a Sala de Conquistas lê o BANCO, não só os torneios) ----
@@ -3426,6 +3889,31 @@ async function netMeusTrofeus(){ return MEU_UID ? netTrofeusDe(MEU_UID) : []; }
    sai da conta na hora: a regra da abertura ("só para maiores de 18") vale
    pra conta velha igual vale pra nova.
    ========================================================================= */
+/* 18/08 (mig 41): a tela de quem foi banido. Diz o que aconteceu e o que dá pra
+   fazer — nada além de sair. Não tem "fale conosco" porque não existe canal;
+   quando existir, entra aqui. Sem fechar clicando fora, e o único botão é sair
+   da conta: banido com sessão aberta continuaria "dentro" até fechar o app. */
+function netTelaBanido(row){
+  const q = row.banido_em ? new Date(row.banido_em) : null;
+  const p = (n)=>String(n).padStart(2,'0');
+  const quando = q ? `${p(q.getDate())}/${p(q.getMonth()+1)}/${q.getFullYear()}` : '';
+  const el = _sheet('net-banido', `
+    <div style="font:700 17px system-ui;margin-bottom:2px">Sua conta foi suspensa</div>
+    <div style="font-size:12.5px;color:var(--ink2);margin-bottom:14px;line-height:1.5">
+      O ADM do Ranket suspendeu esta conta${quando?' em <b>'+quando+'</b>':''}. Enquanto estiver assim,
+      o app não abre pra você — nem pra ver, nem pra jogar.
+    </div>
+    <div style="font-size:11.5px;color:var(--ink3);margin-bottom:16px;line-height:1.5">
+      Suas partidas e seu histórico continuam guardados. Se achar que foi engano, fale com quem administra o app.
+    </div>
+    <button onclick="_net.sairBanido()" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:none;color:#fff;font:700 14px system-ui;cursor:pointer">Sair da conta</button>`);
+  el.onclick = null;
+}
+async function _sairBanido(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.reload();
+}
+
 function netPedirIdade(){
   const el = _sheet('net-idade', `
     <div style="font:700 17px system-ui;margin-bottom:2px">Uma pergunta que faltou</div>
@@ -3698,15 +4186,64 @@ async function _admBuscar(v){
    campo grande onde escolher errado é fácil e permanente. */
 async function _admSel(id, nome){
   _adm.sel = { id, nome };
-  _adm.novo = { nome:'', etiqueta:'', grupo_id:'', patch:'' };
-  const [t, g] = await Promise.all([
+  _adm.novo = { nome:'', etiqueta:'', grupo_id:'', patch:'', motivo:'' };
+  /* 18/08 (mig 41): a moderação precisa de três leituras a mais — se está
+     banido, as partidas recentes (pra anular) e o mesmo `grupos` que já vinha
+     (pra tirar).
+
+     ⚠️ A LISTA DE PARTIDAS VEM CURTA, E É A FECHADURA. `matches_select` (mig 7)
+     só devolve partida em que QUEM PERGUNTA está — e o ADM raramente está.
+     Aqui aparecem só as partidas do jogador contra o próprio ADM (ou de
+     torneio). Pra anular qualquer partida de qualquer um, falta uma policy de
+     leitura pro ADM em `matches` — mig 43. Até lá, o botão de anular existe e
+     funciona (a `partida_anular` é security definer e não depende disto), mas
+     só alcança o que a lista mostra. A tela DIZ isso, em vez de mostrar lista
+     vazia com cara de "não tem partida". */
+  const [t, g, p, m] = await Promise.all([
     sb.from('trofeus_temporada').select('id,tipo,nome,etiqueta,origem,temporada,grupo_id,criado_em')
       .eq('player_id', id).order('criado_em', {ascending:false}),
     sb.from('grupo_membros').select('grupo_id, grupos(id,nome)').eq('player_id', id),
+    sb.from('players').select('banido_em,banido_por').eq('id', id).maybeSingle(),
+    sb.from('matches').select('id,criador_id,adversario_id,status,placar,esporte,placar_em,created_at,anulada_em')
+      .or(`criador_id.eq.${id},adversario_id.eq.${id}`)
+      .in('status',['confirmada','pendente','aceito'])
+      .order('created_at',{ascending:false}).limit(12),
   ]);
-  _adm.trofeus = t.data || [];
-  _adm.grupos  = (g.data||[]).map(x=>x.grupos).filter(Boolean);
+  _adm.trofeus  = t.data || [];
+  _adm.grupos   = (g.data||[]).map(x=>x.grupos).filter(Boolean);
+  _adm.banido   = !!(p.data && p.data.banido_em);
+  _adm.partidas = m.data || [];
   netRenderAdm();
+}
+
+/* ---- MODERAÇÃO (18/08, mig 41) ------------------------------------------ */
+async function _admBanir(ligar){
+  if(!_adm.sel) return;
+  const nome = _adm.sel.nome;
+  if(ligar && !confirm(`Suspender a conta de ${nome}?\n\nO app para de abrir pra essa pessoa e ela some do radar e da busca. As partidas dela ficam. Dá pra desfazer.`)) return;
+  if(!ligar && !confirm(`Reativar a conta de ${nome}?`)) return;
+  const { error } = await sb.from('players')
+    .update(ligar ? { banido_em:new Date().toISOString(), banido_por:MEU_UID } : { banido_em:null, banido_por:null })
+    .eq('id', _adm.sel.id);
+  if(error){ alert('Não deu: '+error.message); return; }
+  if(window.toast) toast(ligar ? `⛔ Conta de ${nome} suspensa.` : `✅ Conta de ${nome} reativada.`);
+  await _admSel(_adm.sel.id, nome);
+}
+async function _admAnular(matchId, rotulo){
+  const motivo = prompt(`Anular a partida ${rotulo}?\n\nO Nível dos dois volta, os pontos são estornados e a partida fica marcada como anulada — não some.\n\nMotivo (fica registrado):`);
+  if(motivo === null) return;                       // cancelou o prompt
+  const { data, error } = await sb.rpc('partida_anular', { p_match: matchId, p_motivo: motivo || null });
+  if(error){ alert('Não deu pra anular: '+error.message); return; }
+  if(window.toast) toast(data && data.ja_estava ? 'Já estava anulada.' : `Partida anulada${data&&data.estornos?` · ${data.estornos} estorno${data.estornos>1?'s':''}`:''}.`);
+  if(_adm.sel) await _admSel(_adm.sel.id, _adm.sel.nome);
+}
+async function _admTirarDoGrupo(gid, gnome){
+  if(!_adm.sel) return;
+  if(!confirm(`Tirar ${_adm.sel.nome} de "${gnome}"?`)) return;
+  const { error } = await sb.from('grupo_membros').delete().eq('grupo_id', gid).eq('player_id', _adm.sel.id);
+  if(error){ alert('Não deu: '+error.message); return; }
+  if(window.toast) toast(`${_adm.sel.nome} saiu de ${gnome}.`);
+  await _admSel(_adm.sel.id, _adm.sel.nome);
 }
 
 async function _admDar(){
@@ -3956,6 +4493,41 @@ function netRenderAdm(){
             placeholder="Texto do patch — até 24 (ex.: Fundador)"
             style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
           <button onclick="_net.admDarPatch()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">◈ Mandar patch</button>
+
+          <!-- 18/08 (mig 41): MODERAÇÃO. Vem por ÚLTIMO e separada por uma
+               linha porque é a parte do painel que faz mal — troféu e patch
+               dão; isto tira. Ordem na tela = ordem de gravidade. -->
+          <div style="margin-top:22px;padding-top:14px;border-top:1px dashed var(--dn-bg)">
+            <div style="font:700 11px system-ui;color:var(--dn);text-transform:uppercase;letter-spacing:.08em">Moderação</div>
+
+            ${_adm.banido
+              ? `<div style="margin-top:9px;padding:10px 12px;border-radius:11px;background:var(--dn-bg);font-size:12.5px"><b>⛔ Conta suspensa.</b> O app não abre pra ${_admEsc(_adm.sel.nome)} e ela não aparece no radar nem na busca.</div>
+                 <button onclick="_net.admBanir(false)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">Reativar a conta</button>`
+              : `<button onclick="_net.admBanir(true)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:700 13px system-ui;cursor:pointer;margin-top:9px">⛔ Suspender a conta</button>
+                 <div style="font-size:10.5px;color:var(--ink3);margin-top:5px">Some do radar e da busca; o app para de abrir. As partidas ficam. Dá pra desfazer.</div>`}
+
+            <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Anular partida <span style="color:var(--ink3)">(volta Nível e estorna pontos — não apaga)</span></div>
+            ${(_adm.partidas||[]).filter(m=>!m.anulada_em).map(m=>{
+                const outro = m.criador_id===_adm.sel.id ? m.adversario_id : m.criador_id;
+                const q = m.placar_em||m.created_at, d=new Date(q), pp=(n)=>String(n).padStart(2,'0');
+                const rot = `${pp(d.getDate())}/${pp(d.getMonth()+1)} · vs ${_nomeDe(outro).split(' ')[0]}${m.placar?' · '+m.placar:''}`;
+                return `<div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
+                  <div style="flex:1;min-width:0;font-size:12px"><b>${_admEsc(rot)}</b>
+                    <div style="font-size:10.5px;color:var(--ink3)">${m.status}${m.esporte==='beach'?' · beach':''}</div></div>
+                  <button onclick="_net.admAnular('${m.id}','${_admEsc(rot.replace(/'/g,'’'))}')"
+                    style="padding:7px 10px;border-radius:9px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:600 11px system-ui;cursor:pointer">Anular</button>
+                </div>`;
+              }).join('')
+              || `<p style="color:var(--ink3);font-size:11.5px;margin-top:6px;line-height:1.45">Nenhuma partida visível. Por enquanto só aparecem as partidas dessa pessoa <b>contra você</b> ou de torneio — a fechadura de leitura de partidas não abre pro ADM ainda (mig 43).</p>`}
+
+            <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Tirar de comunidade</div>
+            ${_adm.grupos.map(g=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
+                <div style="flex:1;min-width:0;font-size:12.5px"><b>${_admEsc(g.nome)}</b></div>
+                <button onclick="_net.admTirarDoGrupo('${g.id}','${_admEsc((g.nome||'').replace(/'/g,'’'))}')"
+                  style="padding:7px 10px;border-radius:9px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:600 11px system-ui;cursor:pointer">Tirar</button>
+              </div>`).join('')
+              || `<p style="color:var(--ink3);font-size:11.5px;margin-top:6px">Não está em nenhuma comunidade.</p>`}
+          </div>
         </div>`;
     }
 
@@ -4088,6 +4660,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha,
   abrirAdm:netAbrirAdm, fecharAdm:netFecharAdm, admAba:_admAba, admBuscar:_admBuscar,
   admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
+  admBanir:_admBanir, admAnular:_admAnular, admTirarDoGrupo:_admTirarDoGrupo,   // 18/08 (mig 41)
   admLocSet:_admLocSet, admSalvarLocal:_admSalvarLocal,
   admRegSet:_admRegSet, admCriarRegiao:_admCriarRegiao, admApagarRegiao:_admApagarRegiao,
   admLocalRegiao:_admLocalRegiao, admSalvarEndereco:_admSalvarEndereco,
@@ -4095,6 +4668,12 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   locais:netLocais, meusLocais:netMeusLocais, salvarMeusLocais:netSalvarMeusLocais,
   abrirLocais:netAbrirMeusLocais, fecharLocais:netFecharMeusLocais,
   locToggle:_locToggle, locPrincipal:_locPrincipal, locSalvar:_locSalvar,
+  // 18/08: perfil do clube (30) e cadastro de quadra particular (31)
+  verLocal:netVerLocal, fecharLocal:netFecharLocal,
+  criarQuadra:netCriarQuadra, fecharQnova:netFecharQnova, qset:_qset, qsalvar:_qsalvar,
+  // 18/08: a conversa da comunidade (mig 37) e da partida (mig 40) — mesma folha
+  abrirChat:netAbrirChat, abrirChatPartida:netAbrirChatPartida, fecharChat:netFecharChat,
+  chatEnviar:_chatEnviar, chatDigitou:_chatDigitou, chatApagar:_chatApagar,
   /* 13/08: `onQuando` ficou de fora quando o campo de data entrou (mig 21) e os
      irmãos dela — `onLocal` e `onQuadra` — foram exportados. A função existia,
      só não estava no `_net`, então o `onchange` do datetime-local morria em
@@ -4107,6 +4686,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
   admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
   pedirIdade:netPedirIdade, idadeConfirmar:_idadeConfirmar,
+  sairBanido:_sairBanido,   // 18/08 (mig 41)
   abrirMao:netAbrirMao, maoAdv:_maoAdv, maoFmt:_maoFmt, maoEnviar:_maoEnviar };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;

@@ -823,7 +823,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=51"></script>
+<script src="net.js?v=52"></script>
 
 <script>
 /* =========================================================================
@@ -1122,6 +1122,99 @@ function pintarBonecos(){
       el.dataset.pronto = k;
     });
   });
+}
+
+/* =========================================================================
+   ITEM 42 (18/08) — EXPORTAR O CARD COMO IMAGEM
+   O app já sabe desenhar o atleta: `pintarChave` devolve o boneco pintado, com
+   escudo e patrocinador, num PNG. Faltava a moldura — cena de fundo, nome e
+   número — e um jeito de a imagem sair do app.
+
+   4:5 (1080×1350) porque é o formato que o WhatsApp e o Instagram não cortam.
+   Todos os arquivos são do mesmo domínio, então o canvas não fica "tainted" e o
+   `toBlob` funciona; se um dia a arte vier de CDN, isso quebra em silêncio.
+
+   Duas saídas, nesta ordem: `navigator.share` com o arquivo (é o caminho REAL
+   no celular, onde o download some numa pasta que ninguém acha) e, sem ele,
+   o link de download. No iOS o share é o único que presta.
+   ========================================================================= */
+async function exportarCard(){
+  const j = S.jogadores[EU];
+  const W=1080, H=1350;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d');
+
+  // fundo: a mesma cena que a pessoa escolheu na vitrine
+  const cena = j.cena || {quadra:'saibro', momento:'noite'};
+  const bg = await carregarImg(`../quadras/${cena.quadra}-${cena.momento}.jpg`);
+  if(bg){
+    // cover: preenche sem distorcer, cortando o excedente do lado maior
+    const r = Math.max(W/bg.naturalWidth, H/bg.naturalHeight);
+    const dw = bg.naturalWidth*r, dh = bg.naturalHeight*r;
+    x.drawImage(bg, (W-dw)/2, (H-dh)*0.14, dw, dh);
+  } else { x.fillStyle='#0A1100'; x.fillRect(0,0,W,H); }
+
+  // o mesmo scrim da home: sem ele o texto branco some no fundo claro
+  const g=x.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(11,8,6,.55)'); g.addColorStop(.24,'rgba(11,8,6,.12)');
+  g.addColorStop(.52,'rgba(11,8,6,.10)'); g.addColorStop(.82,'rgba(11,8,6,.62)');
+  g.addColorStop(1,'rgba(11,8,6,.92)');
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+
+  // o atleta, com escudo e patrocinador — a mesma chave da vitrine
+  const r = await pintarChave(chaveBoneco(j, true));
+  if(r){
+    const img = await carregarImg(r.url);
+    if(img){
+      const n = (NUMEROS && NUMEROS[`${j.bon}-${roupaAtual(j)}`]) || null;
+      const a = (n && n.atleta) || {altura:52.5, x:49.5, chao:82.5};
+      const alt = H*(a.altura/100)*1.25;                 // 1,25: no card ele é o assunto
+      const larg = alt*(img.naturalWidth/img.naturalHeight);
+      x.drawImage(img, W*(a.x/100) - larg/2, H*(a.chao/100) - alt, larg, alt);
+    }
+  }
+
+  // o texto. Ordem de leitura: nome grande, número embaixo, marca no rodapé.
+  x.textAlign='center';
+  x.fillStyle='#FFFEFD';
+  x.font='700 78px system-ui, sans-serif';
+  x.shadowColor='rgba(0,0,0,.75)'; x.shadowBlur=24; x.shadowOffsetY=3;
+  x.fillText((j.nome||'Jogador').toUpperCase(), W/2, H-232);
+  x.font='600 40px system-ui, sans-serif';
+  x.fillStyle='rgba(255,254,253,.86)';
+  x.fillText(`CLASSE ${divDe(j)} · NÍVEL ${nivelDe(j)}`, W/2, H-166);
+  x.shadowBlur=0; x.shadowOffsetY=0;
+
+  const marca = await carregarImg('../marcas/ranket-horizontal.png');
+  if(marca){
+    const mw=210, mh=mw*(marca.naturalHeight/marca.naturalWidth);
+    x.globalAlpha=.9; x.drawImage(marca, (W-mw)/2, H-104, mw, mh); x.globalAlpha=1;
+  }
+
+  /* JPEG e não PNG: o fundo é foto, e em PNG o card sai com ~1,8 MB — peso que
+     o WhatsApp recomprime de qualquer jeito e que trava no 4G de quadra. Em
+     JPEG 0,92 cai pra um décimo disso sem diferença visível. Não há
+     transparência a preservar: o fundo cobre a moldura inteira. */
+  const blob = await new Promise(ok=> c.toBlob(ok, 'image/jpeg', 0.92));
+  if(!blob){ toast('Não deu pra gerar a imagem.'); return; }
+  /* normaliza antes de cortar: sem o NFD, "José" vira "jos" e "Você" vira "voc"
+     — o replace apaga a letra acentuada inteira em vez de trocar pela sem acento. */
+  const base = (j.nome||'jogador').normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'jogador';
+  const nomeArq = `ranket-${base}.jpg`;
+  const arq = new File([blob], nomeArq, {type:'image/jpeg'});
+
+  /* `canShare({files})` e não só `share`: o Chrome no desktop tem `share` e
+     recusa arquivo — perguntar antes evita o erro depois de tudo pronto. */
+  if(navigator.canShare && navigator.canShare({files:[arq]})){
+    try{ await navigator.share({files:[arq]}); return; }
+    catch(e){ if(e && e.name==='AbortError') return; }   // fechou o menu: não é falha
+  }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=nomeArq;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  toast('Card salvo nas suas imagens.');
 }
 
 /* Posiciona a figura do vestiário com os números medidos: altura em % da tela,
@@ -1539,6 +1632,10 @@ inicio(){
       ${bt.t!=='Marcar jogo' ? `<button onclick="trocarAba('radar')">◎ Marcar jogo</button>` : ''}
       <button onclick="_net.abrirBusca&&_net.abrirBusca()">⌕ Buscar oponente</button>
       <button onclick="trocarAba('comunidade')">▣ Minha comunidade</button>
+      <!-- 18/08 (item 42): o card sai do app. Fica aqui, entre as secundárias,
+           e não como botão grande: compartilhar é consequência de ter jogado,
+           não a ação do ciclo. -->
+      <button onclick="exportarCard()">⇪ Meu card</button>
     </div>`;
 
   // faixa "o que mexeu na comunidade" — o feed real, não loot.
@@ -1770,8 +1867,10 @@ radar(){
   const i=ordemDiv.indexOf(divDe(eu));
   const permitidas=[ordemDiv[i-1],divDe(eu),ordemDiv[i+1]].filter(Boolean);
   // Jogadores REAIS cadastrados, na faixa de ±1 divisão. Sem elenco fake.
+  // 18/08 (mig 41): banido não aparece — o radar é a oferta, e ele não está
+  // em oferta. Continua no elenco (`S.jogadores`) pra o inbox saber o nome.
   let disp = Object.keys(S.jogadores)
-    .filter(id=> id!==EU && S.jogadores[id])
+    .filter(id=> id!==EU && S.jogadores[id] && !S.jogadores[id].banido)
     .map(id=> ({id, j:S.jogadores[id]}))
     .filter(x=> permitidas.includes(divDe(x.j)));
 
@@ -1799,7 +1898,29 @@ radar(){
     ? `<div class="grade" style="margin-bottom:12px">${chipLoc('todos','Todos')}${chipLoc('clube','Meu clube')}${tenhoRegiao?chipLoc('regiao',meu.regiao):''}${chipLoc('cidade',meu.cidade?meu.cidade.split('/')[0]:'Minha cidade')}</div>`
     : '';
 
+  /* 18/08 (mig 42): quem está com bola na mão hoje sobe pro topo. É ordenação
+     ESTÁVEL sobre a lista já filtrada — o ±1 classe e o chip de lugar
+     continuam mandando em quem entra; isto só decide quem vem primeiro. */
+  const livre = (x)=> !!(x.j.livreAte && new Date(x.j.livreAte) > new Date());
+  disp = disp.map((x,i)=>({x,i})).sort((a,b)=> (livre(b.x)-livre(a.x)) || (a.i-b.i)).map(o=>o.x);
+  const nLivres = disp.filter(livre).length;
+  const euLivre = !!(eu.livreAte && new Date(eu.livreAte) > new Date());
+
   return {titulo:'Radar', dir:`±1 classe`, html:`
+    <div class="sec">
+      <!-- 18/08 (mig 42): o botão. O estado está na cara — cor cheia quando
+           ligado — porque botão que não mostra se está ligado é botão que a
+           pessoa aperta duas vezes. Desliga sozinho à meia-noite (o banco
+           recorta o valor pro fim de hoje em Salvador). -->
+      <button onclick="window.netLivreHoje&&netLivreHoje(${euLivre?'false':'true'})"
+        style="width:100%;padding:13px;border-radius:14px;cursor:pointer;font:700 14px system-ui;
+               border:1px solid ${euLivre?'var(--lime)':'var(--linha2)'};
+               background:${euLivre?'rgba(131,224,0,.14)':'var(--sup)'};color:${euLivre?'var(--lime)':'var(--ink)'}">
+        ${euLivre?'🎾 Você está com bola na mão hoje':'🎾 Tô livre hoje'}</button>
+      <p class="nota" style="margin-top:6px;text-align:center">${euLivre
+        ? 'Quem procura jogo te vê no topo do radar. Desliga sozinho à meia-noite — ou toque de novo.'
+        : 'Liga isso e você aparece no topo do radar de quem procura jogo hoje.'}</p>
+    </div>
     <div class="sec">
       <div class="card clic" onclick="netAbrirBusca()">
         <div class="linha-item">
@@ -1812,16 +1933,16 @@ radar(){
     <div class="sec">
       <!-- 11/08: era "divisões" aqui e "±1 classe" onze linhas acima, na mesma
            tela. O app chama de classe; o vocabulário antigo era divisão. -->
-      <div class="rot">Quem tá no app <span>classes ${permitidas.join(' · ')}</span></div>
+      <div class="rot">Quem tá no app <span>classes ${permitidas.join(' · ')}${nLivres?` · <b style="color:var(--lime)">${nLivres} com bola na mão</b>`:''}</span></div>
       ${chipsLoc}
       ${disp.length ? disp.map(x=>`
         <!-- 16/08: era netDesafiar() direto. Tocar numa pessoa é consulta,
              não compromisso: agora abre a ficha, e Desafiar / Pedir amizade
              moram lá dentro, com pesos diferentes. -->
-        <div class="card clic" onclick="netVerJogador('${x.id}')">
+        <div class="card clic" onclick="netVerJogador('${x.id}')" ${livre(x)?'style="border-color:var(--lime)"':''}>
           <div class="linha-item">
             ${avatar(x.id)}
-            <div class="txt"><b>${nome(x.id)}</b><small>Classe ${divDe(x.j)} · Nível ${nivelDe(x.j)}</small></div>
+            <div class="txt"><b>${nome(x.id)}</b>${livre(x)?' <span class="pil2" style="background:var(--lime);color:#0A1100">🎾 livre hoje</span>':''}<small>Classe ${divDe(x.j)} · Nível ${nivelDe(x.j)}</small></div>
             <div class="seta">›</div>
           </div></div>`).join('')
         : `<div class="card"><p class="nota">Ninguém na sua faixa ainda. Quando outra pessoa se cadastrar (dentro de ±1 classe de você), ela aparece aqui pra você lançar o placar.</p></div>`}
@@ -3166,6 +3287,8 @@ function hidratarJogador(row){
   // 11/08: a declaração de idade viaja junto — sem ela o sync de outro aparelho
   // mandaria a linha sem nascimento e a pergunta voltaria pra quem já respondeu
   if(row.nascimento){ eu.nascimento=row.nascimento; eu.maiorDe18=!!row.maior_de_18; eu.idadeDeclaradaEm=row.idade_declarada_em||null; }
+  // 18/08 (mig 42): o meu "livre até" vem do banco — o botão do radar lê daqui
+  eu.livreAte = row.livre_ate || null;
   S.cadastroFeito=true;
   if(typeof onb!=='undefined' && onb) fecharCadastro();
   salvar(); render();
@@ -3193,6 +3316,10 @@ function aplicarJogadoresReais(lista){
       nivel:a.nivel ?? 1200, div:divisaoDe(a.nivel ?? 1200),
       nivelB:a.nivelb ?? 1200, divB:divisaoDe(a.nivelb ?? 1200),
       bon:a.bon || 'm1', cor:a.cor || '#5C2E3C',
+      // 18/08 (mig 41 e 42): as duas marcas viajam pro elenco local. O radar
+      // e a busca leem daqui; o inbox ignora — precisa do banido pelo nome.
+      banido: !!a.banido_em,
+      livreAte: a.livre_ate || null,
     };
   });
   S.jogadores = novo;
