@@ -70,12 +70,6 @@ button,input,select{font:inherit;color:inherit}
   background:repeating-linear-gradient(58deg,transparent 0 30px,rgba(232,222,210,.028) 30px 32px);
 }
 
-/* ---------- barra de status ---------- */
-.status{
-  flex:0 0 42px;display:flex;align-items:center;justify-content:flex-end;
-  padding:0 14px;z-index:5;
-}
-
 /* ---------- topo ---------- */
 .topo{
   flex:0 0 auto;padding:6px 18px 13px;display:flex;align-items:center;gap:12px;
@@ -294,23 +288,57 @@ button,input,select{font:inherit;color:inherit}
 }
 #vnova b{font-weight:700}
 
-/* gaveta de teste */
-#gaveta{
-  position:absolute;inset:0;background:rgba(11,8,6,.78);z-index:30;display:none;
-  align-items:flex-end;
+/* 18/08 — TELA DE CARREGAMENTO. Os três primeiros segundos de quem abre eram
+   preto liso: o `index.html` pinta o corpo, mas o app só desenha depois de o
+   Supabase vir do CDN (script bloqueante), o net.js carregar e o boot conectar.
+   Em 4G ruim isso é tempo de gente achar que quebrou e fechar.
+
+   Mora no HTML e no CSS de propósito — nada de JS, senão ela chegaria junto com
+   o problema que existe pra cobrir. Some sozinha quando o app renderiza. */
+#splash{
+  position:absolute;inset:0;z-index:80;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  transition:opacity .32s ease;
 }
-#gaveta.on{display:flex}
-#gaveta .cx{width:100%;background:var(--sup);border-top:1px solid var(--linha2);
-  border-radius:14px 14px 0 0;padding:18px 18px max(20px,env(safe-area-inset-bottom))}
-#gaveta h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:12px;font-weight:700}
-/* alvo de toque de 40px: a engrenagem é o acesso às ferramentas de teste e vai
-   ser muito usada agora que o teste é no aparelho, não no desktop. */
-#eng{position:relative;z-index:5;width:40px;height:40px;border-radius:50%;
-  display:grid;place-items:center;cursor:pointer;
-  background:rgba(21,16,13,.66);border:1px solid var(--linha2);color:var(--ink2);
-  font-size:20px;line-height:1;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-#eng:active{transform:scale(.94)}
+#splash.sai{opacity:0;pointer-events:none}
+#splash img{width:132px;height:auto;opacity:.96}
+#splash .pulso{
+  width:34px;height:3px;border-radius:99px;background:var(--linha2);overflow:hidden;position:relative;
+}
+#splash .pulso::after{
+  content:'';position:absolute;inset:0;background:var(--marca);
+  transform:translateX(-100%);animation:splashPulso 1.15s ease-in-out infinite;
+}
+@keyframes splashPulso{ 50%{transform:translateX(0)} 100%{transform:translateX(100%)} }
+/* quem pediu menos movimento não recebe a barra correndo — fica a marca parada */
+@media (prefers-reduced-motion:reduce){ #splash .pulso::after{animation:none;transform:translateX(0)} }
+
+/* 18/08 — INSTALAR NA TELA DE INÍCIO. Faixa acima da nav, some ao ser dispensada
+   e não volta (a escolha fica no aparelho). Não aparece pra quem já instalou.
+
+   Fica no FLUXO, como irmã da nav, em vez de flutuar por cima dela: a nav não
+   tem altura fixa (é padding + safe-area, que muda de aparelho pra aparelho),
+   então qualquer `bottom: calc(altura + x)` seria um chute que erra em algum
+   iPhone. No fluxo ela encosta na nav sozinha, em qualquer aparelho. */
+#instale{
+  flex:0 0 auto;margin:0 8px 8px;
+  background:var(--sup);border:1px solid var(--linha2);border-radius:14px;
+  padding:12px 13px;display:flex;align-items:center;gap:11px;
+  box-shadow:0 10px 28px rgba(0,0,0,.5);
+}
+#instale[hidden]{display:none}
+#instale .tx{flex:1;min-width:0;font-size:12px;line-height:1.4;color:var(--ink2)}
+#instale .tx b{color:var(--ink);font-size:12.5px}
+#instale button{border-radius:10px;font:700 12px system-ui;cursor:pointer;padding:9px 12px;white-space:nowrap}
+#instale .sim{background:var(--marca);color:#0A1100;border:none}
+#instale .nao{background:none;color:var(--ink3);border:none;font-size:18px;line-height:1;padding:4px 6px}
+
+/* 18/08: a gaveta de teste e a engrenagem que a abria saíram. Ela dizia de si
+   mesma que "o app de verdade não tem essa tela", e um dos quatro botões
+   (`resetar`) apagava o estado do aparelho sem perguntar. Com ela foram junto
+   a barra `.status` — que só existia pra segurar a engrenagem — e o toast que
+   mandava usar o ⚙: apontar pra um botão que não existe mais é o defeito de
+   sempre, vocabulário revogado que sobrevive na tela. */
 
 /* 07/08: folha do cenário da vitrine — miniatura de verdade da quadra, porque
    nome de superfície ("saibro", "grama") não diz nada até você ver a cor. */
@@ -747,10 +775,10 @@ button,input,select{font:inherit;color:inherit}
 
 <div id="fone">
   <div id="amb"></div>
-  <!-- 07/08: a barra de status falsa (hora + sinal) saiu. No desktop ela vendia
-       a ideia de "isso é um celular"; no celular de verdade ela duplica a barra
-       do sistema, que fica dois centímetros acima dela. Sobra a engrenagem. -->
-  <div class="status"><button id="eng" title="ferramentas de teste">⚙</button></div>
+  <!-- 07/08: a barra de status falsa (hora + sinal) saiu — no celular de
+       verdade ela duplica a barra do sistema, dois centímetros acima.
+       18/08: saiu a engrenagem e, com ela, a faixa inteira. O app ganha os
+       42px de volta no topo, que é onde eles fazem mais falta. -->
 
   <div class="topo" id="topo">
     <button class="voltar" id="voltar">‹</button>
@@ -760,6 +788,15 @@ button,input,select{font:inherit;color:inherit}
   </div>
 
   <div id="tela"></div>
+
+  <!-- 18/08: nasce escondida. Só aparece se o navegador disser que dá pra
+       instalar (Android) ou se for iOS fora do modo instalado — e nunca pra
+       quem já instalou, que é justamente quem mais abriria o app. -->
+  <div id="instale" hidden>
+    <div class="tx"><b>Deixe o Ranket na tela de início</b><br><span id="instale-tx">Abre direto, sem procurar no navegador.</span></div>
+    <button class="sim" id="instale-sim">Instalar</button>
+    <button class="nao" id="instale-nao" title="agora não">×</button>
+  </div>
 
   <div class="nav" id="nav">
     <button data-t="inicio" class="on"><i>◈</i>Início</button>
@@ -771,17 +808,13 @@ button,input,select{font:inherit;color:inherit}
 
   <div id="toast"></div>
 
-  <div id="gaveta">
-    <div class="cx">
-      <h3>Ferramentas de teste</h3>
-      <button class="btn sec" onclick="simularConfirmacao()">Adversário confirma o placar pendente</button>
-      <button class="btn sec" onclick="avancarSemana()">Avançar 7 dias na temporada</button>
-      <button class="btn sec" onclick="resetar()">Recomeçar do zero</button>
-      <button class="btn sec" onclick="fecharGaveta();abrirCadastro()">Ver o cadastro (novo jogador)</button>
-      <button class="btn gh" onclick="fecharGaveta()">Fechar</button>
-      <p class="nota">Existe só pra destravar o teste — o app de verdade não tem essa tela. A confirmação do adversário e a passagem do tempo acontecem sozinhas.</p>
-    </div>
+  <!-- 18/08: a splash é markup, não JS — tem que estar pintada antes de o
+       Supabase e o net.js sequer começarem a baixar. -->
+  <div id="splash">
+    <img src="../marcas/ranket-vertical.png" alt="Ranket">
+    <div class="pulso"></div>
   </div>
+
   <!-- 07/08: seletor de cenário da vitrine. Vive na home (ícone ◈) porque é o
        fundo da SUA home — o vestiário cuida de você, não do lugar. -->
   <div id="cenas"><div class="cx" id="cenas-cx"></div></div>
@@ -790,7 +823,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=50"></script>
+<script src="net.js?v=51"></script>
 
 <script>
 /* =========================================================================
@@ -1327,6 +1360,22 @@ function trocarAba(t){ aba=t; pilha=[]; if(t==='comunidade') S.novidades=0;
 // o quadro virou aba interna da Comunidade (05/08: "a comunidade é aba, não o app inteiro")
 function verQuadro(){ trocarAba('comunidade'); ir('quadro') }
 
+/* 18/08: a porta ÚNICA pra ficha de outro jogador. Existiam duas — a folha do
+   net.js (radar: Desafiar e Pedir amizade) e a vista `jogador` daqui (quadro:
+   confronto direto). Cada lista abria uma, e a pessoa via metade da resposta
+   dependendo de onde tocou. Agora todo mundo entra pela folha, que é quem tem
+   as ações.
+
+   A vista `jogador` sobrevive só como saída sem rede: se o net.js não carregou,
+   `netVerJogador` não existe e um clique morto seria pior que a tela antiga.
+   Tocar em mim mesmo vai pra minha ficha — no quadro eu apareço na lista, e a
+   folha calcularia "o que está em jogo" de mim contra mim. */
+function verJogador(id){
+  if(id===EU) return trocarAba('ficha');
+  if(window.netVerJogador) return netVerJogador(id);
+  ir('jogador',{id});
+}
+
 const $=(s)=>document.querySelector(s);
 
 function render(){
@@ -1626,7 +1675,7 @@ quadro(){
   const eu=S.jogadores[EU], pos=posicoes();
   const ordem=ordena(tabelaPontos().comunidade);
   const linhas = ordem.map((id,i)=>`
-    <div class="ln ${id===EU?'eu':''}" onclick="ir('jogador',{id:'${id}'})">
+    <div class="ln ${id===EU?'eu':''}" onclick="verJogador('${id}')">
       <div class="pos">${i+1}</div>
       ${avatar(id)}
       <div class="nm">${id===EU?'Você':nome(id)}
@@ -2075,7 +2124,7 @@ comunidade(){
     <div class="sec">
       <div class="rot">Os ${S.comunidade.membros.length} da comunidade</div>
       ${ordem.map((id,i)=>`
-        <div class="card clic" onclick="ir('jogador',{id:'${id}'})">
+        <div class="card clic" onclick="verJogador('${id}')">
           <div class="linha-item">
             ${avatar(id)}
             <div class="txt"><b>${id===EU?'Você':nome(id)}</b><small>${i+1}º · ${tabelaPontos().comunidade[id]} pts · Nível ${nivelDe(S.jogadores[id])}</small></div>
@@ -2302,16 +2351,6 @@ function enviarPlacar(id){
   S.pendentes=S.pendentes.filter(x=>x.id!==id);
   pilha=[]; salvar(); render();
   toast('Enviado. <b>Nada mexeu ainda</b> — o ciclo fecha quando '+nome(par.adv).split(' ')[0]+' confirmar.');
-  setTimeout(()=>{ if(S.aguardando) toast('Dica: use o ⚙ no topo pra simular a confirmação dele.') }, 4200);
-}
-
-function simularConfirmacao(){
-  if(!S.aguardando){ toast('Não tem placar esperando confirmação.'); return }
-  const a=S.aguardando; S.aguardando=null;
-  aplicar(a);
-  fecharGaveta();
-  aba='inicio'; pilha=[{rota:'mexeu'}];
-  render();
 }
 
 /* personalização (vestiário) — cosmético, reflete na home e no ambiente */
@@ -2806,22 +2845,6 @@ function cancelarProposta(id){
   toast('Proposta retirada. Ninguém é avisado.');
 }
 
-function avancarSemana(){
-  S.semana=Math.min(12,S.semana+1); S.open.dias=Math.max(0,S.open.dias-7);
-  if(S.comunidade.cinturao){   // mesma guarda: sem cinturão ligado, não há o que avançar
-    S.comunidade.cinturao.prazoDias=Math.max(0,S.comunidade.cinturao.prazoDias-7);
-    S.comunidade.cinturao.desde+=7;
-  }
-  S.ant.comunidade[EU]=posicoes().comunidade;
-  // os outros também jogam
-  Object.keys(tabelaPontos().comunidade).forEach(id=>{ if(id!==EU) tabelaPontos().comunidade[id]+=Math.round(Math.abs(Math.sin(S.semana*id.charCodeAt(2))*34)) });
-  fecharGaveta(); salvar(); render();
-  toast('Semana '+S.semana+' de 12. A comunidade jogou também.');
-}
-
-function resetar(){ guarda.removeItem('appTenis'); S=estadoInicial(); pilha=[]; aba='inicio'; render(); fecharGaveta(); toast('Recomeçado.') }
-function fecharGaveta(){ $('#gaveta').classList.remove('on') }
-
 /* =========================================================================
    CADASTRO / ONBOARDING — o primeiro login → cria o personagem
    ========================================================================= */
@@ -3060,8 +3083,6 @@ function renderOnb(){
    ========================================================================= */
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>trocarAba(b.dataset.t));
 $('#voltar').onclick=voltar;
-$('#eng').onclick=()=>$('#gaveta').classList.add('on');
-$('#gaveta').onclick=(e)=>{ if(e.target.id==='gaveta') fecharGaveta() };
 $('#cenas').onclick=(e)=>{ if(e.target.id==='cenas') fecharCena() };
 // (o relógio falso saiu junto com a barra de status — sem isso, este setInterval
 //  quebrava a cada segundo tentando escrever num #hora que não existe mais)
@@ -3069,6 +3090,68 @@ render();
 // A decisão de cadastro espera o netBoot conectar e checar se já existe conta no
 // banco (hidrata e pula o cadastro). Sem rede, cai no cadastro local.
 if(!window.netBoot && !S.cadastroFeito) abrirCadastro();
+
+/* =========================================================================
+   TELA DE CARREGAMENTO (18/08)
+   O `render()` acima já desenhou: a partir daqui a splash está cobrindo tela
+   pronta, e sair é só deixar de cobrir. O teto de 6s não é otimismo — é a
+   garantia de que uma falha de rede não deixa ninguém preso olhando a marca.
+   ========================================================================= */
+function sairSplash(){
+  const s=$('#splash'); if(!s || s.classList.contains('sai')) return;
+  s.classList.add('sai');
+  setTimeout(()=>{ if(s.parentNode) s.remove() }, 400);   // depois do fade
+}
+/* O teto vale sempre, inclusive quando o boot trava sem rejeitar — que é o modo
+   de falha que mais aparece em 4G ruim. Quem engancha o boot é a chamada lá
+   embaixo, onde o `netBoot` de fato acontece. */
+setTimeout(sairSplash, 6000);
+if(!window.netBoot) requestAnimationFrame(sairSplash);
+
+/* =========================================================================
+   INSTALAR NA TELA DE INÍCIO (18/08)
+   Dois mundos e um só lugar na tela. No Android o navegador avisa que dá pra
+   instalar (`beforeinstallprompt`) e entrega o convite pra disparar na hora
+   certa; no iOS não existe API nenhuma — só dá pra ENSINAR o caminho, e mesmo
+   isso só faz sentido no Safari, porque Chrome no iPhone não instala.
+
+   Quem já instalou nunca vê: é justamente quem abriria mais o app, e oferecer
+   o que a pessoa já fez é o jeito mais rápido de a faixa virar ruído.
+   ========================================================================= */
+(function instalar(){
+  const faixa=$('#instale'); if(!faixa) return;
+  const jaInstalado = matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
+  if(jaInstalado || guarda.getItem('instalarNao')==='1') return;
+
+  const fechar=()=>{ faixa.hidden=true; guarda.setItem('instalarNao','1') };
+  $('#instale-nao').onclick=fechar;
+
+  let convite=null;
+  addEventListener('beforeinstallprompt', (e)=>{
+    /* segurar o evento é o ponto: sem o preventDefault o Chrome mostra a barra
+       dele, no momento dele, e o botão daqui nunca teria o que disparar. */
+    e.preventDefault(); convite=e; faixa.hidden=false;
+    $('#instale-sim').textContent='Instalar';
+  });
+
+  const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const safari = iOS && !/crios|fxios|edgios/i.test(navigator.userAgent);
+  if(safari){
+    faixa.hidden=false;
+    $('#instale-tx').textContent='No Safari: toque em Compartilhar e depois em "Adicionar à Tela de Início".';
+    $('#instale-sim').textContent='Entendi';
+  }
+
+  $('#instale-sim').onclick=async ()=>{
+    if(!convite){ fechar(); return; }              // iOS, ou convite que expirou
+    convite.prompt();
+    try{ await convite.userChoice; }catch(e){}
+    convite=null; fechar();                         // aceitando ou não, não pergunta de novo
+  };
+
+  // instalou por fora (menu do navegador): a faixa perde o assunto na hora
+  addEventListener('appinstalled', fechar);
+})();
 
 /* Hidrata o jogador local a partir da linha do banco (login em outro aparelho ou
    sessão que já tem conta). Copia tudo e marca cadastro feito — sem recriar nada. */
@@ -3134,8 +3217,10 @@ function aplicarJogadoresReais(lista){
 window.aplicarJogadoresReais = aplicarJogadoresReais;
 
 /* Passo 3 do backend: conecta no Supabase e espelha meu jogador no banco.
-   Não bloqueia — se cair, o protótipo roda offline igual. */
-if(window.netBoot) netBoot(S.jogadores[EU]);
+   Não bloqueia — se cair, o protótipo roda offline igual.
+   18/08: é aqui que a splash sai. Os dois desfechos servem — conectado ou
+   offline, o app já está utilizável nos dois. */
+if(window.netBoot) netBoot(S.jogadores[EU]).then(sairSplash, sairSplash);
 
 /* Os números do escudo e do patrocinador são medidos por sprite e vivem fora do
    código (atleta-numeros.json), gerados a partir da calibragem no editor.

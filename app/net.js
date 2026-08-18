@@ -150,6 +150,18 @@ async function netBoot(eu){
       if(window.aplicarJogadoresReais){ window.aplicarJogadoresReais(outros); if(window.render) render(); }
     }catch(e){ console.error('[net] carregar jogadores falhou', e); }
     try{ await netCarregarAmigos(); }catch(e){}
+    /* localização (migração 19): locais + os meus + o mapa do radar. O espelho
+       em window é o que as telas síncronas leem (ficha, quadro, radar).
+
+       18/08 — SUBIU PRA CÁ, e a ordem é o conserto. Isto rodava DEPOIS do
+       inbox, e o card do desafio desenha o local lendo `_locDe()`, que lê este
+       cache. Com o cache ainda nulo, `_pinDe` não achava a linha e a apagava
+       inteira: clube, quadra e endereço sumiam do card sem erro nenhum — e o
+       inbox é justamente a tela que ABRE sozinha quando chega desafio. Quem
+       recebia via só a data e quem leva a bola, e o combinado do lugar parecia
+       nunca ter sido enviado. Carregar antes custa uma consulta na frente do
+       inbox; não carregar custa a informação principal do card. */
+    try{ await netLocais(); await netMeusLocais(); await netMapaLocais(); }catch(e){}
     // liga o tempo-real e carrega as partidas em aberto (desafios, placares pra confirmar)
     netSubscribe();
     await netAtualizarInbox();
@@ -158,9 +170,6 @@ async function netBoot(eu){
     try{ await netFecharTemporada(); }catch(e){}
     // sou ADM do app? acende a porta de entrada da aba ADM (migração 18)
     try{ await netCheckAdm(); }catch(e){}
-    // localização (migração 19): locais + os meus + o mapa do radar. O espelho
-    // em window é o que as telas síncronas leem (ficha, quadro, radar).
-    try{ await netLocais(); await netMeusLocais(); await netMapaLocais(); }catch(e){}
     // as comunidades reais e minha posição em cada uma (12/08) — mesmo padrão
     try{ await netMeusQuadros(); }catch(e){}
     // destaque por movimento na comunidade (12/08)
@@ -187,6 +196,26 @@ const _souCriador = (m)=> m.criador_id === MEU_UID;
 const _advId = (m)=> _souCriador(m) ? m.adversario_id : m.criador_id;   // o "outro"
 const _chaveLocal = (uid)=> (uid===MEU_UID) ? EU : uid;                 // uid → chave em S.jogadores
 const _nomeDe = (uid)=>{ const j = S.jogadores[_chaveLocal(uid)]; return (j&&j.nome) || 'Jogador'; };
+
+/* 18/08: o avatar das listas do net.js eram SEIS cópias do mesmo <div> inline —
+   e quatro delas desenhavam só o disco colorido, sem as iniciais dentro. Disco
+   mudo em lista de 28px não identifica ninguém: numa comunidade com dois
+   jogadores de cor parecida, as duas linhas viram a mesma linha.
+
+   Não usa o `avatar()` do index de propósito. Aquele é o boneco de corpo
+   inteiro, desenhado em canvas e pensado pra 96px pra cima; aqui são listas de
+   28 a 36px, onde ele vira borrão e cobra render caro por linha. O disco com
+   inicial é a versão honesta desse tamanho.
+
+   `ap` vem do cadastro, ou seja, é texto de gente — escapa sempre. */
+const _disco = (o, px=28)=>{
+  const cor = (o && o.cor) || '#5C2E3C';
+  const ini = _admEsc((o && o.ap) || '?');
+  return `<div style="width:${px}px;height:${px}px;border-radius:50%;background:${cor};flex:0 0 ${px}px;`
+       + `display:flex;align-items:center;justify-content:center;color:#FFFEFD;`
+       + `font:700 ${Math.max(10, Math.round(px*0.36))}px system-ui">${ini}</div>`;
+};
+const _discoUid = (uid, px=28)=> _disco(S.jogadores[_chaveLocal(uid)], px);
 const _inverter = (placar)=> (placar||'').split(/\s+/).map(p=>{ const m=p.match(/^(\d+)\D+(\d+)$/); return m?`${m[2]}-${m[1]}`:p; }).join(' ');
 
 /* ---- Identidade pública + amigos -------------------------------------- */
@@ -412,6 +441,20 @@ async function netAtualizarInbox(){
   if(desconhecido && window.aplicarJogadoresReais){
     try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){}
   }
+  /* 18/08: mesma ideia pro LUGAR. Subir o `netLocais` no boot resolve a corrida
+     da abertura, mas não o clube cadastrado pelo ADM depois que eu conectei —
+     esse chega no card por tempo-real com um `local_id` que o meu cache não
+     conhece, e `_pinDe` apagaria a linha em silêncio de novo.
+
+     O `_locTentados` não é zelo: `netLocais` filtra `ativo=true`, então local
+     DESATIVADO pelo ADM nunca vai ser achado por mais que se recarregue — e sem
+     a marca, toda atualização do inbox dispararia a consulta outra vez, pra
+     sempre. Tenta uma vez por id e desiste; o `_pinDe` diz o que sobrou. */
+  const naoAchados = data.map(m=>m.local_id).filter(id=> id && !_locDe(id) && !_locTentados.has(id));
+  if(naoAchados.length || !_locais){
+    naoAchados.forEach(id=> _locTentados.add(id));
+    try{ await netLocais(true); }catch(e){ console.error('[net] locais no inbox', e); }
+  }
   netAplicarConfirmadas(data);                 // mexe no meu nível se fechou partida
   let abrirInbox=false, desafioVS=null;
   data.forEach(m=>{
@@ -582,7 +625,7 @@ function netVerJogador(id){
       <button onclick="_net.fecharPerfil()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
-      <div style="width:52px;height:52px;border-radius:50%;background:${j.cor||'var(--sup2)'};flex:0 0 52px"></div>
+      ${_disco(j, 52)}
       <div style="min-width:0">
         <b style="font-size:17px">${j.nome||'Jogador'}</b>
         <div style="font-size:12px;color:var(--ink2)">Classe ${divDe(j)} · Nível ${advN}${amigo?' · <span style="color:var(--up)">amigo</span>':''}</div>
@@ -603,13 +646,71 @@ function netVerJogador(id){
     <button onclick="_net.fecharPerfil();netDesafiar('${id}')"
       style="width:100%;margin-top:14px;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 15px system-ui;cursor:pointer">Desafiar ${primeiro}</button>
 
+    ${_confrontoDireto(id)}
+
+    <!-- troféus e patches chegam do banco; o miolo é trocado quando a consulta
+         volta. Enquanto isso a seção diz que está buscando, em vez de afirmar
+         "nenhum troféu" — que é o que um vazio otimista faria, e seria mentira
+         pra quem tem. -->
+    <div id="net-perfil-conq" style="margin-top:16px">
+      <div style="font-size:11.5px;color:var(--ink3)">Buscando troféus e patches…</div>
+    </div>
+
     ${amigo
       ? `<p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px;line-height:1.5">Vocês já são amigos — dá pra desafiar em qualquer classe, sem a janela de ±1.</p>`
       : `<button onclick="_net.pedirAmizade('${id}','${(j.nome||'').replace(/'/g,"\\'")}')"
           style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:none;color:#fff;font:700 14px system-ui;cursor:pointer">Pedir pra ser amigo</button>
          <p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px;line-height:1.5">Amizade é mútua: ele recebe o pedido e decide. Sendo amigos, vocês se desafiam em qualquer classe.</p>`}
   `);
+  _carregarConquistas(id);
 }
+
+/* ---- as três seções que a ficha ganhou em 18/08 ------------------------
+   Antes existiam DUAS fichas de jogador: esta (aberta pelo radar, com Desafiar
+   e Pedir amizade) e a `jogador()` do index (aberta pelo quadro, com confronto
+   direto e atributos). Mesma pergunta — "quem é essa pessoa?" — respondida pela
+   metade em cada uma, e qual você via dependia de por onde tocou. É o mesmo
+   defeito de superfícies que discordam que já mordeu o radar e a busca. Agora
+   é uma só, e os dois caminhos abrem ela. */
+/* Lê S.historico, que é estado do APARELHO: em celular novo vem vazio mesmo com
+   as partidas registradas no banco. Por isso o texto do vazio não afirma "nunca
+   jogaram" — diz que não se enfrentaram, sem cravar de onde vem a certeza.
+   Levar o confronto direto pro banco é item à parte. */
+function _confrontoDireto(id){
+  const h = (S.historico||[]).filter(x=> x.adv===id);
+  const linha = (t)=>`<div style="font-size:11.5px;color:var(--ink2);margin-top:5px">${t}</div>`;
+  if(!h.length) return `<div style="margin-top:16px">
+    <div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em">Confronto direto</div>
+    ${linha('Vocês ainda não se enfrentaram.')}</div>`;
+  const v = h.filter(x=>x.venceu).length;
+  return `<div style="margin-top:16px">
+    <div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em">Confronto direto</div>
+    <div style="font:700 15px system-ui;margin-top:6px">${v} <span style="font-weight:400;font-size:12px;color:var(--ink2)">×</span> ${h.length-v}</div>
+    ${h.slice(0,5).map(x=>linha(
+      `<span style="color:${x.venceu?'var(--up)':'var(--dn)'}">${x.venceu?'venceu':'perdeu'}</span> ${x.placar||''}${x.quando?' · '+x.quando:''}`
+    )).join('')}
+    ${h.length>5?linha(`<span style="color:var(--ink3)">e mais ${h.length-5}</span>`):''}
+  </div>`;
+}
+
+async function _carregarConquistas(id){
+  const [trofeus, patches] = await Promise.all([
+    netTrofeusDe(id).catch(()=>[]),
+    netPatchesDe(id).catch(()=>[]),
+  ]);
+  const el = document.getElementById('net-perfil-conq');
+  if(!el) return;                       // fechou a ficha antes de a consulta voltar
+  const rot = (t)=>`<div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">${t}</div>`;
+  const pil = (txt,cor)=>`<span style="display:inline-block;padding:4px 9px;border-radius:99px;background:var(--sup2);color:${cor};font:700 11px system-ui;margin:0 5px 5px 0">${_admEsc(txt)}</span>`;
+  const bloco = [];
+  if(trofeus.length) bloco.push(`<div>${rot(`Troféus · ${trofeus.length}`)}
+    ${trofeus.map(t=> pil(`🏆 ${t.nome||t.tipo}${t.etiqueta?' · '+t.etiqueta:''}`, 'var(--gold)')).join('')}</div>`);
+  if(patches.length) bloco.push(`<div style="margin-top:12px">${rot(`Patches · ${patches.length}`)}
+    ${patches.map(p=> pil(`◈ ${p.patch.nome}`, 'var(--ink)')).join('')}</div>`);
+  el.innerHTML = bloco.length ? bloco.join('')
+    : `<div style="font-size:11.5px;color:var(--ink3)">Ainda não tem troféu nem patch.</div>`;
+}
+
 function netFecharPerfil(){ const el=document.getElementById('net-perfil'); if(el) el.remove(); }
 window.netVerJogador = netVerJogador;
 
@@ -1260,6 +1361,11 @@ const _pinDe = (m, pref='')=>{
   }
   const l = F('local_id') && _locDe(F('local_id'));
   if(l) h+=`<div style="font-size:11.5px;color:var(--ink2);margin-top:${quando?'3px':'6px'}">📍 ${l.nome}${F('quadra')?' · Quadra '+F('quadra'):''}${l.endereco?`<span style="color:var(--ink3)"> — ${l.endereco}</span>`:''}</div>`;
+  /* 18/08: a partida TEM lugar marcado e o cache não sabe o nome dele. Antes
+     isto caía no vazio e o card mentia por omissão — quem lia achava que o
+     desafio veio sem local. O número da quadra ainda é verdade e vai junto:
+     é a parte do combinado que não depende de resolver o nome do clube. */
+  else if(F('local_id')) h+=`<div style="font-size:11.5px;color:var(--ink3);margin-top:${quando?'3px':'6px'}">📍 Lugar marcado${F('quadra')?' · Quadra '+F('quadra'):''} — o nome do clube não carregou</div>`;
   /* Os dois combinados de responsabilidade, cada um com o SEU verbo: quadra se
      reserva, bola se leva — ninguém carrega uma quadra. São fatos separados
      de propósito (colunas separadas, mig 27) porque caem em pessoas
@@ -1428,7 +1534,7 @@ function netRenderInbox(){
   const pedidosH = !_peds.length ? '' :
     `<div style="font:700 12px system-ui;color:var(--gold);margin:16px 0 2px;text-transform:uppercase;letter-spacing:.08em">Pedidos de amizade</div>`
     + _peds.map(p=>`<div style="display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--sup2)">
-        <div style="width:28px;height:28px;border-radius:50%;background:${(S.jogadores[_chaveLocal(p.de)]||{}).cor||'#5C2E3C'};flex:0 0 28px"></div>
+        ${_discoUid(p.de, 28)}
         <div style="flex:1;min-width:0">
           <b>${_nomeDe(p.de)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.de)}</span>
           <div style="font-size:11px;color:var(--ink2)">quer ser seu amigo — amigos se desafiam em qualquer classe</div>
@@ -1681,7 +1787,7 @@ function netRenderBusca(){
     const div=window.divisaoDe?divisaoDe(p.nivel):'';
     const nomeEsc=(p.nome||'').replace(/'/g,'’');
     return `<div style="display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--linha);border-radius:12px;margin-top:8px">
-      <div style="width:36px;height:36px;border-radius:50%;background:${p.cor||'#5C2E3C'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 36px">${p.ap||'?'}</div>
+      ${_disco(p, 36)}
       <div style="flex:1;min-width:0"><b>${p.nome}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.id)}</span>
         <div style="font-size:11px;color:var(--ink2)">Classe ${div} · Nível ${p.nivel}${amigo?' · <span style="color:var(--up)">✔ amigo</span>':''}</div></div>
       <div style="display:flex;flex-direction:column;gap:5px">
@@ -2258,7 +2364,7 @@ async function netVerGrupo(gid){
     }
     return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
       <div style="width:22px;text-align:center;font:700 12px system-ui;color:${i===0?'var(--gold)':'var(--ink2)'};flex:0 0 22px">${i+1}º</div>
-      <div style="width:28px;height:28px;border-radius:50%;background:${(S.jogadores[_chaveLocal(p.player_id)]||{}).cor||'#5C2E3C'};flex:0 0 28px"></div>
+      ${_discoUid(p.player_id, 28)}
       <div style="flex:1;min-width:0"><b>${_nomeDe(p.player_id)}</b>
         ${ehDono?'<span style="color:var(--gold);font-size:11px"> dono</span>':p.papel==='admin'?'<span style="color:var(--up);font-size:11px"> admin</span>':''}
         <div style="font-size:11px;color:var(--ink2)"><b style="color:var(--up)">${ptsG[p.player_id]||0}</b> pts · Nível ${nivelG[p.player_id]??'—'}</div></div>
@@ -2551,6 +2657,25 @@ async function netSairTorneio(id){
 }
 
 // -- UI: lista de torneios --
+/* 18/08: a fase do torneio em português. O `status` do banco tem três valores
+   e eles vazavam crus pra tela ("em-andamento" com hífen, "concluido" sem
+   acento) — vocabulário de coluna não é vocabulário de gente.
+
+   ⚠️ A DATA do torneio não entra aqui porque ela NÃO EXISTE: `torneios` tem
+   `created_at` e mais nada de tempo (mig 4, mais as colunas de 5, 8 e 10).
+   Usar `created_at` como data do torneio seria mentir — "criado em" não é
+   "acontece em". Separar futuro de passado depende de uma coluna nova. */
+const _FASES = {
+  'inscricoes':   ['Inscrições', 'var(--lime)'],
+  'em-andamento': ['Em andamento', 'var(--gold)'],
+  'concluido':    ['Encerrado', 'var(--ink3)'],
+};
+function _faseSelo(t){
+  const f = _FASES[t.status] || _FASES['inscricoes'];
+  return `<span style="flex:0 0 auto;padding:2px 8px;border-radius:99px;background:var(--sup2);`
+       + `color:${f[1]};font:700 9.5px system-ui;letter-spacing:.06em;text-transform:uppercase">${f[0]}</span>`;
+}
+
 async function netAbrirTorneios(){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
   const {meus,abertos,cont}=await netMeusTorneios();
@@ -2559,13 +2684,27 @@ async function netAbrirTorneios(){
     const regra=t.tipo==='restrito'&&t.classes?' · div. '+t.classes.join('/'):'';
     return `<div class="tsheet-item" onclick="_net.verTorneio('${t.id}')" style="display:flex;align-items:center;gap:11px;padding:13px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;cursor:pointer">
       <div style="width:34px;height:34px;border-radius:9px;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">🏆</div>
-      <div style="flex:1;min-width:0"><b>${t.nome}</b>
-        <div style="font-size:11px;color:var(--ink2)">${esp} · mata-mata · ${n}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos${regra} · ${t.aberto?'aberto':'fechado'}${t.status!=='inscricoes'?' · '+t.status:''}</div></div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:7px"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.nome}</b>${_faseSelo(t)}</div>
+        <div style="font-size:11px;color:var(--ink2);margin-top:2px">${esp} · mata-mata · ${n}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos${regra} · ${t.aberto?'aberto':'fechado'}</div></div>
       ${entrar?`<button onclick="event.stopPropagation();_net.entrarTorneio('${t.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:'<span style="color:var(--ink2)">›</span>'}
     </div>`;
   };
-  const meusH = meus.length? meus.map(t=>card(t,false)).join('') : `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Você não está em nenhum torneio ainda.</p>`;
-  const abH = abertos.length? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Torneios abertos</div>`+abertos.map(t=>card(t,true)).join('') : '';
+  /* 18/08: "Seus torneios" era uma pilha só, do inscrição ao concluído, e a fase
+     ia no fim da linha densa com a palavra crua do banco ("em-andamento"). Agora
+     separa por fase e o selo diz em português. A ordem é a da urgência: o que
+     está rolando agora vem primeiro, o que já acabou vai pro fim. */
+  const porFase = (lista, st)=> lista.filter(t=> (t.status||'inscricoes')===st);
+  const grupo = (rot, lista, entrar)=> lista.length
+    ? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">${rot}</div>`
+      + lista.map(t=>card(t,entrar)).join('')
+    : '';
+  const meusH = meus.length
+    ? grupo('Em andamento', porFase(meus,'em-andamento'), false)
+      + grupo('Inscrições abertas', porFase(meus,'inscricoes'), false)
+      + grupo('Encerrados', porFase(meus,'concluido'), false)
+    : `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Você não está em nenhum torneio ainda.</p>`;
+  const abH = grupo('Torneios abertos', abertos, true);
   _sheet('net-torneios', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px system-ui">Torneios</div>
       <button onclick="_net.fecharTorneios()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
@@ -2838,7 +2977,7 @@ async function netVerTorneio(id){
   const souParticipante=ps.some(p=>p.player_id===MEU_UID);
   const cheio = ps.length>=t.tamanho;
   const linha=p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
-      <div style="width:28px;height:28px;border-radius:50%;background:${(S.jogadores[_chaveLocal(p.player_id)]||{}).cor||'#5C2E3C'};flex:0 0 28px"></div>
+      ${_discoUid(p.player_id, 28)}
       <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.player_id)}</span></div>
       ${p.player_id===t.dono_id?'<span style="color:var(--gold);font-size:11px">dono</span>':''}
     </div>`;
@@ -3081,6 +3220,10 @@ window.netEntrarPorLink = netEntrarPorLink;
    não filtra nada, que era a única razão de existir).
    ========================================================================= */
 let _locais = null;      // todos os locais ativos, com o nome da cidade colado
+/* ids de local que o inbox já tentou resolver e não achou — quase sempre clube
+   que o ADM desativou depois de a partida ser marcada. Sem esta marca, cada
+   atualização do inbox pediria a lista de novo pelo mesmo id que nunca vem. */
+const _locTentados = new Set();
 let _meusLocais = null;  // [{local_id, principal}] — os MEUS
 let _mapaLoc = null;     // player_id → {local_id, cidade_id, regiao_id} (view player_cidade)
 
@@ -3262,13 +3405,19 @@ function netRenderMeusLocais(){
    Descoberto em 11/08 testando o ADM: a sala derivava tudo (torneios, selos
    locais) e nunca leu trofeus_temporada — Reinado, Coroa e troféu do ADM
    existiam no banco e não apareciam pra ninguém. */
-async function netMeusTrofeus(){
-  if(!MEU_UID) return [];
+/* 18/08: virou "de quem?" em vez de "meus". A ficha do outro jogador precisa
+   dos troféus dele, e a policy permite: `trofeus_sel` é `for select using
+   (true)` (mig 13) — troféu é fato público, quem ganhou ganhou. O `netMeusTrofeus`
+   fica como atalho pra Sala de Conquistas não ter que saber disso. */
+async function netTrofeusDe(uid){
+  if(!uid) return [];
   const r = await sb.from('trofeus_temporada')
     .select('id,tipo,nome,etiqueta,origem,temporada,grupo_id,criado_em')
-    .eq('player_id', MEU_UID).order('criado_em', {ascending:false});
+    .eq('player_id', uid).order('criado_em', {ascending:false});
+  if(r.error){ console.error('[net] trofeus', r.error); return []; }
   return r.data || [];
 }
+async function netMeusTrofeus(){ return MEU_UID ? netTrofeusDe(MEU_UID) : []; }
 
 /* =========================================================================
    DECLARAÇÃO DE IDADE NO LOGIN (11/08) — pras contas anteriores à migração 15.
@@ -3340,15 +3489,19 @@ function netPatchFiltro(texto, nomesMembros){
   return { key:'clear', ic:'✓', t:'Pode ser criado', d:'Não bateu em lista dura, lista cinza nem nome de membro.' };
 }
 
-async function netMeusPatches(){
-  if(!MEU_UID) return [];
-  const es=(await sb.from('patch_envios').select('patch_id,de,criado_em').eq('para',MEU_UID)).data||[];
+/* 18/08: mesma virada dos troféus, e pela mesma razão — `patch_envios_sel` é
+   `using (true)` (mig 22). Patch é elogio dado em público; esconder o de quem
+   recebeu não protegeria ninguém. */
+async function netPatchesDe(uid){
+  if(!uid) return [];
+  const es=(await sb.from('patch_envios').select('patch_id,de,criado_em').eq('para',uid)).data||[];
   if(!es.length) return [];
   const ps=(await sb.from('patches').select('id,nome,grupo_id,origem,criado_por').in('id',es.map(e=>e.patch_id))).data||[];
   const porId={}; ps.forEach(p=>porId[p.id]=p);
   return es.map(e=>({ ...e, patch:porId[e.patch_id] })).filter(x=>x.patch)
            .sort((a,b)=>(b.criado_em||'').localeCompare(a.criado_em||''));
 }
+async function netMeusPatches(){ return MEU_UID ? netPatchesDe(MEU_UID) : []; }
 
 /* ---- UI: patches da comunidade (criar, mandar) ------------------------- */
 let _pat=null;
@@ -3759,7 +3912,7 @@ function netRenderAdm(){
     const achados = _adm.achados.map(p=>`
       <div onclick="_net.admSel('${p.id}','${_admEsc((p.nome||'').replace(/'/g,'’'))}')"
         style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--linha);border-radius:11px;margin-top:7px;cursor:pointer">
-        <div style="width:32px;height:32px;border-radius:50%;background:${p.cor||'#5C2E3C'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex:0 0 32px">${_admEsc(p.ap||'?')}</div>
+        ${_disco(p, 32)}
         <div style="flex:1;min-width:0"><b>${_admEsc(p.nome)}</b>
           <div style="font-size:11px;color:var(--ink2)">Nível ${p.nivel}</div></div>
         <div style="color:var(--ink3)">›</div></div>`).join('');
