@@ -99,8 +99,14 @@ async function netAdversarios(){
      NÃO filtra banido de propósito — o inbox precisa do nome dele pra desenhar
      a partida em aberto, e `_nomeDe` lê daqui. Quem esconde é o RADAR e a
      BUSCA, que são as duas superfícies onde aparecer = ser oferecido. */
+  /* 18/08: `escudo` e `patroc` entram. Existem em `players` desde o schema e
+     nunca foram lidos daqui — o boneco do adversário sempre renderizou sem
+     marca, e a camisa patrocinada era vista por UMA pessoa: quem a veste.
+     Enquanto isso valesse, qualquer número de alcance prometido a um
+     patrocinador seria falso. São escolhas de exibição, públicas por natureza
+     (estão na camisa), e `players_select` é `using(true)`. */
   const { data, error } = await sb.from('players')
-    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate')
+    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc')
     .neq('id', MEU_UID)
     .order('nome');
   if(error){ console.error('[net] lista falhou', error); return []; }
@@ -3621,6 +3627,17 @@ async function netMeusLocais(force){
   if(_meusLocais && !force) return _meusLocais;
   if(!MEU_UID) return [];
   const r = await sb.from('player_locais').select('local_id,principal').eq('player_id', MEU_UID);
+  /* 18/08: `r.data || []` transformava QUALQUER erro em lista vazia — e vazio
+     aqui é truthy, então a guarda do topo congelava o vazio pela sessão inteira.
+     Era o mesmo defeito que o `netLocais` já tinha consertado em 13/08, e aqui
+     ele passou batido porque nada destrutivo encostava nesta lista.
+
+     O Apagar do item 32 mudou isso: a folha "onde você joga" reabre logo depois
+     de apagar uma quadra. Se este fetch falhar nessa hora, ela reabre com TUDO
+     desmarcado, e um toque em Salvar manda `netSalvarMeusLocais([], null)` —
+     que apaga todos os `player_locais` da pessoa e ainda canta "Locais salvos.".
+     Erro tem que deixar `_meusLocais` nulo, pra próxima chamada tentar de novo. */
+  if(r.error){ console.error('[net] meusLocais', r.error); _meusLocais = null; return []; }
   _meusLocais = r.data || [];
   _locPublicar();
   return _meusLocais;
@@ -3773,6 +3790,12 @@ function netVerLocal(id){
       ? `<p style="font-size:11px;color:var(--ink3);margin-top:12px;line-height:1.5">${meu
           ? 'Quadra sua. O endereço só aparece pra quem você desafiar.'
           : 'Quadra particular de outro jogador.'}</p>`
+      : ''}
+    ${meu && l.origem==='jogador'
+      ? `<div style="display:flex;gap:8px;margin-top:14px">
+           ${_btn('Editar', `_net.editarQuadra('${l.id}')`)}
+           ${_btn('Apagar', `_net.apagarQuadra('${l.id}')`, 'no')}
+         </div>`
       : ''}`);
 }
 function netFecharLocal(){ const el=document.getElementById('net-local'); if(el) el.remove(); }
@@ -3791,31 +3814,79 @@ function netFecharLocal(){ const el=document.getElementById('net-local'); if(el)
 let _qnova = null;
 function netCriarQuadra(){
   const meu = window.__meusLocais || {};
-  _qnova = { nome:'', tipo:'condominio', quadras:1, endereco:'',
+  _qnova = { id:null, nome:'', tipo:'condominio', quadras:1, endereco:'',
              cidade_id: meu.cidadeId || (_cidades[0]||{}).id || null };
   netRenderCriarQuadra();
 }
+
+/* =========================================================================
+   ITEM 32 — EDITAR E APAGAR A PRÓPRIA QUADRA
+
+   As policies `locais_jogador_upd`, `locais_endereco_upd` e `locais_jogador_del`
+   existem desde a migração 25 e passaram na prova de RLS pelos DOIS lados. Só
+   que nenhuma tinha botão: dava pra cadastrar e não dava pra corrigir nem
+   apagar. Como o cadastro exige endereço, quem digitasse errado ficava preso
+   com ele — e o endereço é justamente o que o desafiado usa pra chegar.
+
+   É o espelho do que a tela de moderação ensinou hoje: lá nasceu um botão sem
+   visão pra usar, aqui uma fechadura sem botão pra abrir. Fechadura provada e
+   sem superfície não protege nada, só dorme.
+
+   `_qnova.id` null = cadastrando, uuid = editando. O formulário é o mesmo de
+   propósito: são os mesmos campos e as mesmas regras, e duplicar a folha faria
+   as duas divergirem no primeiro conserto que só uma recebesse.
+   ========================================================================= */
+function netEditarQuadra(id){
+  const l = _locDe(id);
+  if(!l){ alert('Quadra não encontrada.'); return; }
+  if(l.dono_id !== MEU_UID){ alert('Essa quadra não é sua.'); return; }
+  _qnova = { id:l.id, nome:l.nome||'', tipo:l.tipo||'condominio',
+             quadras:l.quadras||1, endereco:l.endereco||'',
+             cidade_id:l.cidade_id||null,
+             /* guardados pra comparar na hora de gravar: `cidade0` decide se a
+                região tem que ser zerada (região pertence a uma cidade, e nada
+                no banco amarra as duas — mig 19), e `quadras0` decide se vale
+                conferir partida apontando pra quadra que deixou de existir. */
+             cidade0:l.cidade_id||null, quadras0:l.quadras||1 };
+  netFecharLocal();
+  netRenderCriarQuadra();
+}
 function netFecharQnova(){ _qnova=null; const el=document.getElementById('net-qnova'); if(el) el.remove(); }
-function _qset(campo, v){ if(!_qnova) return; _qnova[campo] = (campo==='quadras') ? Math.max(1, Math.min(20, +v||1)) : v; netRenderCriarQuadra(); }
+/* `_sheet` faz `innerHTML =` inteiro, então cada tecla destrói o <input> em foco
+   — no celular o teclado fecha a cada letra. A casa já resolve isso no painel do
+   ADM devolvendo o foco depois do render; aqui vai um passo além e devolve a
+   POSIÇÃO do cursor, não o fim do texto: corrigir endereço é digitar no meio, e
+   pular pro fim a cada tecla embaralharia justamente o caso que o Editar existe
+   pra atender. */
+let _qfoco = null;
+function _qset(campo, v, pos){
+  if(!_qnova) return;
+  _qnova[campo] = (campo==='quadras') ? Math.max(1, Math.min(20, +v||1)) : v;
+  _qfoco = (campo==='nome' || campo==='endereco')
+    ? { campo, pos: (pos==null ? String(v).length : pos) } : null;
+  netRenderCriarQuadra();
+}
 function netRenderCriarQuadra(){
   const q=_qnova; if(!q) return;
   const TIPOS=[['condominio','Condomínio'],['clube','Clube'],['publico','Pública'],['academia','Academia'],['outro','Outra']];
   const pronto = q.nome.trim() && q.endereco.trim() && q.cidade_id;
   const seg = TIPOS.map(([v,n])=>`<button onclick="_net.qset('tipo','${v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px system-ui;cursor:pointer;background:${q.tipo===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
   _sheet('net-qnova', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Cadastrar minha quadra</div>
+      <div style="font:700 17px system-ui">${q.id?'Editar minha quadra':'Cadastrar minha quadra'}</div>
       <button onclick="_net.fecharQnova()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b>: não entra na busca dos outros, e o endereço só aparece pra quem você desafiar.</div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${q.id
+      ? 'Corrigir aqui muda o endereço pra quem já foi desafiado também — é a mesma linha que eles leem.'
+      : 'A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b>: não entra na busca dos outros, e o endereço só aparece pra quem você desafiar.'}</div>
 
     <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">Nome</div>
-    <input value="${_admEsc(q.nome)}" oninput="_net.qset('nome',this.value)" placeholder="Ex.: Quadra do Ed. Aurora" maxlength="60"
+    <input id="q-nome" value="${_admEsc(q.nome)}" oninput="_net.qset('nome',this.value,this.selectionStart)" placeholder="Ex.: Quadra do Ed. Aurora" maxlength="60"
       style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui" autocomplete="off"/>
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Tipo</div>
     <div style="display:flex;gap:6px">${seg}</div>
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Endereço <span style="color:var(--dn)">— obrigatório</span></div>
-    <input value="${_admEsc(q.endereco)}" oninput="_net.qset('endereco',this.value)" placeholder="Rua, número e bairro" maxlength="160"
+    <input id="q-endereco" value="${_admEsc(q.endereco)}" oninput="_net.qset('endereco',this.value,this.selectionStart)" placeholder="Rua, número e bairro" maxlength="160"
       style="width:100%;padding:12px;border-radius:12px;border:1px solid ${q.endereco.trim()?'var(--linha2)':'var(--dn)'};background:var(--bg);color:#fff;font:600 14px system-ui" autocomplete="off"/>
 
     <div style="display:flex;gap:10px;margin-top:12px">
@@ -3835,14 +3906,98 @@ function netRenderCriarQuadra(){
 
     <div style="display:flex;gap:8px;margin-top:16px">
       ${_btn('Cancelar','_net.fecharQnova()')}
-      ${pronto?_btn('Cadastrar','_net.qsalvar()','ok'):''}
+      ${pronto?_btn(q.id?'Salvar':'Cadastrar','_net.qsalvar()','ok'):''}
     </div>
     ${pronto?'':'<p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px">Falta o nome ou o endereço.</p>'}`);
+
+  // devolve foco e cursor pro campo que estava sendo digitado (ver _qset)
+  if(_qfoco){
+    const el = document.getElementById('q-'+_qfoco.campo);
+    if(el){ el.focus(); const p = Math.min(_qfoco.pos, el.value.length); el.setSelectionRange(p, p); }
+  }
 }
+/* Trava de toque duplo, compartilhada pelo Salvar e pelo Apagar. Os dois abrem
+   diálogo DEPOIS de um round-trip de rede, então o segundo toque não é
+   impaciência: é a pessoa achando, com razão, que o primeiro não pegou. Sem
+   isto o segundo DELETE volta com zero linhas e o guarda de zero-linhas acusa
+   "essa quadra não é sua" — mentira, e das que assustam. A casa já usa o mesmo
+   padrão no chat (`_chatEnviar`, "trava o toque duplo"). */
+let _qbusy = false;
 async function _qsalvar(){
+  if(_qbusy) return;
+  _qbusy = true;
+  try { await _qsalvarInterno(); } finally { _qbusy = false; }
+}
+async function _qsalvarInterno(){
   const q=_qnova; if(!q) return;
   const nome=q.nome.trim(), endereco=q.endereco.trim();
   if(!nome || !endereco || !q.cidade_id) return;
+
+  /* EDITAR — a ordem é a INVERSA da do cadastro, e de propósito. No INSERT o
+     desfazer é apagar o que acabou de nascer; aqui o local já existia antes,
+     então apagar não seria rollback, seria estrago. Sem desfazer possível, o
+     jeito de não deixar meia-escrita é gravar primeiro o campo que pode ser
+     RECUSADO — o endereço, que tem fechadura própria (`locais_endereco_upd`).
+     Se ele falhar, nada mudou e a folha continua aberta com o que a pessoa
+     digitou; a metade que sobra é a menos danosa das duas.
+
+     `.select('id')` nos dois: sem ele, update barrado pela RLS volta SEM erro e
+     com zero linhas, e a tela cantaria "atualizada" tendo mudado nada. Erro
+     silencioso é o único tipo que este projeto já viu passar batido. */
+  if(q.id){
+    /* ENCOLHER O NÚMERO DE QUADRAS. `matches.quadra` só é checado contra 1..60
+       no banco (mig 19) — nada amarra ele ao `locais.quadras`. Baixar de 4 pra 2
+       deixa o card de um jogo marcado imprimindo "Quadra 4" num lugar que não
+       tem mais. Avisa e deixa seguir: encolher pode ser exatamente o certo (a
+       quadra foi desativada), e a decisão é de quem é dono. */
+    if(q.quadras < (q.quadras0||q.quadras)){
+      const alta = await sb.from('matches').select('id', { count:'exact', head:true })
+        .eq('local_id', q.id).in('status', ['desafiado','aceito']).gt('quadra', q.quadras);
+      if(alta.error){ alert('Não deu pra conferir os jogos marcados: '+alta.error.message); return; }
+      if(alta.count && !confirm(`${alta.count} jogo${alta.count>1?'s':''} marcado${alta.count>1?'s':''} aponta${alta.count>1?'m':''} pra uma quadra acima da ${q.quadras}.\n\n`
+        + `Eles vão continuar mostrando um número que não existe mais aqui. Salvar assim mesmo?`)) return;
+    }
+
+    const end = await sb.from('locais_endereco')
+      .upsert({ local_id:q.id, endereco }, { onConflict:'local_id' }).select('local_id');
+    if(end.error){ alert('Não deu pra gravar o endereço: '+end.error.message); return; }
+    if(!end.data || !end.data.length){ alert('O endereço não foi gravado — essa quadra não é sua ou não existe mais.'); return; }
+
+    /* A região pertence a uma CIDADE, e nada no banco amarra as duas (mig 19).
+       Mudou de cidade, a região que o ADM tinha classificado passa a ser de
+       outro lugar — e o chip de região do radar casaria a pessoa com jogadores
+       da cidade errada. Zera só quando a cidade muda: zerar sempre apagaria a
+       classificação do ADM a cada correção de nome, que é estrago de outro tipo. */
+    const campos = { nome, tipo:q.tipo, quadras:q.quadras, cidade_id:q.cidade_id };
+    if(q.cidade0 && q.cidade_id !== q.cidade0) campos.regiao_id = null;
+
+    const upd = await sb.from('locais').update(campos).eq('id', q.id).select('id');
+
+    /* Os dois caminhos de erro daqui pra baixo REFRESCAM o cache antes de sair.
+       Sem isso `_locais` fica com o endereço velho pelo resto da sessão — e o
+       estrago não é só a tela divergir: reabrir o Editar carrega `l.endereco`
+       do cache velho e o próximo upsert REGRAVA o endereço antigo por cima do
+       novo, calado. Perda de dado de verdade, não de exibição. */
+    if(upd.error){
+      await netLocais(true);
+      alert(upd.error.code === '23505'
+        ? `Você já tem uma quadra com esse nome. O endereço foi gravado; escolha outro nome pra terminar.`
+        : 'O endereço gravou, mas o resto não: '+upd.error.message);
+      return;
+    }
+    if(!upd.data || !upd.data.length){
+      await netLocais(true);
+      alert('O endereço gravou, mas o resto não mudou — essa quadra não é sua.');
+      return;
+    }
+
+    netFecharQnova();
+    await netLocais(true); await netMeusLocais(true);
+    if(window.toast) toast(`📍 <b>${_admEsc(nome)}</b> atualizada.`);
+    if(document.getElementById('net-locais')) netAbrirMeusLocais();
+    return;
+  }
+
   const novo = await sb.from('locais').insert({
     nome, cidade_id:q.cidade_id, tipo:q.tipo, quadras:q.quadras,
     origem:'jogador', dono_id:MEU_UID,
@@ -3861,6 +4016,121 @@ async function _qsalvar(){
   await netLocais(true); await netMeusLocais(true);
   if(window.toast) toast(`📍 <b>${nome}</b> cadastrada. Marque ela em "onde você joga".`);
   // a folha de trás está com a lista velha em mãos: redesenha com a quadra nova
+  if(document.getElementById('net-locais')) netAbrirMeusLocais();
+}
+
+/* APAGAR — o banco já resolve o passado sozinho: `matches.local_id` é
+   `on delete set null` (mig 19), então placar e rating de partida jogada
+   continuam valendo, e é assim que tem que ser — partida é histórico.
+
+   O que o banco NÃO resolve é o jogo que ainda vai acontecer. Ali o `set null`
+   trabalha contra: a partida perde o local em silêncio, o card do outro jogador
+   fica sem endereço e ele aparece em lugar nenhum. Por isso o futuro BARRA e o
+   passado não — quem já jogou não perde nada, quem AINDA VAI jogar não
+   consentiu com o sumiço do endereço. Cancelar o desafio é decisão dele
+   também, e existe caminho pra isso (`desafio_cancelar`, mig 36).
+
+   O `quando is null` entra na conta junto: a migração 34 proibiu desafio novo
+   sem data, mas os "a combinar" gravados antes continuam válidos, e um desafio
+   sem data é tão marcado quanto os outros. Filtrar só por `gte` deixaria
+   justamente os mais antigos passarem despercebidos. */
+async function netApagarQuadra(id){
+  if(_qbusy) return;
+  _qbusy = true;
+  try { await _netApagarQuadraInterno(id); } finally { _qbusy = false; }
+}
+async function _netApagarQuadraInterno(id){
+  const l = _locDe(id);
+  if(!l){ alert('Quadra não encontrada.'); return; }
+  if(l.dono_id !== MEU_UID){ alert('Essa quadra não é sua.'); return; }
+
+  /* A conta enxerga tudo que precisa: numa quadra particular só o dono cria
+     partida (a trava de 13/08 do `matches_guard`), e `matches_select` devolve
+     as partidas de quem pergunta — então o dono vê 100% dos jogos marcados
+     ali. Se um dia outra pessoa puder marcar na quadra alheia, esta conta
+     passa a ser parcial e o aviso vira mentira. */
+  /* A JANELA É DE -12h, NÃO DE AGORA. A partida não morre no horário marcado:
+     o W.O. só é apurado 12h depois (`netApurarWO`), e nesse intervalo ela está
+     viva — dá pra assinar presença e lançar placar. Cortar em `now()` deixaria
+     de fora justamente o jogo de ontem à noite que ainda vai ser lançado.
+
+     `quando is null` entra junto: a migração 34 proibiu desafio novo sem data,
+     mas os "a combinar" gravados antes continuam válidos, e sem data um desafio
+     é tão marcado quanto os outros. */
+  const limite = new Date(Date.now() - 12*3600*1000).toISOString();
+
+  /* DUAS CONTAS, não uma. A contraproposta grava só `prop_local_id` e não toca
+     em `local_id` (mig 27) — então uma quadra minha oferecida numa contraproposta
+     não aparece contando por `local_id`. Se ela for apagada, o `on delete set
+     null` limpa o `prop_local_id`, e quando o outro aceitar, o
+     `contraproposta_aceitar` copia `local_id = prop_local_id` = NULL: partida
+     aceita, com data, e sem lugar nenhum. Exatamente o dano que esta função
+     existe pra impedir, entrando por uma porta que ela não estava olhando.
+
+     São duas queries em vez de um `or` de dois campos com janelas de data
+     diferentes: a data que vale na contraproposta é `prop_quando`, não `quando`.
+     Query separada é mais longa e é a que dá pra provar lendo. */
+  const [porLocal, porProp] = await Promise.all([
+    sb.from('matches').select('id', { count:'exact', head:true })
+      .eq('local_id', id).in('status', ['desafiado','aceito'])
+      .or(`quando.gte.${limite},quando.is.null`),
+    sb.from('matches').select('id', { count:'exact', head:true })
+      .eq('prop_local_id', id).eq('status', 'desafiado'),
+  ]);
+  if(porLocal.error){ alert('Não deu pra conferir se há jogo marcado: '+porLocal.error.message); return; }
+  if(porProp.error){ alert('Não deu pra conferir as contrapropostas: '+porProp.error.message); return; }
+
+  const n = (porLocal.count||0) + (porProp.count||0);
+  if(n){
+    const p = n>1;
+    alert(`"${l.nome}" tem ${n} jogo${p?'s':''} marcado${p?'s':''} ou proposto${p?'s':''}.\n\n`
+        + `Se apagar agora, quem ia jogar fica sem o endereço e não tem como saber pra onde ir.\n\n`
+        + `Desafio que você já mandou e ainda não foi respondido não dá pra cancelar por aqui — espere a pessoa aceitar ou recusar. Os que já foram aceitos você cancela na caixa de entrada.`);
+    return;
+  }
+
+  /* Aviso de cortesia, não trava: `grupos.local_id` é `on delete set null`
+     (mig 19) e o campo não é lido em nenhum outro lugar, então o dano é o
+     rótulo da comunidade sumir e o gestor reescolher. Se a conta falhar, segue
+     sem ela — travar o apagar por causa de um aviso seria pior que o aviso. */
+  const gr = await sb.from('grupos').select('id', { count:'exact', head:true }).eq('local_id', id);
+  const casa = (!gr.error && gr.count) ? gr.count : 0;
+
+  if(!confirm(`Apagar "${l.nome}"?\n\n`
+    + `As partidas com placar já lançado continuam valendo, com placar e rating — partida é histórico.\n\n`
+    + (casa ? `${casa} comunidade${casa>1?'s':''} usa${casa>1?'m':''} essa quadra como casa e vai${casa>1?'o':''} ficar sem casa fixa.\n\n` : '')
+    + `O que some é a quadra da sua lista e o endereço dela.`)) return;
+
+  const del = await sb.from('locais').delete().eq('id', id).select('id');
+  if(del.error){ alert('Não deu pra apagar: '+del.error.message); return; }
+  if(!del.data || !del.data.length){ alert('Nada foi apagado — essa quadra não é sua ou já não existe.'); return; }
+
+  netFecharLocal();
+  await netLocais(true); await netMeusLocais(true);
+
+  /* REELEGER O PRINCIPAL. `player_locais.local_id` é `on delete cascade` (mig 19),
+     então se a quadra apagada era a principal, a linha some e NADA no banco
+     reelege — o índice único de principal é parcial e aceita zero. O app não
+     percebe porque `_locPublicar` faz `find(principal) || [0]` e publica um
+     substituto SÓ EM MEMÓRIA, com estrela e tudo na tela.
+
+     No banco a pessoa cai fora da view `player_cidade` (que filtra por
+     `principal`), some do `__mapaLocais`, e aí os filtros do radar — que são
+     `!m || ...` — deixam de filtrar ela: passa a aparecer no "Minha cidade" de
+     TODAS as cidades. Nenhum erro, nenhuma tela quebrada, e a pessoa vazando
+     pra outro estado.
+
+     Elege o primeiro e DIZ qual foi, porque a escolha do principal era dela. */
+  let extra = '';
+  if(_meusLocais && _meusLocais.length && !_meusLocais.some(x=>x.principal)){
+    const novo = _meusLocais[0];
+    const r = await netSalvarMeusLocais(_meusLocais.map(x=>x.local_id), novo.local_id);
+    const ln = _locDe(novo.local_id);
+    extra = r && r.ok && ln
+      ? ` <b>${_admEsc(ln.nome)}</b> virou seu principal — troque em "onde você joga" se não for esse.`
+      : ' ⚠️ Você ficou sem local principal — abra "onde você joga" e marque um.';
+  }
+  if(window.toast) toast(`🗑 <b>${_admEsc(l.nome)}</b> apagada.${extra}`);
   if(document.getElementById('net-locais')) netAbrirMeusLocais();
 }
 
@@ -4671,6 +4941,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   // 18/08: perfil do clube (30) e cadastro de quadra particular (31)
   verLocal:netVerLocal, fecharLocal:netFecharLocal,
   criarQuadra:netCriarQuadra, fecharQnova:netFecharQnova, qset:_qset, qsalvar:_qsalvar,
+  editarQuadra:netEditarQuadra, apagarQuadra:netApagarQuadra,
   // 18/08: a conversa da comunidade (mig 37) e da partida (mig 40) — mesma folha
   abrirChat:netAbrirChat, abrirChatPartida:netAbrirChatPartida, fecharChat:netFecharChat,
   chatEnviar:_chatEnviar, chatDigitou:_chatDigitou, chatApagar:_chatApagar,

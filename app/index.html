@@ -823,7 +823,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=52"></script>
+<script src="net.js?v=53"></script>
 
 <script>
 /* =========================================================================
@@ -3320,6 +3320,11 @@ function aplicarJogadoresReais(lista){
       // e a busca leem daqui; o inbox ignora — precisa do banido pelo nome.
       banido: !!a.banido_em,
       livreAte: a.livre_ate || null,
+      // 18/08: as marcas viajam junto. Sem estas duas linhas o `pintarChave`
+      // desenha o adversário de camisa limpa — o escudo e o patrocinador dele
+      // existiam no banco e não chegavam em tela nenhuma além da própria.
+      escudo: a.escudo || null,
+      patroc: a.patroc || null,
     };
   });
   S.jogadores = novo;
