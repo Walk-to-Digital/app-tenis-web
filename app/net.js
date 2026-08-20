@@ -415,7 +415,7 @@ window.netPedidosAmizade = ()=> _pedidosAmizade || [];
 async function netBuscar(termo){
   termo=(termo||'').trim().toLowerCase();
   if(!termo) return [];
-  const { data } = await sb.from('players').select('id,nome,ap,email,nivel,nivelb,bon,cor,banido_em').neq('id',MEU_UID);
+  const { data } = await sb.from('players').select('id,nome,ap,email,nivel,nivelb,nivel_duplas,nivelb_duplas,bon,cor,banido_em').neq('id',MEU_UID);
   const idHex = termo.replace(/[^a-f0-9]/g,'');
   // 18/08 (mig 41): banido não é achável. Nem por ID exato — buscar é o
   // caminho pra pedir amizade e desafiar, e nenhum dos dois pode chegar nele.
@@ -448,17 +448,65 @@ function netSubscribe(){
     .subscribe();
 }
 
+/* ---- A LADDER DE DUPLAS NO APP (mig 46) --------------------------------
+   Trilho próprio: partida de duplas lê e move `nivel_duplas`/`nivelb_duplas`,
+   nunca o Nível de simples — duplas não tem divisão e não afeta promoção nem
+   rebaixamento (31/07). A ladder foi SEMEADA com o simples na migração, então
+   o `?? nivel` é só a rede pra linha que chegou por caminho que não passou
+   pelo trigger; em campo os dois já vêm preenchidos.
+
+   `_motorTime` é o espelho EXATO do `_motor_time` do banco (mig 46): média
+   dos dois com floor(x+0,5). Se as duas contas divergirem, a prévia mente — e
+   prévia que mente é pior que prévia nenhuma, porque é com ela que a pessoa
+   decide se aceita o jogo. */
+const _ladderDe = (j)=> !j ? 1200
+  : ((typeof S!=='undefined' && S.esporte==='beach')
+      ? (j.nivelb_duplas ?? j.nivelb ?? j.nivelB ?? 1200)
+      : (j.nivel_duplas  ?? j.nivel  ?? 1200));
+const _motorTime = (a,b)=> Math.floor((a+b)/2 + 0.5);
+
+/* Os quatro assentos, e onde EU sento. null em partida de simples pra quem
+   não está nela — quem chama separa os dois mundos sem repetir a pergunta. */
+function _assentoDe(m, uid){
+  uid = uid || MEU_UID;
+  if(!m) return null;
+  if(m.criador_id===uid)             return 'criador';
+  if(m.adversario_id===uid)          return 'adversario';
+  if(m.parceiro_criador_id===uid)    return 'parceiro_criador';
+  if(m.parceiro_adversario_id===uid) return 'parceiro_adversario';
+  return null;
+}
+const _souCapitao = (m,uid)=> ['criador','adversario'].includes(_assentoDe(m,uid));
+/* O aceite que EU ainda devo nesta partida. null quando não se aplica. */
+function _meuAceitePendente(m){
+  if(!m || !m.dupla || m.status!=='desafiado') return null;
+  if(m.parceiro_criador_id===MEU_UID    && !m.aceite_parceiro_criador)    return 'aceite_parceiro_criador';
+  if(m.parceiro_adversario_id===MEU_UID && !m.aceite_parceiro_adversario) return 'aceite_parceiro_adversario';
+  return null;
+}
+window._netDuplas = { ladderDe:_ladderDe, motorTime:_motorTime, assentoDe:_assentoDe,
+                      souCapitao:_souCapitao, meuAceitePendente:_meuAceitePendente };
+
 // precisa da MINHA ação?  (desafio pra mim · aceito sem placar · placar pra confirmar)
 function netAcionavel(m){
-  /* 13/08 (mig 25): com proposta na mesa a vez é de quem NÃO propôs — e isso
-     inclui o CRIADOR, que em todo outro caso de 'desafiado' só espera. Sem esta
-     linha a contraproposta chegava e o ✉ não acendia pra ele: ninguém abre uma
-     caixa que não avisa que tem coisa dentro, e o combinado ficava parado
-     esperando uma resposta que o outro não sabia que devia. */
+  /* (45/47) O PARCEIRO tem UMA ação, e é a que trava os outros três: enquanto
+     os dois carimbos não existem, o capitão adversário não consegue aceitar
+     (trava 17 do guard). Convite que não acende o ✉ morre igual aos troféus do
+     ADM — objeto emitido sem superfície de leitura. */
+  if(_meuAceitePendente(m)) return true;
+  /* Parceiro que já carimbou não tem mais nada a fazer: ele não lança placar
+     nem confirma (trava 19). O card fica na caixa como acompanhamento, sem
+     badge — badge que acende pra quem não pode agir ensina a ignorar badge. */
+  if(m.dupla && !_souCapitao(m)) return false;
   if(m.status==='desafiado') return m.prop_por ? m.prop_por!==MEU_UID
                                                : m.adversario_id===MEU_UID;
   if(m.status==='aceito')    return true;                    // qualquer um dos dois lança
   if(m.status==='pendente')  return m.placar_por !== MEU_UID; // o outro confirma
+  /* CONTESTADA pede ação dos DOIS (20/08): a partida está parada até alguém
+     relançar, e qualquer um dos dois pode. Sem acender o ✉, ela seria uma
+     pendência que ninguém lembra que existe — que é como ela ficou presa antes
+     de ter card. */
+  if(m.status==='contestada') return true;
   return false;
 }
 /* O que conta como "novidade que exige a minha ação". Era só `m.status`, e a
@@ -472,9 +520,21 @@ const _chaveEstado = (m)=> (m.status==='desafiado' && m.prop_por)
 
 async function netAtualizarInbox(){
   if(!MEU_UID) return;
+  /* (45) OS QUATRO ASSENTOS. Sem as duas linhas de parceiro aqui, o convite de
+     duplas nunca chega em tela nenhuma: a `matches_select` já libera a leitura
+     pros quatro, mas quem não é pedido não é lido. É o par que faltava — a
+     fechadura abriu na 45, a porta é esta. */
   const { data, error } = await sb.from('matches').select('*')
-    .or(`criador_id.eq.${MEU_UID},adversario_id.eq.${MEU_UID}`)
-    .in('status',['desafiado','aceito','pendente','confirmada'])
+    .or(`criador_id.eq.${MEU_UID},adversario_id.eq.${MEU_UID},`
+      + `parceiro_criador_id.eq.${MEU_UID},parceiro_adversario_id.eq.${MEU_UID}`)
+    /* 'contestada' ENTRA AQUI (20/08). Sem ela, contestar era um beco sem
+       saída: o `netContestar` gravava o status, a partida saía desta consulta
+       e SUMIA pros dois — sem card, sem caminho de relançar, presa pra sempre.
+       O toast dizia "conversem e lancem de novo" e não havia onde.
+       O banco sempre permitiu a volta (nenhuma das 19 travas do guard barra
+       `contestada → pendente`, e o placar só congela em 'confirmada') — quem
+       fechava a porta era esta linha. */
+    .in('status',['desafiado','aceito','pendente','confirmada','contestada'])
     .order('created_at',{ascending:false});
   if(error){ console.error('[net] inbox', error); return; }
   // 11/08: apura o prazo de 72h ANTES de ler o resto. Se fechou alguma, a
@@ -550,8 +610,29 @@ function netAplicarConfirmadas(list){
     if(m.status!=='confirmada') return;
     if(!m.delta_criador || !m.delta_adversario) return;
     if(S.deltasAplicados.includes(m.id)) return;
-    const meu = _souCriador(m) ? m.delta_criador : m.delta_adversario;
+    /* (46) EM DUPLAS O DELTA É POR ASSENTO, e o trilho é OUTRO. O parceiro
+       recebe o delta do LADO (o banco grava os quatro), e o número que anda é
+       a ladder — nunca o Nível de simples, nunca a calibragem. Espelha o ramo
+       de duplas do `_matches_creditar_nivel`; se este espelho divergir, o app
+       mostra um número que o banco não tem. */
     const eu = S.jogadores[EU];
+    if(m.dupla){
+      const assento = _assentoDe(m);
+      if(!assento) return;                       // não é minha partida
+      const meuD = (assento==='criador'   || assento==='parceiro_criador')
+                     ? m.delta_criador : m.delta_adversario;
+      if(!meuD) return;
+      if(m.esporte==='beach') eu.nivelb_duplas = (eu.nivelb_duplas??1200) + (meuD.dNivel||0);
+      else                    eu.nivel_duplas  = (eu.nivel_duplas ??1200) + (meuD.dNivel||0);
+      // duplas NÃO anda cal nem calibrando (31/07) — a calibragem é do trilho
+      // de cadastro, e o motor chama duplas com (false, 0)
+      S.deltasAplicados.push(m.id); mexeu=true;
+      const advCap = _nomeDe(m.criador_id===MEU_UID||m.parceiro_criador_id===MEU_UID
+                              ? m.adversario_id : m.criador_id).split(' ')[0];
+      if(window.toast) toast(`Duplas confirmada contra ${advCap} · Nível de duplas ${(meuD.dNivel>=0?'+':'')}${meuD.dNivel}`);
+      return;
+    }
+    const meu = _souCriador(m) ? m.delta_criador : m.delta_adversario;
     if(m.esporte==='beach') eu.nivelB = (eu.nivelB??1200) + (meu.dNivel||0);
     else                    eu.nivel  = (eu.nivel ??1200) + (meu.dNivel||0);
     if(eu.calibrando){ eu.cal=(eu.cal||0)+1; if(eu.cal>=8) eu.calibrando=false; }
@@ -778,9 +859,12 @@ function netDesafiar(id){
      conserta quem já escolheu. */
   const princ = meu.principal && _locaisMarcaveis().some(l=>l.id===meu.principal)
     ? meu.principal : null;
-  _on = { step:'desafio', advId:id, adv:{id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB},
+  _on = { step:'desafio', advId:id, adv:{id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB,
+            nivel_duplas:j.nivel_duplas, nivelb_duplas:j.nivelb_duplas},
           localId: princ, quadra: null, quando: null,
-          quadraPor: null, bolaPor: null };
+          quadraPor: null, bolaPor: null,
+          // (45) nasce simples: duplas é escolha explícita, nunca default
+          dupla: false, parCri: null, parAdv: null };
   netRenderOnline();
 }
 window.netDesafiar = netDesafiar;
@@ -820,6 +904,37 @@ function _onQuandoAtalho(v){
   netRenderOnline();
 }
 
+/* ---- duplas na tela de desafio (mig 45) --------------------------------
+   O toggle e os dois seletores. Trocar de modo LIMPA os parceiros: um id de
+   parceiro sobrevivendo num desafio de simples seria estado invisível, e o
+   `matches_parceiros_so_em_dupla` recusaria o insert com uma mensagem que não
+   foi escrita pra ninguém ler. */
+function _onDupla(v){
+  _on.dupla = !!v;
+  if(!_on.dupla){ _on.parCri=null; _on.parAdv=null; }
+  netRenderOnline();
+}
+function _onParceiro(qual, id){
+  _on[qual==='meu' ? 'parCri' : 'parAdv'] = id || null;
+  netRenderOnline();
+}
+/* Quem pode ser parceiro: gente de verdade, não banida, e que não seja um dos
+   dois capitães nem o outro parceiro — a constraint `matches_quatro_distintos`
+   cobra os quatro distintos, e oferecer na lista quem o banco vai recusar é
+   fabricar um erro. Amigos primeiro: parceiro de duplas é escolha social. */
+function _parceirosPossiveis(excluir){
+  const fora = new Set([MEU_UID, _on.advId, ...(excluir||[])].filter(Boolean));
+  return Object.keys(S.jogadores||{})
+    .filter(id=> id!==EU && S.jogadores[id] && !S.jogadores[id].banido)
+    /* `S.jogadores` é chaveado pelo UID (ver `_chaveLocal`: só o EU tem chave
+       própria, e ele já saiu no filtro acima). Então a chave É o id que vai
+       pro banco — sem tradução, sem inventar um mapa que não existe. */
+    .map(id=> ({ id, j:S.jogadores[id] }))
+    .filter(x=> !fora.has(x.id))
+    .sort((a,b)=> (netEhAmigo(b.id)?1:0)-(netEhAmigo(a.id)?1:0)
+                || (a.j.nome||'').localeCompare(b.j.nome||''));
+}
+
 async function _onConfirmarDesafio(){
   const adv=_on.adv;
   /* 16/08 — a data virou obrigatória (mig 34). A trava de verdade é a do
@@ -830,11 +945,21 @@ async function _onConfirmarDesafio(){
     if(window.toast) toast('Escolha o dia e a hora do jogo.');
     return;
   }
+  /* (45) DUPLAS NASCE COM OS QUATRO — a trava (15a) do guard recusa o insert
+     sem os dois parceiros. Avisar aqui é a cortesia de sempre: a trava de
+     verdade é a do banco, esta fala a língua de quem está na tela. */
+  if(_on.dupla && (!_on.parCri || !_on.parAdv)){
+    if(window.toast) toast(!_on.parCri ? 'Escolha o seu parceiro.' : 'Escolha o parceiro do adversário.');
+    return;
+  }
   try{
     const { error } = await sb.from('matches').insert({
       criador_id: MEU_UID, adversario_id: adv.id,
       esporte: (typeof S!=='undefined' && S.esporte) ? S.esporte : 'tenis',
-      formato:'md3', dupla:false, status:'desafiado', cantada:null,
+      formato:'md3', dupla: !!_on.dupla, status:'desafiado', cantada:null,
+      /* Só viajam em duplas: em simples as colunas ficam NULL por construção,
+         que é o que `matches_parceiros_so_em_dupla` cobra. */
+      ...(_on.dupla ? { parceiro_criador_id:_on.parCri, parceiro_adversario_id:_on.parAdv } : {}),
       local_id: _on.localId || null, quadra: _on.quadra || null,
       quando: _on.quando || null,
       // só entram na criação: a trava (5) do trigger congela os dois no
@@ -843,7 +968,9 @@ async function _onConfirmarDesafio(){
     });
     if(error) throw error;
     netFecharOnline();
-    if(window.toast) toast(`Desafio enviado pra ${adv.nome.split(' ')[0]} — ele aceita no app dele.`);
+    if(window.toast) toast(_on.dupla
+      ? `Duplas proposta — os outros três precisam topar no app deles.`
+      : `Desafio enviado pra ${adv.nome.split(' ')[0]} — ele aceita no app dele.`);
     netAtualizarInbox();
   }catch(e){ alert('Não deu pra desafiar: '+(e.message||e)); }
 }
@@ -936,6 +1063,16 @@ async function _maoEnviar(){
 
 /* ---- 2a: aceitar / recusar (do lado de quem recebeu) ------------------ */
 async function netAceitar(matchId){
+  /* (45) EM DUPLAS OS QUATRO TOPAM PRIMEIRO. A trava (17) recusa o aceite
+     enquanto faltar carimbo, e a mensagem dela é escrita pra quem lê SQL. A
+     cortesia é a mesma da data obrigatória: dizer antes, com a palavra da
+     tela, quem ainda não respondeu. */
+  const md = (_inbox||[]).find(x=>x.id===matchId);
+  if(md && md.dupla && (!md.aceite_parceiro_criador || !md.aceite_parceiro_adversario)){
+    const falta = !md.aceite_parceiro_criador ? md.parceiro_criador_id : md.parceiro_adversario_id;
+    if(window.toast) toast(`Falta ${_nomeDe(falta).split(' ')[0]} topar a duplas — o desafio abre quando os quatro responderem.`);
+    return;
+  }
   const { error } = await sb.from('matches').update({ status:'aceito', aceito_at:new Date().toISOString() }).eq('id',matchId);
   if(error){ alert('Erro ao aceitar: '+error.message); return; }
   if(window.toast) toast('Desafio aceito! Agora é só jogar e lançar o placar.');
@@ -946,6 +1083,33 @@ async function netRecusar(matchId){
   if(error){ alert('Erro: '+error.message); return; }
   netAtualizarInbox();
 }
+
+/* ---- 2a-duplas: o aceite do PARCEIRO (mig 45) --------------------------
+   Irmão do check-in: carimbo pessoal, write-once, e o VALOR é imposto pelo
+   trigger com `now()` — o que mandamos daqui é só o sinal de que o toque
+   aconteceu. Mandar `new Date()` seria data de presença escrita pelo próprio
+   interessado, que é o que a trava (16) recusa; o banco sobrescreve de todo
+   jeito, e a linha existe só pra o `is distinct from` disparar.
+
+   Não é função RPC de propósito: a fechadura mora no guard, e o caminho é o
+   mesmo `update` que o app já sabe fazer. */
+async function netAceitarParceiro(matchId){
+  const m = (_inbox||[]).find(x=>x.id===matchId);
+  const col = m && _meuAceitePendente(m);
+  if(!col){ netAtualizarInbox(); return; }
+  const { error } = await sb.from('matches').update({ [col]: new Date().toISOString() }).eq('id',matchId);
+  if(error){ alert('Não deu pra aceitar: '+error.message); return; }
+  /* Quem fecha o convite é o capitão adversário, e ele só consegue depois dos
+     DOIS carimbos (trava 17). Dizer isso aqui evita a pergunta "aceitei, e
+     agora?" — o estado real é "falta o outro par e o capitão". */
+  const outro = (col==='aceite_parceiro_criador') ? m.aceite_parceiro_adversario
+                                                  : m.aceite_parceiro_criador;
+  if(window.toast) toast(outro
+    ? 'Você topou! Agora é com o capitão adversário fechar o desafio.'
+    : 'Você topou! Falta o outro parceiro responder.');
+  netAtualizarInbox();
+}
+window.netAceitarParceiro = netAceitarParceiro;
 
 /* ---- 2a-bis: presença (mig 25) ----------------------------------------
    O valor mandado é só um carimbo de intenção — a trava (7) do trigger
@@ -982,7 +1146,18 @@ async function netLancarPlacar(matchId){
   // confirmação vai aplicar — prévia que mente é pior que prévia que não existe
   _on = { step:'placar', matchId, souCriador:_souCriador(m),
           ctx:_ctxDoTorneio(await _torneioDe(m.torneio_id)), fmt:m.formato, dupla:!!m.dupla,
-          adv:{id:advUid, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB}, sets:null, placarTxt:'' };
+          /* a ladder viaja junto (mig 46): sem ela `_ladderDe` cairia no Nível
+             de simples e a prévia de uma duplas mostraria o número do trilho
+             errado — a mesma conta que o banco NÃO vai fazer. */
+          adv:{id:advUid, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB,
+               nivel_duplas:j.nivel_duplas, nivelb_duplas:j.nivelb_duplas},
+          /* Os parceiros POR ASSENTO, não por coluna. `parceiro_criador_id` é o
+             parceiro do CRIADOR — se eu for o adversário, ele é do outro time.
+             Resolver aqui evita a prévia trocar os dois lados e mostrar a
+             média do time errado justamente pra quem está lançando. */
+          parMeu:  _souCriador(m) ? m.parceiro_criador_id : m.parceiro_adversario_id,
+          parDele: _souCriador(m) ? m.parceiro_adversario_id : m.parceiro_criador_id,
+          sets:null, placarTxt:'' };
   netRenderOnline();
 }
 
@@ -1142,6 +1317,13 @@ function _venceEm(m){
 
 function _prazoVencido(m){
   if(m.status !== 'pendente' || !m.placar_em) return false;
+  /* (45/47) QUEM APURA É CAPITÃO. O parceiro passou a VER a partida na caixa
+     (a `matches_select` abriu pros quatro), e apurar prazo é ESCREVER status —
+     a trava (19) recusa isso vindo dele. Sem esta linha o app do parceiro
+     tentaria fechar, tomaria o erro, e o `catch` do `netApurarPrazos` apaga a
+     guarda de reentrada: uma tentativa recusada POR ATUALIZAÇÃO, pra sempre.
+     Ler não é poder agir — o relógio corre pros capitães. */
+  if(m.dupla && !_souCapitao(m)) return false;
   const vence = _venceEm(m);
   return vence !== null && Date.now() > vence;
 }
@@ -1267,6 +1449,11 @@ async function netCancelarDesafio(matchId){
   const m = _inbox.find(x=>x.id===matchId); if(!m) return;
   const nome0 = _nomeDe(_advId(m)).split(' ')[0];
 
+  if(m.torneio_id){
+    if(window.toast) toast('Partida de torneio não se cancela pelo app — quem manda na chave é o dono.');
+    return;
+  }
+
   if(m.checkin_criador || m.checkin_adversario){
     if(window.toast) toast('Alguém já assinou presença — esta partida se encerra pelo placar.');
     return;
@@ -1279,9 +1466,12 @@ async function netCancelarDesafio(matchId){
   }
 
   const custa = horas !== null && horas < 6;
+  // 19/08: o mesmo botão agora também encerra desafio que o outro nem aceitou.
+  // "Cancelar o jogo" ali seria mentira — jogo combinado ainda não existe.
+  const oQue = m.status === 'desafiado' ? 'o desafio pra' : 'o jogo com';
   const aviso = custa
     ? `Faltam menos de 6h pro jogo com ${nome0}. Cancelar agora custa Pontos, igual a não aparecer — o tempo de ele remarcar a quadra já passou.\n\nCancelar mesmo assim?`
-    : `Cancelar o jogo com ${nome0}? Não custa nada — ainda dá tempo de ele se organizar.`;
+    : `Cancelar ${oQue} ${nome0}? Não custa nada — ainda dá tempo de ele se organizar.`;
   if(!confirm(aviso)) return;
 
   try{
@@ -1294,9 +1484,10 @@ async function netCancelarDesafio(matchId){
       if(window.salvar) salvar();
     }
     if(window.toast){
+      const rotulo = m.status === 'desafiado' ? `Desafio pra ${nome0}` : `Jogo com ${nome0}`;
       toast(data && data.custou
-        ? `Jogo com ${nome0} cancelado — os Pontos foram descontados.`
-        : `Jogo com ${nome0} cancelado. Sem custo.`);
+        ? `${rotulo} cancelado — os Pontos foram descontados.`
+        : `${rotulo} cancelado. Sem custo.`);
     }
     netAtualizarInbox();
   }catch(e){
@@ -1308,6 +1499,10 @@ async function netCancelarDesafio(matchId){
 async function netApurarWO(lista){
   const alvos = (lista||[]).filter(m =>
     m.status === 'aceito' && m.quando && !m.torneio_id &&
+    // (45/47) mesma razão do `_prazoVencido`: o W.O. encerra a partida, e
+    // encerrar é dos capitães. `partida_wo` derivaria o faltante dos dois
+    // check-ins, que são deles — o parceiro não tem o que assinar nem apurar.
+    !(m.dupla && !_souCapitao(m)) &&
     Date.now() > new Date(m.quando).getTime() + 12*3600e3 &&
     !_apurandoWO[m.id]);
   if(!alvos.length) return 0;
@@ -1443,6 +1638,24 @@ const _podeContrapor = (m)=> m.status==='desafiado'
   && (m.prop_rodadas||0) < 3
   && m.prop_por !== MEU_UID;
 
+/* 19/08 — as condições da `desafio_cancelar` (mig 36) repetidas aqui, pela
+   mesma razão do `_podeContrapor`: ESCONDER o botão, não validar. Quem valida
+   é a função. Estavam soltas dentro do ramo 'aceito' e por isso não valiam
+   pros ramos de 'desafiado' — o criador de um desafio ainda não aceito não
+   tinha saída nenhuma na tela, embora o banco aceitasse desde a 36. Era a
+   fechadura provada sem botão, e é o que impedia apagar quadra com desafio
+   pendente.
+
+   ⚠️ `torneio_id` entra aqui e não estava no ramo 'aceito': o inbox (l. 524)
+   não filtra partida de torneio, e a função recusa por escrito — "quem manda
+   na chave é o dono". O botão aparecia e só devolvia erro. Botão que não
+   funciona não é oferta (a mesma regra que já governa o "Recusar"). */
+const _podeCancelar = (m)=>
+     (m.status==='desafiado' || m.status==='aceito')
+  && !m.torneio_id
+  && !m.checkin_criador && !m.checkin_adversario
+  && (!m.quando || new Date(m.quando) > new Date());
+
 /* ---- presença (mig 25) ------------------------------------------------
    Qual das duas colunas é minha depende de que lado da partida eu sou. O
    banco defende o resto: a trava (7) do trigger força o valor a `now()`,
@@ -1470,7 +1683,39 @@ function netRenderInbox(){
        adversário, e o combinado velho valeria com a proposta descartada em
        silêncio e os `prop_*` sujos numa partida já aceita. Proposta na mesa
        sempre manda no card. */
-    if(m.status==='desafiado' && m.adversario_id===MEU_UID && !m.prop_por){
+    /* (45/47) DUPLAS MANDA NO CARD, pela mesma razão da contraproposta: quem
+       é parceiro não é adversário, e cair nos ramos de baixo mostraria a ele
+       um desafio que não é dele, com botões que a trava (19) recusa. Três
+       estados, nesta ordem: eu devo o aceite · eu já aceitei · a partida andou
+       e eu só acompanho. */
+    if(m.dupla && !_souCapitao(m)){
+      const meuLado = m.parceiro_criador_id===MEU_UID ? 'criador' : 'adversario';
+      const capitao = _nomeDe(meuLado==='criador' ? m.criador_id : m.adversario_id).split(' ')[0];
+      const advCap  = _nomeDe(meuLado==='criador' ? m.adversario_id : m.criador_id).split(' ')[0];
+      const advPar  = _nomeDe(meuLado==='criador' ? m.parceiro_adversario_id : m.parceiro_criador_id).split(' ')[0];
+      const dupla   = `<div style="font-size:12.5px;color:var(--ink2);margin-top:7px">Você e <b style="color:var(--ink)">${capitao}</b> contra <b style="color:var(--ink)">${advCap}</b> e <b style="color:var(--ink)">${advPar}</b></div>`;
+      if(_meuAceitePendente(m)){
+        txt=`<div style="font-size:14px"><b>${capitao}</b> te chamou pra jogar de <b>duplas</b></div>${dupla}${_pinDe(m)}`
+          + `<div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Os quatro precisam topar pra o desafio valer. Recusar não custa nada.</div>`;
+        acoes=`${_btn('Recusar',`_net.recusar('${m.id}')`,'no')}${_btn('Topar',`_net.aceitarParceiro('${m.id}')`,'ok')}`;
+      } else if(m.status==='desafiado'){
+        const falta = (meuLado==='criador') ? !m.aceite_parceiro_adversario : !m.aceite_parceiro_criador;
+        txt=`Você topou a duplas com <b>${capitao}</b>${dupla}`
+          + `<div style="font-size:11.5px;color:var(--ink3);margin-top:7px">${falta
+              ? `Falta <b>${advPar}</b> responder — depois é com ${advCap} fechar.`
+              : `Agora é com <b>${advCap}</b> fechar o desafio.`}</div>`;
+        acoes='';
+      } else {
+        /* Partida viva ou aguardando placar. O parceiro não lança nem confirma
+           (trava 19) — o card existe pra ele saber onde e quando é o jogo, que
+           é o que ele precisa. Botão que o banco recusaria não é oferta. */
+        const estado = m.status==='aceito' ? 'Jogo confirmado'
+                     : m.status==='pendente' ? `${advCap} lançou o placar — os capitães confirmam`
+                     : 'Partida encerrada';
+        txt=`<b>${estado}</b>${dupla}${_pinDe(m)}`;
+        acoes='';
+      }
+    } else if(m.status==='desafiado' && m.adversario_id===MEU_UID && !m.prop_por){
       const uid=_advId(m); const j=S.jogadores[_chaveLocal(uid)]||{nome:outro};
       const amigo=netEhAmigo(uid);
       const divTxt=(window.divisaoDe&&j.nivel!=null)?('Classe '+divisaoDe(j.nivel)):'';
@@ -1509,8 +1754,19 @@ function netRenderInbox(){
     } else if(m.status==='desafiado' && m.prop_por===MEU_UID){
       txt=`Você propôs outro combinado pra <b>${outro}</b> — falta ele responder`
         + _pinOuVazio(m,'prop_');
+      /* Cancelar só do lado do CRIADOR. O banco deixa qualquer um dos dois
+         cancelar, mas quem recebeu o desafio tem "Recusar", que é de graça
+         por desenho — oferecer a ele o cancelamento seria oferecer o caminho
+         que pode custar Pontos (menos de 6h) tendo um gratuito ao lado.
+         ⚠️ Sobra o caso do adversário que contrapropôs: ele fica sem botão
+         nenhum neste ramo. O certo pra ele é "Recusar", não cancelar. */
+      acoes=`${(_souCriador(m) && _podeCancelar(m))
+              ? _btn('Cancelar o desafio',`_net.cancelarDesafio('${m.id}')`,'no') : ''}`;
     } else if(m.status==='desafiado'){
+      // só o criador cai aqui: os outros três ramos já pegaram o adversário
       txt=`Aguardando <b>${outro}</b> aceitar seu desafio` + _pinDe(m);
+      acoes=`${_podeCancelar(m)
+              ? _btn('Cancelar o desafio',`_net.cancelarDesafio('${m.id}')`,'no') : ''}`;
     } else if(m.status==='aceito'){
       /* 16/08: o placar só existe depois que OS DOIS assinaram presença.
          Antes, "Lançar placar" aparecia junto com "Cheguei" e não exigia nada —
@@ -1555,7 +1811,7 @@ function netRenderInbox(){
          encerra é o relógio do W.O., não o botão. */
       acoes=`${faltaMim?_btn('Cheguei',`_net.checkin('${m.id}')`):''}`
         + `${(!faltaMim && !faltaOutro)?_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok'):''}`
-        + `${(faltaMim && faltaOutro && (!m.quando || new Date(m.quando) > new Date()))
+        + `${(faltaMim && faltaOutro && _podeCancelar(m))
               ? _btn('Cancelar',`_net.cancelarDesafio('${m.id}')`,'no') : ''}`;
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
       const euVenci = _souCriador(m) ? m.venceu_criador : !m.venceu_criador;
@@ -1569,11 +1825,31 @@ function netRenderInbox(){
       acoes=`${_btn('Contestar',`_net.contestar('${m.id}')`,'no')}${_btn('Confirmar',`_net.confirmar('${m.id}')`,'ok')}`;
     } else if(m.status==='pendente'){
       txt=`Aguardando <b>${outro}</b> confirmar o placar` + _avisoPrazo(m, 'esperar');
+    /* CONTESTADA (20/08) — o estado que não tinha card e por isso não tinha saída.
+       Fica VISÍVEL como contestada em vez de voltar pra 'aceito': houve uma
+       discordância, e apagar esse registro seria apagar o fato. É o mesmo
+       princípio do W.O. e do cancelamento — quem discordou fica escrito.
+       Relançar é dos CAPITÃES (trava 19); o parceiro cai no ramo de duplas
+       lá em cima e vê o estado sem botão. */
+    } else if(m.status==='contestada'){
+      const meuPl = _souCriador(m) ? m.placar : _inverter(m.placar);
+      const euContestei = m.placar_por === MEU_UID;   // quem lançou é quem foi contestado
+      txt=`<span style="display:inline-block;padding:2px 7px;border-radius:7px;background:var(--sup2);color:var(--dn);font-size:10px;font-weight:700;margin-bottom:6px">PLACAR CONTESTADO</span><br>`
+        + (euContestei
+            ? `<b>${outro}</b> não concordou com o placar que você lançou (${meuPl})`
+            : `Você não concordou com o placar que <b>${outro}</b> lançou (${meuPl})`)
+        + _pinDe(m)
+        + `<div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Combinem o placar certo e lancem de novo — qualquer um dos dois pode. Nada foi para o ranking: a partida não valeu nada até vocês concordarem.</div>`;
+      acoes=`${_btn('Lançar de novo',`_net.lancar('${m.id}')`,'ok')}`;
     }
     /* 18/08 (mig 40): a conversa da partida. Em todo card vivo — desafiado,
        aceito, pendente — porque é nesses que existe o que combinar. É de
        contorno e ao lado das ações, não entre elas: falar não é decidir. */
-    const viva = ['desafiado','aceito','pendente'].includes(m.status);
+    /* 'contestada' entra (20/08, com a mig 49): é o estado em que conversar é o
+       ÚNICO caminho de saída — o card manda combinar o placar certo, e a
+       policy `partida_msg_ins` passou a aceitar mensagem nesse status. As duas
+       coisas andam juntas: botão sem policy é recado que morre em 42501. */
+    const viva = ['desafiado','aceito','pendente','contestada'].includes(m.status);
     const conversar = viva ? `<button onclick="_net.abrirChatPartida('${m.id}')" title="conversar" style="flex:0 0 auto;padding:11px 13px;border-radius:12px;border:1px solid var(--linha2);background:none;color:var(--ink2);font:600 13px system-ui;cursor:pointer">💬</button>` : '';
     return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
       <div style="font-size:14px;margin-bottom:${(acoes||conversar)?'12px':'0'}">${txt}</div>
@@ -1675,7 +1951,38 @@ function netRenderOnline(){
                border:1px solid ${qv===_fmtLocal(a.d)?'var(--lime)':'var(--linha2)'};
                background:${qv===_fmtLocal(a.d)?'rgba(131,224,0,.12)':'transparent'};
                color:${qv===_fmtLocal(a.d)?'var(--lime)':'var(--ink2)'}">${a.rot}</button>`).join('');
+    /* (45) SIMPLES × DUPLAS. Só na criação — a trava (2) congela `dupla` no
+       UPDATE, então a contraproposta NÃO oferece o toggle: mudar o formato de
+       um desafio que já existe é outro desafio. Em duplas, dois seletores:
+       o meu parceiro e o do adversário. Quem desafia nomeia os quatro (15a) —
+       é assim que o convite chega aos outros três, e é o que faz a partida
+       nascer completa em vez de virar um objeto pela metade esperando gente. */
+    const duplaH = ehContra ? '' : (()=>{
+      const aba=(on,rot,val)=>`<button type="button" onclick="_net.onDupla(${val})"
+        style="flex:1;padding:10px;border-radius:10px;font:700 13px system-ui;cursor:pointer;
+               border:1px solid ${on?'var(--lime)':'var(--linha2)'};
+               background:${on?'rgba(131,224,0,.12)':'transparent'};
+               color:${on?'var(--lime)':'var(--ink2)'}">${rot}</button>`;
+      const sel=(qual,valor,excluir,rot)=>{
+        const ops=_parceirosPossiveis(excluir);
+        return `<div style="font-size:12px;color:var(--ink2);margin:8px 0 6px">${rot} ${valor?'':'<span style="color:var(--dn)">— escolha</span>'}</div>
+        <select onchange="_net.onParceiro('${qual}',this.value)"
+          style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:#fff;font:600 14px system-ui;
+                 border:1px solid ${valor?'var(--linha2)':'var(--dn)'}">
+          <option value="" ${!valor?'selected':''}>Quem joga?</option>
+          ${ops.map(o=>`<option value="${o.id}" ${valor===o.id?'selected':''}>${o.j.nome}${netEhAmigo(o.id)?' · amigo':''}</option>`).join('')}
+        </select>`;
+      };
+      return `<div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🎾 Como vão jogar</div>
+        <div style="display:flex;gap:6px">${aba(!_on.dupla,'Simples',false)}${aba(!!_on.dupla,'Duplas',true)}</div>
+        ${_on.dupla ? sel('meu', _on.parCri, [_on.parAdv], '👤 Seu parceiro')
+                      + sel('deles', _on.parAdv, [_on.parCri], `👤 Parceiro de ${(_on.adv.nome||'').split(' ')[0]}`)
+                      + `<div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Os quatro precisam topar. Se um recusar, o desafio morre — e vocês marcam outro.</div>`
+                    : ''}
+        <div style="height:12px"></div>`;
+    })();
     const qdoH = `
+      ${duplaH}
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🗓 Quando ${qv?'':'<span style="color:var(--dn)">— escolha o dia e a hora</span>'}</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">${atalhos}</div>
       <input type="datetime-local" value="${qv}" onchange="_net.onQuando(this.value)"
@@ -1776,10 +2083,28 @@ function netRenderOnline(){
     if(sets){
       let g=0,p=0; sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
       const venceu=g>p;
-      const advNivel=(S.esporte==='beach')?(_on.adv.nivelb??1200):(_on.adv.nivel??1200);
-      const c=calcular(nivelDe(eu), advNivel, venceu, _on.ctx||'amistoso', _on.fmt, !!_on.dupla, eu.calibrando, eu.cal);
+      /* (46) EM DUPLAS A CONTA É DA MÉDIA DO TIME, no trilho da ladder — e a
+         calibragem sai (o motor chama duplas com false,0). Espelha o ramo de
+         duplas do `_matches_motor`; qualquer divergência aqui é a tela
+         prometendo um número que o banco não vai creditar. */
+      let meuN, advNivel, calib, calN;
+      if(_on.dupla){
+        /* `parMeu`/`parDele` vêm resolvidos por assento no `netLancarPlacar`.
+           No fluxo de DESAFIO quem cria é sempre o criador, então `parCri` já
+           é o meu parceiro — o `??` cobre os dois caminhos sem duplicar regra. */
+        const parMeu = S.jogadores[_chaveLocal(_on.parMeu  ?? _on.parCri)];
+        const parAdv = S.jogadores[_chaveLocal(_on.parDele ?? _on.parAdv)];
+        meuN    = parMeu ? _motorTime(_ladderDe(eu), _ladderDe(parMeu)) : _ladderDe(eu);
+        advNivel= parAdv ? _motorTime(_ladderDe(_on.adv), _ladderDe(parAdv)) : _ladderDe(_on.adv);
+        calib=false; calN=0;
+      } else {
+        meuN = nivelDe(eu);
+        advNivel=(S.esporte==='beach')?(_on.adv.nivelb??1200):(_on.adv.nivel??1200);
+        calib=eu.calibrando; calN=eu.cal;
+      }
+      const c=calcular(meuN, advNivel, venceu, _on.ctx||'amistoso', _on.fmt, !!_on.dupla, calib, calN);
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:14px 0">
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">NÍVEL</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
         <div style="text-align:center"><div style="font:700 20px system-ui;color:var(--up)">+${c.dPts}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
         <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
       </div>${c.zebra?'<p style="text-align:center;color:var(--up);font-size:12px">Zebra — multiplicador nos pontos.</p>':''}`;
@@ -2328,6 +2653,12 @@ async function _cinturaoEstado(g, membros){
    posterior ao início do reinado atual. Daí o `m.id` ser obrigatório aqui. */
 async function _cinturaoTentarPassar(m){
   if(!m || !m.id || !m.esporte) return;
+  /* (mig 48) DUPLAS NÃO TEM CINTURÃO (31/07). O banco já não conta duplas como
+     defesa; aqui o app para de PEDIR a passagem — `vencedor`/`perdedor` abaixo
+     são derivados de dois jogadores e não descrevem um time. Pedir e ser
+     recusado em silêncio funcionaria, mas ensinaria que a chamada é inofensiva
+     e esconderia o dia em que ela deixasse de ser. */
+  if(m.dupla) return;
   const vc = !!m.venceu_criador;
   const vencedor = vc ? m.criador_id : m.adversario_id;
   const perdedor = vc ? m.adversario_id : m.criador_id;
@@ -4904,6 +5235,9 @@ window.netAbrirAdm = netAbrirAdm;
 window.netAbrirTorneios = netAbrirTorneios;
 window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>MEU_UID,
   desafiar:netDesafiar, confirmarDesafio:_onConfirmarDesafio, aceitar:netAceitar, recusar:netRecusar,
+  /* mig 45/46 — duplas. Mesma advertência do bloco abaixo: o `onclick` só
+     enxerga o que está neste mapa. */
+  aceitarParceiro:netAceitarParceiro, onDupla:_onDupla, onParceiro:_onParceiro,
   /* mig 25 — presença e contraproposta. Os cinco entram AQUI e não em outro
      lugar: o `onclick` do HTML só enxerga o que está neste mapa, e função que
      fica de fora morre em silêncio (foi o que aconteceu com `onQuando`). */

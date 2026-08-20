@@ -1,0 +1,93 @@
+{
+  "_leia_me": [
+    "As notícias que fecham a home. Lista CURADA, à mão.",
+    "",
+    "Por que à mão: o app é site estático — não existe servidor pra buscar RSS,",
+    "e o navegador barra ler portal direto (CORS). Se um dia isso virar robô,",
+    "ele escreve NESTE mesmo arquivo, no mesmo formato. O app não muda.",
+    "",
+    "Campos:",
+    "  titulo   a manchete. Obrigatório. Aparece em até 2 linhas.",
+    "  link     URL da matéria. Obrigatório e precisa começar com http:// ou",
+    "           https:// — qualquer outra coisa é ignorada na hora de montar.",
+    "  esporte  \"tenis\" ou \"beach\". Só aparece pra quem estiver naquela lente.",
+    "           Omitido = aparece nas duas (use pra notícia que serve aos dois).",
+    "  fonte    de onde veio. Ex: ge.globo, ESPN. Opcional.",
+    "  data     como você quer que apareça. Ex: hoje, 13/08. Opcional.",
+    "  ate      último dia em que a matéria aparece, no formato AAAA-MM-DD.",
+    "           Ex: \"2026-08-29\". No dia seguinte ela some sozinha. OPCIONAL:",
+    "           matéria sem prazo (perfil, história, guia) fica até você tirar.",
+    "           Quem PEDE prazo é a notícia colada num evento — \"às vésperas\",",
+    "           \"vai receber\", \"estreia\". Sem isso a home anuncia em setembro",
+    "           um torneio que acabou em agosto.",
+    "  img      miniatura, caminho a partir da raiz. Ex: noticias/fonseca.jpg",
+    "           Opcional — notícia sem foto continua valendo.",
+    "",
+    "O app mostra no máximo 4 POR ESPORTE, na ordem em que estiverem aqui.",
+    "As de baixo ficam de reserva. Item sem titulo ou sem link válido é",
+    "ignorado em silêncio no app — mas o publicar.sh barra antes de subir.",
+    "",
+    "Lista vazia = a seção não aparece na home. Não existe 'em breve'.",
+    "",
+    "Curadoria de 19/08/2026, com os links conferidos um a um. Notícia",
+    "envelhece: reveja antes de cada publicação. O `ate` cobre o caso previsível",
+    "(evento com data), e é ele que impede a home de anunciar torneio encerrado",
+    "sem ninguém lembrar. O que ele NÃO cobre é a matéria que envelhece sem data",
+    "marcada — essa continua sendo olho seu."
+  ],
+  "noticias": [
+    {
+      "titulo": "João Fonseca e Bia Haddad já têm adversários definidos para a estreia no US Open",
+      "esporte": "tenis",
+      "fonte": "ESPN",
+      "link": "https://www.espn.com.br/tenis/artigo/_/id/15573673/joao-fonseca-adversario-definido-estreia-us-open",
+      "ate": "2026-08-29"
+    },
+    {
+      "titulo": "Fonseca e Bia caem no ranking às vésperas da estreia em Nova York",
+      "esporte": "tenis",
+      "fonte": "CNN Brasil",
+      "link": "https://www.cnnbrasil.com.br/esportes/tenis/joao-fonseca-e-bia-haddad-caem-no-ranking-antes-de-estreia-no-us-open/",
+      "ate": "2026-08-29"
+    },
+    {
+      "titulo": "O que Fonseca precisa somar em Montreal e Cincinnati para entrar como cabeça de chave",
+      "esporte": "tenis",
+      "fonte": "Tenis News",
+      "link": "https://www.tenisnews.com.br/joao-fonseca-no-us-open-2026-os-pontos-para-seguir-cabeca-de-chave/",
+      "ate": "2026-08-29"
+    },
+    {
+      "titulo": "Fonseca e Bia estão confirmados na chave principal do US Open",
+      "esporte": "tenis",
+      "fonte": "Terra",
+      "link": "https://www.terra.com.br/esportes/tenis/joao-fonseca-e-bia-haddad-sao-confirmados-no-us-open,f4fb3140d5529c08aa7911f7ccf0e15a7mkapi0k.html",
+      "ate": "2026-08-29"
+    },
+    {
+      "titulo": "Cascavel recebe etapa internacional com cerca de 250 atletas de seis países, de 24 a 30/08",
+      "esporte": "beach",
+      "fonte": "O Paraná",
+      "link": "https://oparana.com.br/esportes/cascavel-recebe-etapa-internacional-de-beach-tennis-com-atletas-de-seis-paises/"
+    },
+    {
+      "titulo": "Augusto Neto é convocado para defender o Brasil no Pan-Americano, em Cuiabá",
+      "esporte": "beach",
+      "fonte": "Jornal Pequeno",
+      "data": "13/08",
+      "link": "https://jornalpequeno.com.br/2026/08/13/augusto-neto-vai-defender-o-brasil-no-pan-americano-de-beach-tennis/"
+    },
+    {
+      "titulo": "João Pessoa sedia o Campeonato Brasileiro Interclubes e o Circuito Paraibano",
+      "esporte": "beach",
+      "fonte": "Jornal da Paraíba",
+      "link": "https://jornaldaparaiba.com.br/esportes/joao-pessoa-recebe-campeonato-brasileiro-interclubes-e-circuito-paraibano-beach-tennis"
+    },
+    {
+      "titulo": "Arena Portos do Paraná, em Caiobá, recebe um dos maiores torneios do mundo",
+      "esporte": "beach",
+      "fonte": "O Paraná",
+      "link": "https://oparana.com.br/esportes/arena-portos-do-parana-em-caioba-recebe-um-dos-maiores-torneios-de-beach-tennis-do-mundo/"
+    }
+  ]
+}

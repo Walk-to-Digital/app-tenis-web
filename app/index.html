@@ -424,6 +424,44 @@ button,input,select{font:inherit;color:inherit}
 .ini .strip-rot a{color:var(--ink3);text-decoration:none;cursor:pointer}
 .ini .strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .ini .strip::-webkit-scrollbar{display:none}
+/* 19/08 — notícias do esporte, fechando a home. Lista vertical e não carrossel:
+   manchete que passa de raspão não é lida, e aqui a peça É o texto. A miniatura
+   é opcional de propósito — notícia sem foto continua valendo, e exigir imagem
+   faria a curadoria travar por falta de arte. */
+.ini .news-wrap{position:relative;z-index:2;padding:0 16px 20px}
+.ini .news-rot{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
+.ini .news{display:flex;flex-direction:column;gap:8px}
+.ini .nitem{display:flex;gap:10px;align-items:center;text-decoration:none;
+  background:rgba(30,23,20,.82);border:1px solid var(--linha);border-radius:10px;
+  padding:10px 12px;backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent}
+.ini .nitem:active{background:var(--sup2)}
+.ini .nthumb{flex:0 0 52px;width:52px;height:52px;border-radius:8px;object-fit:cover;
+  background:var(--sup2);display:block}
+.ini .ntxt{flex:1;min-width:0}
+.ini .ntxt b{display:block;font-size:12.5px;color:var(--ink);font-weight:700;line-height:1.32;
+  /* duas linhas e reticências: manchete longa não pode empurrar a nav pra fora */
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ini .ntxt small{display:block;font-size:10.5px;color:var(--ink3);margin-top:3px}
+.ini .nseta{color:var(--ink3);font-size:15px;flex:0 0 auto}
+/* 19/08 — o espaço de mídia da home (inventário próprio, no molde do Cartola:
+   uma peça só, no fim do feed, vendida por nós e não sorteada por rede).
+
+   O `aspect-ratio` no WRAPPER, não na imagem, é o que impede o pulo de layout:
+   a altura fica reservada antes de o JPEG chegar, então o strip acima não
+   desce sozinho no meio da leitura no 4G da quadra. `--ads-prop` vem da
+   campanha; o valor aqui é só o padrão de quem não declarou. */
+.ini .ads-wrap{position:relative;z-index:2;padding:0 16px 18px}
+.ini .ads-rot{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;margin-bottom:6px;opacity:.75}
+.ini .ads{display:block;aspect-ratio:var(--ads-prop,1/1);border-radius:12px;
+  overflow:hidden;border:1px solid var(--linha);background:var(--sup);
+  -webkit-tap-highlight-color:transparent}
+.ini .ads img{width:100%;height:100%;object-fit:cover;display:block}
+/* peça que é LOGO, não foto: cabe inteira e respira, em vez de ser cortada */
+.ini .ads.conter{background:var(--sup2);display:flex;align-items:center;justify-content:center;padding:8% 12%}
+.ini .ads.conter img{width:100%;height:100%;object-fit:contain}
+.ini .ads:active{transform:scale(.99)}
 .ini .mcard{flex:0 0 auto;min-width:158px;background:rgba(30,23,20,.82);border:1px solid var(--linha);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:9px;backdrop-filter:blur(6px)}
 .ini .mcard .mic{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink2)}
 .ini .mcard .mtx{min-width:0}
@@ -823,7 +861,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=53"></script>
+<script src="net.js?v=63"></script>
 
 <script>
 /* =========================================================================
@@ -849,7 +887,20 @@ function estadoInicial(){ return {
   pontosB:{ comunidade:{u001:0} },
   ant:{comunidade:{}},
   comunidade:{ nome:'Sua comunidade', membros:['u001'], cinturao:null, patches:[] },
-  open:{nome:'Ace Open 2026', dias:52, inscrito:true},
+  /* 20/08 — O CONTADOR MENTIA, E EM TRÊS LUGARES.
+     Estava `{nome:'Ace Open 2026', dias:52, inscrito:true}`: 52 dias dá
+     10/10/2026, mas o Ace Open acontece em MEADOS DE SETEMBRO (13-14/09/2024,
+     12-13/09/2025) e não há edição 2026 anunciada — quatro buscas em 19/08.
+     Era dado de protótipo se passando por fato na tela de quem abre o app, e o
+     `inscrito:true` afirmava uma inscrição que ninguém fez.
+
+     Agora o dado carrega a VERDADE, e o que a tela mostra é derivado dele:
+     sem `quando`, não há contagem — a tela diz que a data não saiu, que é o
+     que se sabe. Quando o Bahiano confirmar a 5ª edição, isto volta a contar
+     sozinho preenchendo UM campo (`quando:'2026-09-12'`), sem tocar em código.
+     Nome sem ano de propósito: o evento é o Ace Open Moura Dubeux; o ano é do
+     calendário, e cravá-lo é o mesmo erro em roupa nova. */
+  open:{ nome:'Ace Open', local:'Clube Bahiano de Tênis', quando:null, inscrito:false },
   pendentes:[],
   aguardando:null,     // partida enviada esperando confirmação do adversário
   historico:[],
@@ -914,6 +965,19 @@ if(!S || !S.jogadores) S = estadoInicial();
   ['pontos','pontosB'].forEach(p=>{
     if(S[p] && S[p].panela && !S[p].comunidade){ S[p].comunidade = S[p].panela; delete S[p].panela; }
   });
+  /* 20/08: O CONTADOR DO ACE OPEN MENTIA, E A MENTIRA ESTÁ GRAVADA NO APARELHO.
+     Trocar o `estadoInicial()` NÃO conserta ninguém: quem já abriu o app tem
+     `{nome:'Ace Open 2026', dias:52, inscrito:true}` no localStorage, e o
+     estado salvo ganha do default — a tela continuaria dizendo "faltam 52
+     dias" e "Inscrito" pra todo mundo que já é usuário, que é exatamente quem
+     a gente quer que volte. É o irmão local do "banco antes de app": o estado
+     no aparelho não troca de versão junto com o código.
+
+     Reescreve pelo FORMATO, não pelo valor: qualquer `open` que ainda tenha
+     `dias` é da forma velha, independente do número que esteja lá. Testar
+     `dias===52` consertaria só quem parou no 52 e deixaria passar qualquer
+     outro número que já tivesse sido salvo. */
+  if(S.open && 'dias' in S.open){ S.open = novo.open; }
   salvar();
 })();
 
@@ -1264,6 +1328,27 @@ const nivelDe = (j)=> ehBeach() ? (j.nivelB ?? 1200) : j.nivel;
 const divDe   = (j)=> ehBeach() ? (j.divB ?? 'D')    : j.div;
 const tabelaPontos = ()=> ehBeach() ? S.pontosB : S.pontos;
 
+/* A linha do Ace Open — DERIVADA da data, nunca cravada (20/08).
+   O contador antigo era um número escrito à mão que envelhecia sozinho: `52`
+   ficou `52` pra sempre, então no dia seguinte já estava errado, e errado numa
+   direção que ninguém percebe (a data só anda pra frente). Contar a partir de
+   uma data real é o que faz o número não poder mentir — e não ter data é o que
+   faz a tela dizer isso em vez de inventar.
+
+   Sem `quando`: diz a verdade conhecida. Com `quando`: conta os dias.
+   O "hoje"/"amanhã" existe porque "faltam 0 dias" é frase de máquina. */
+function openLinha(){
+  const o = S.open || {};
+  if(!o.quando) return 'data da próxima edição ainda não anunciada';
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const d = new Date(o.quando + 'T00:00:00'); d.setHours(0,0,0,0);
+  const dias = Math.round((d - hoje) / 864e5);
+  if(dias < 0)  return 'edição encerrada';
+  if(dias === 0) return 'é hoje';
+  if(dias === 1) return 'é amanhã';
+  return `faltam ${dias} dias`;
+}
+
 function calcular(meu, advNivel, venceu, ctx, formato, dupla, calibrando, cal){
   const beach = ehBeach();
   let k = K_BASE;
@@ -1470,6 +1555,239 @@ function verJogador(id){
 }
 
 const $=(s)=>document.querySelector(s);
+
+/* ======================= ESPAÇO DE MÍDIA DA HOME =========================
+   19/08 — inventário PRÓPRIO, no molde do Cartola: o espaço é vendido por nós
+   (como as marcas do vestiário já são), não sorteado por uma rede. Nada de
+   script de terceiro: rede de anúncio decide sozinha o que aparece, e o que
+   apareceria é concorrente de arena na home do app.
+
+   Zero migração de propósito: a campanha vive no `anunciantes.json`, que o
+   `publicar.sh` leva junto. Trocar anunciante é editar um arquivo e publicar —
+   não precisa de tabela, de policy nem de prova de RLS.
+
+   ⚠️ O QUE ISTO NÃO FAZ: contar. Sem banco não existe impressão nem clique
+   somados, então dá pra vender a primeira vez ("seu banner na home") e não dá
+   pra renovar, porque na renovação o anunciante pergunta quanta gente viu.
+   `_adsEvento` abaixo é o gancho pronto: hoje só escreve no console e num
+   contador local; no dia em que houver tabela, é ele que passa a mandar. */
+let ADS = null;              // null = ainda não chegou; [] = chegou e está vazio
+let _adsDaVez = null;        // a campanha escolhida NESTA abertura do app
+let _adsContou = {};         // impressão é uma por abertura, não uma por render
+
+/* Data local em texto, comparada como texto. Nada de `new Date(de) < new Date()`:
+   '2026-08-20' vira meia-noite UTC, que no fuso daqui é dia 19 às 21h — a
+   campanha entraria no ar três horas antes do combinado com o anunciante. */
+function _adsHoje(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')
+                         + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* A peça da CASA (`casa:true`) preenche o espaço não vendido e sai de cena
+   sozinha assim que existir campanha paga na janela. Por isso ela não é só
+   "mais uma campanha": se disputasse o rodízio, metade das aberturas que o
+   anunciante pagou mostraria o nosso próprio logo. Sem venda, aparece a casa;
+   com venda, nunca — e ninguém precisa lembrar de tirar. */
+function _adsNoAr(){
+  if(!Array.isArray(ADS)) return [];
+  const hoje = _adsHoje();
+  const vivas = ADS.filter(c => c && c.img && c.de && c.ate && c.de <= hoje && hoje <= c.ate);
+  const pagas = vivas.filter(c => !c.casa);
+  return pagas.length ? pagas : vivas.filter(c => c.casa);
+}
+
+/* Rodízio por ABERTURA do app, não por render. Duas razões: a home re-renderiza
+   a cada toque e o banner ficaria piscando de anunciante; e o índice guardado
+   faz o rodízio dar a volta entre as aberturas, em vez de sortear e concentrar
+   as impressões num só — com dois anunciantes pagando o mesmo, alternar é o
+   que honra a venda. */
+function _adsEscolher(){
+  const vivas = _adsNoAr();
+  if(!vivas.length) return null;
+  if(_adsDaVez && vivas.some(c => c.id === _adsDaVez.id)) return _adsDaVez;
+  let i = 0;
+  try{ i = parseInt(localStorage.getItem('ads_rodizio')||'0',10) || 0;
+       localStorage.setItem('ads_rodizio', String((i+1) % Math.max(vivas.length,1))); }
+  catch(e){ i = 0; }                       // navegador sem storage não quebra o app
+  _adsDaVez = vivas[i % vivas.length];
+  return _adsDaVez;
+}
+
+function _adsEvento(tipo, id){
+  try{
+    const k = 'ads_' + tipo + '_' + id;
+    localStorage.setItem(k, String((parseInt(localStorage.getItem(k)||'0',10)||0) + 1));
+  }catch(e){}
+  console.log('[ads]', tipo, id);          // o gancho: aqui entra o banco quando houver
+}
+
+/* A impressão conta quando o PIXEL aparece, não quando o markup é gerado. Com
+   `loading=lazy` a arte do fim da home só é buscada quando a pessoa rola até
+   lá — contar na geração diria que 100% viu, inclusive quem fechou o app na
+   primeira tela. Número inflado é pior que número nenhum: destrói justamente a
+   única coisa que o anunciante compra. */
+function _adsVisto(id){
+  if(_adsContou[id]) return;               // uma por abertura, não uma por render
+  _adsContou[id] = 1;
+  _adsEvento('impressao', id);
+}
+
+/* Arte que não carrega não pode deixar moldura órfã: um retângulo vazio de
+   310px no fim da home lê como app quebrado, não como anúncio. O `publicar.sh`
+   já barra campanha com arte ausente — isto aqui é a segunda linha, pro caso
+   de a arte sumir do servidor depois de publicada. */
+function _adsFalhou(img, id){
+  const w = img.closest && img.closest('.ads-wrap');
+  if(w) w.style.display = 'none';
+  console.warn('[ads] arte não carregou:', id, img.getAttribute('src'));
+}
+
+function adsHTML(){
+  const c = _adsEscolher();
+  if(!c) return '';                        // sem campanha no ar: nada na tela, nem moldura vazia
+  const prop = c.proporcao || '1/1';
+  const alt  = (c.alt || c.marca || 'Anúncio').replace(/"/g,'&quot;');
+  /* `conter` pra peça que é LOGO, `cobrir` (padrão) pra peça que é foto. Um
+     logo sob `cover` é cortado nas beiradas — e logo cortado é o tipo de coisa
+     que o dono da marca vê antes de qualquer outra pessoa. */
+  const enc = c.encaixe === 'conter' ? ' conter' : '';
+  /* Sem link a peça continua valendo (marca que só quer aparecer), mas aí ela
+     não pode ser <a>: âncora sem href não recebe foco nem anuncia destino. */
+  const dentro = `<img src="../${c.img}" alt="${alt}" loading="lazy"
+       onload="_adsVisto('${c.id}')" onerror="_adsFalhou(this,'${c.id}')">`;
+  const peca = c.link
+    ? `<a class="ads${enc}" href="${c.link}" target="_blank" rel="noopener noreferrer"
+          onclick="_adsEvento('clique','${c.id}')">${dentro}</a>`
+    : `<div class="ads${enc}">${dentro}</div>`;
+  /* A peça da casa NÃO leva o rótulo "Publicidade". Chamar o próprio logo de
+     publicidade é falso — e queima a palavra que precisa significar alguma
+     coisa no dia em que houver anunciante de verdade ali. */
+  const rotulo = c.casa ? '' : '<div class="ads-rot">Publicidade</div>';
+  return `<div class="ads-wrap" style="--ads-prop:${prop}">
+      ${rotulo}
+      ${peca}
+    </div>`;
+}
+
+/* Busca uma vez, no boot. O `?v=` é o mesmo do net.js: sem ele o celular serve
+   o inventário velho do cache e o anunciante novo não sobe — o mesmo cache que
+   já mascarou verificação neste projeto em 18/08. */
+async function adsCarregar(){
+  try{
+    const v = (document.querySelector('script[src*="net.js?v="]')||{}).src||'';
+    const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
+    if(!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    ADS = Array.isArray(j.campanhas) ? j.campanhas : [];
+  }catch(e){
+    ADS = [];                              // inventário ausente ou torto não tira o app do ar
+    console.warn('[ads] inventário não carregou:', e.message);
+  }
+  // chegou depois da primeira pintura: repinta só se a home for a tela aberta
+  if(ADS.length && !pilha.length && aba === 'inicio') render();
+}
+
+/* ==================== NOTÍCIAS DO ESPORTE (19/08) ========================
+   Fecha a home. É conteúdo DE FORA — tênis no mundo — e não se confunde com
+   o `__destaques`, que é movimentação do próprio app (quem bateu quem na
+   comunidade) e já vive na faixa "Sua temporada".
+
+   A lista é CURADA, num JSON, e não puxada de RSS: o app é site estático, não
+   existe servidor pra buscar o feed, e o navegador barra a leitura direta de
+   portal por CORS. Curadoria custa alguém alimentar; RSS custaria um serviço
+   que hoje não existe. O formato aqui não muda se um dia o JSON passar a ser
+   escrito por robô em vez de à mão — é o mesmo arquivo, outra fonte.
+
+   Sem notícia válida, a seção não existe. Nada de "em breve": espaço vazio
+   prometendo conteúdo é dívida que aparece na tela de quem abre o app. */
+let NEWS = null;
+
+/* Só http(s). Uma manchete é dado editado à mão, e `javascript:` num href que
+   o app monta é o caminho mais curto pra execução de script pela porta dos
+   fundos — mesmo sendo nós que escrevemos o arquivo hoje. */
+function _newsLinkOk(u){
+  return typeof u === 'string' && /^https?:\/\//i.test(u);
+}
+const _esc = (s)=> String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+/* Filtra pela lente do esporte, como todo o resto do app: "trocar de esporte
+   troca a lente inteira" (06/08). Quem está em BEACH não tem por que receber
+   chave de US Open. `esporte` ausente = vale nos dois — é a saída pra notícia
+   que serve aos dois públicos, e o padrão seguro de quem esquecer de marcar. */
+/* 20/08 — VALIDADE. Diferente da campanha do espaço de mídia, que tem `de`/`ate`
+   e sai de cartaz sozinha, notícia ficava até alguém trocar à mão. Em setembro
+   a home estaria anunciando a estreia no US Open com o US Open já terminado —
+   e notícia velha na home não é só inútil: é a tela afirmando que aquilo é
+   novidade. O app não tem robô nem servidor; o que ele tem é a data de hoje.
+
+   `ate` é OPCIONAL de propósito. Matéria sem prazo (perfil, história, guia)
+   fica — e é a maioria. Quem PEDE prazo é a notícia colada num evento, e o
+   custo de pôr a data é uma linha no JSON, na hora de curar.
+
+   Comparação por STRING, e isso é escolha: 'YYYY-MM-DD' ordena igual em texto
+   e em data, e `new Date('2026-09-14')` num campo torto devolve `Invalid Date`,
+   cuja comparação é sempre falsa — a notícia sumiria calada por causa de um
+   typo. Em texto, um campo torto simplesmente não é menor que hoje e a matéria
+   FICA: o modo de falha é "mostrou demais", que alguém vê, e não "sumiu
+   sozinha", que ninguém vê. */
+function _newsValidas(){
+  if(!Array.isArray(NEWS)) return [];
+  const lente = (typeof S !== 'undefined' && S.esporte) ? S.esporte : 'tenis';
+  const hoje = new Date();
+  const hojeISO = hoje.getFullYear() + '-'
+    + String(hoje.getMonth()+1).padStart(2,'0') + '-'
+    + String(hoje.getDate()).padStart(2,'0');
+  return NEWS
+    .filter(n => n && n.titulo && _newsLinkOk(n.link))
+    .filter(n => !n.esporte || n.esporte === lente)
+    // `ate` é o ÚLTIMO dia em que a matéria aparece — some no dia seguinte
+    .filter(n => !n.ate || String(n.ate) >= hojeISO)
+    .slice(0, 4);
+}
+
+function noticiasHTML(){
+  const lista = _newsValidas();
+  if(!lista.length) return '';
+  const itens = lista.map(n => {
+    const thumb = n.img
+      ? `<img class="nthumb" src="../${_esc(n.img)}" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">`
+      : '';
+    const pe = [n.fonte, n.data].filter(Boolean).map(_esc).join(' · ');
+    return `<a class="nitem" href="${_esc(n.link)}" target="_blank" rel="noopener noreferrer">
+        ${thumb}
+        <div class="ntxt"><b>${_esc(n.titulo)}</b>${pe?`<small>${pe}</small>`:''}</div>
+        <div class="nseta">›</div>
+      </a>`;
+  }).join('');
+  /* O título segue a LENTE, não o nome do app. Ficava "Notícias do tênis" em
+     cima de quatro matérias de beach porque o rótulo era texto fixo — a lista
+     obedecia ao esporte e o cabeçalho não, que é pior do que não filtrar:
+     filtra certo e diz errado. */
+  const lente = (typeof S !== 'undefined' && S.esporte) ? S.esporte : 'tenis';
+  const titulo = lente === 'beach' ? 'Notícias do beach tennis' : 'Notícias do tênis';
+  return `<div class="news-wrap">
+      <div class="news-rot"><span>${titulo}</span></div>
+      <div class="news">${itens}</div>
+    </div>`;
+}
+
+async function noticiasCarregar(){
+  try{
+    const v = (document.querySelector('script[src*="net.js?v="]')||{}).src||'';
+    const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
+    if(!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    NEWS = Array.isArray(j.noticias) ? j.noticias : [];
+  }catch(e){
+    NEWS = [];                               // sem notícia o app abre igual
+    console.warn('[news] não carregou:', e.message);
+  }
+  if(NEWS.length && !pilha.length && aba === 'inicio') render();
+}
 
 function render(){
   const atual = pilha.length ? pilha[pilha.length-1] : {rota:aba};
@@ -1692,9 +2010,16 @@ inicio(){
         ${secundarias}
       </div>
 
+      <!-- 19/08: o espaço de mídia vem ANTES da faixa de estado, logo abaixo
+           das ações. Continua depois do "Marcar jogo", que é a única posição
+           que ele não pode ocupar: ali competiria com o registro da partida,
+           que é o elo frágil do ciclo. -->
+      ${adsHTML()}
+
       <!-- 06/08: uma faixa só. A versão anterior tinha um carrossel de atalhos
            que repetia a nav fixa de baixo (Radar, Panela, Ficha, Vestiário).
-           Atalho quem dá é a nav; aqui vive ESTADO — o que corre e o que mudou. -->
+           Atalho quem dá é a nav; aqui vive ESTADO — o que corre e o que mudou.
+           19/08: passou a fechar a home, trocando de lugar com o banner. -->
       <div class="strip-wrap">
         <div class="strip-rot"><span>Sua temporada</span><a onclick="verQuadro()">ver quadro ›</a></div>
         <div class="strip">
@@ -1715,11 +2040,15 @@ inicio(){
           </div>` : ''}
           <div class="mcard">
             <div class="mic">✦</div>
-            <div class="mtx"><b>${S.open.nome}</b><small>faltam ${S.open.dias} dias</small></div>
+            <div class="mtx"><b>${S.open.nome}</b><small>${openLinha()}</small></div>
           </div>
           ${strip}
         </div>
       </div>
+
+      <!-- 19/08: notícias fecham a home. Conteúdo de fora vem por último —
+           antes dele vem o que é DA PESSOA (posição, jogo, temporada). -->
+      ${noticiasHTML()}
     </div>`};
 },
 
@@ -1849,8 +2178,8 @@ quadro(){
       ${comunidades}
       <div class="card clic" onclick="toast('O Ace Open é um Open — chave aberta, não gera ranking próprio.')">
         <div class="linha-item">
-          <div class="txt"><b>${S.open.nome}</b><small>Chave de 32 · começa em ${S.open.dias} dias</small></div>
-          <span class="pil gold">Inscrito</span>
+          <div class="txt"><b>${S.open.nome}</b><small>${S.open.local} · ${openLinha()}</small></div>
+          ${S.open.inscrito?'<span class="pil gold">Inscrito</span>':''}
         </div></div>
     </div>
 
@@ -3208,6 +3537,11 @@ $('#cenas').onclick=(e)=>{ if(e.target.id==='cenas') fecharCena() };
 // (o relógio falso saiu junto com a barra de status — sem isso, este setInterval
 //  quebrava a cada segundo tentando escrever num #hora que não existe mais)
 render();
+// 19/08: o inventário de mídia chega DEPOIS da primeira pintura, de propósito.
+// Ele não é caminho crítico — se a rede estiver ruim na quadra, o app abre e o
+// banner entra quando puder, em vez de a home esperar por um anúncio.
+adsCarregar();
+noticiasCarregar();
 // A decisão de cadastro espera o netBoot conectar e checar se já existe conta no
 // banco (hidrata e pula o cadastro). Sem rede, cai no cadastro local.
 if(!window.netBoot && !S.cadastroFeito) abrirCadastro();
@@ -3280,6 +3614,10 @@ function hidratarJogador(row){
   const eu = S.jogadores[EU];
   eu.nome=row.nome; eu.ap=row.ap||eu.ap; eu.email=row.email||eu.email;
   eu.clube=row.clube||''; eu.nivel=row.nivel??1200; eu.nivelB=row.nivelb??1200;
+  // (mig 46) a ladder de duplas hidrata junto — sem isto o meu próprio número
+  // de duplas ficaria preso no default e a prévia usaria o trilho errado
+  eu.nivel_duplas=row.nivel_duplas ?? row.nivel ?? 1200;
+  eu.nivelb_duplas=row.nivelb_duplas ?? row.nivelb ?? 1200;
   eu.calibrando=!!row.calibrando; eu.cal=row.cal||0;
   if(row.bon) eu.bon=row.bon; if(row.roupa) eu.roupa=row.roupa; if(row.cor) eu.cor=row.cor;
   if(row.cena) eu.cena=row.cena; if(row.escudo) eu.escudo=row.escudo;
@@ -3315,6 +3653,12 @@ function aplicarJogadoresReais(lista){
       nome:a.nome, ap:a.ap || (a.nome||'?').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase(),
       nivel:a.nivel ?? 1200, div:divisaoDe(a.nivel ?? 1200),
       nivelB:a.nivelb ?? 1200, divB:divisaoDe(a.nivelb ?? 1200),
+      /* (mig 46) A LADDER DE DUPLAS — trilho próprio, sem divisão. NÃO passa
+         por `divisaoDe`: duplas não gera A/B/C/D (31/07), e derivar classe
+         daqui seria criar a segunda régua que a decisão recusa. Semeada com o
+         simples no banco; o `??` é rede, não regra. */
+      nivel_duplas:a.nivel_duplas ?? a.nivel ?? 1200,
+      nivelb_duplas:a.nivelb_duplas ?? a.nivelb ?? 1200,
       bon:a.bon || 'm1', cor:a.cor || '#5C2E3C',
       // 18/08 (mig 41 e 42): as duas marcas viajam pro elenco local. O radar
       // e a busca leem daqui; o inbox ignora — precisa do banido pelo nome.
