@@ -873,6 +873,7 @@ function netDesafiar(id){
           quadraPor: null, bolaPor: null,
           // (45) nasce simples: duplas é escolha explícita, nunca default
           dupla: false, parCri: null, parAdv: null };
+  _farmContar(id);   // 5ª do mês contra ele? o aviso chega antes do Desafiar
   netRenderOnline();
 }
 window.netDesafiar = netDesafiar;
@@ -1033,6 +1034,7 @@ function netAbrirContra(matchId){
           quadraPor: lado(m[base+'quadra_por']),
           bolaPor:   lado(m[base+'bola_por']),
           rodadas: m.prop_rodadas||0 };
+  _farmContar(uid);   // a contraproposta é a mesma 5ª partida — avisa igual
   netRenderOnline();
 }
 async function _onEnviarContra(){
@@ -1073,7 +1075,10 @@ window.netAbrirMao = netAbrirMao;
    ser o próprio adversário agora — a constraint `matches_quatro_distintos`
    recusaria, com uma mensagem escrita pra quem lê SQL. */
 function _maoAdv(v){ _on.advId=v||''; if(_on.parAdv===_on.advId) _on.parAdv=null;
-                     if(_on.parCri===_on.advId) _on.parCri=null; netRenderOnline(); }
+                     if(_on.parCri===_on.advId) _on.parCri=null;
+                     _on.nPar=undefined;   // a contagem é DESTE par — a do anterior não vale
+                     if(_on.advId) _farmContar(_on.advId);
+                     netRenderOnline(); }
 function _maoFmt(v){ _on.fmt=v; netRenderOnline(); }
 function _maoElegiveis(){
   const eu=S.jogadores[EU];
@@ -1226,6 +1231,7 @@ async function netLancarPlacar(matchId){
           parMeu:  _souCriador(m) ? m.parceiro_criador_id : m.parceiro_adversario_id,
           parDele: _souCriador(m) ? m.parceiro_adversario_id : m.parceiro_criador_id,
           sets:null, placarTxt:'' };
+  _farmContar(advUid);   // a prévia dos Pontos precisa da contagem pra não mentir
   netRenderOnline();
 }
 
@@ -1302,6 +1308,54 @@ function _aplicarFator(d, fator){
   if(fator === 1) return d;
   const meio = (v)=> v===0 ? 0 : (v>0 ? Math.max(1, Math.round(v*fator)) : Math.min(-1, Math.round(v*fator)));
   return { ...d, dNivel: meio(d.dNivel), dPts: meio(d.dPts) };
+}
+
+/* ---- (16/08, na tela só agora) O ANTI-FARM AVISA ANTES, NÃO SURPREENDE DEPOIS
+   O motor cobra 25% dos Pontos da 5ª partida do mês contra a mesma pessoa
+   (mig 33) — e regra que só existe no documento não muda comportamento: quem
+   marca a 5ª precisa saber ANTES de marcar. A contagem espelha a do
+   `pontos_creditar`: par canônico criador/adversário (parceiro não entra),
+   confirmadas, `coalesce(confirmed_at, created_at)` no mês corrente em UTC —
+   que é o relógio do `date_trunc` do banco, não o do aparelho.
+   E o aviso é honesto no que NÃO muda: o Nível conta cheio. Ele mede o jogo;
+   os Pontos medem a temporada, e o farm mora nos Pontos. */
+async function _farmContar(advId){
+  if(!MEU_UID || !advId) return;
+  const alvo = _on;                     // o sheet pode trocar antes da resposta
+  try{
+    /* uma consulta, duas réguas: o anti-farm conta por MÊS, a zebra (53) por
+       TEMPORADA — e os flags de zebra já viajam nos deltas gravados */
+    const r = await sb.from('matches')
+      .select('confirmed_at,created_at,zc:delta_criador->>zebra,za:delta_adversario->>zebra')
+      .eq('status','confirmada')
+      .or(`and(criador_id.eq.${MEU_UID},adversario_id.eq.${advId}),`
+        + `and(criador_id.eq.${advId},adversario_id.eq.${MEU_UID})`);
+    if(r.error || _on !== alvo) return;
+    const mes = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1);
+    _on.nPar = (r.data||[]).filter(x=> Date.parse(x.confirmed_at || x.created_at) >= mes).length;
+    /* (53) o par já zebrou nesta temporada? A régua é o `inicio` da temporada
+       vigente. Se a leitura falhar, `zebraJa` fica false e a prévia sai cheia
+       — otimista, mas o banco cobra certo de qualquer jeito. */
+    try{
+      const agora = new Date().toISOString();
+      const t = await sb.from('temporadas').select('inicio')
+        .lte('inicio', agora).gt('fim', agora)
+        .order('n',{ascending:false}).limit(1).maybeSingle();
+      const ini = t.data && Date.parse(t.data.inicio);
+      _on.zebraJa = !!ini && (r.data||[]).some(x=>
+        Date.parse(x.confirmed_at || x.created_at) >= ini && (x.zc==='true' || x.za==='true'));
+    }catch(e){ _on.zebraJa = false; }
+    // só re-renderiza quem está NA zona: fora dela a tela não muda, e um
+    // re-render gratuito no meio da digitação do placar derrubaria o foco
+    if(_on.nPar >= 4 || _on.zebraJa) netRenderOnline();
+  }catch(e){}
+}
+// o mesmo meio do `_motor_meio`/`_aplicarFator`: piso de 1 em módulo — a
+// prévia mostra o número que o banco vai creditar, nunca o cheio
+function _farmPts(v){ return v===0 ? 0 : (v>0 ? Math.max(1, Math.round(v*0.25)) : Math.min(-1, Math.round(v*0.25))); }
+function _farmAviso(nome){
+  if(!_on || !(_on.nPar >= 4)) return '';
+  return `<div style="margin:10px 0;padding:10px 12px;border-radius:11px;border:1px solid var(--gold);color:var(--gold);font:600 12px system-ui;line-height:1.5">${_on.nPar+1}ª partida contra ${nome} este mês — vale 25% dos Pontos. O Nível conta cheio.</div>`;
 }
 
 async function netConfirmar(matchId){
@@ -2071,6 +2125,7 @@ function netRenderOnline(){
       <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">${ehContra
         ? `${_on.adv.nome.split(' ')[0]} recebe a proposta e aceita (ou propõe de volta). Dá pra ir e voltar até três vezes — depois é aceitar ou deixar pra lá.${_on.rodadas?` <b>${_on.rodadas} de 3 já foram.</b>`:''}`
         : `Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.`}</div>
+      ${_farmAviso(_on.adv.nome.split(' ')[0])}
       ${qdoH}${locH}${bpH}
       <div style="height:16px"></div>
       <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${ehContra
@@ -2106,12 +2161,17 @@ function netRenderOnline(){
         advNivel=(S.esporte==='beach')?(adv.nivelB??1200):(adv.nivel??1200);
         calib=eu.calibrando; calN=eu.cal;
       }
-      const c=calcular(meuN, advNivel, venceu, 'amistoso', _on.fmt, !!_on.dupla, calib, calN);
+      // (53) a cota de zebra do par viaja no 9º argumento — a prévia faz a
+      // MESMA conta do motor, com o mesmo interruptor
+      const c=calcular(meuN, advNivel, venceu, 'amistoso', _on.fmt, !!_on.dupla, calib, calN, !_on.zebraJa);
+      // (16/08) anti-farm: da 5ª do mês os Pontos saem a 25% — a prévia mostra
+      // o que o banco vai creditar, não o cheio. O Nível não é tocado.
+      const ptsM = _on.nPar>=4 ? _farmPts(c.dPts) : c.dPts;
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:12px 0">
         <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:var(--up)">+${c.dPts}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:${ptsM>=0?'var(--up)':'var(--dn)'}">${ptsM>0?'+':''}${ptsM}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
         <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
-      </div>`;
+      </div>${(!c.zebra && venceu && _on.zebraJa && faixa(advNivel)>faixa(meuN))?'<p style="text-align:center;color:var(--ink3);font-size:12px">Zebra já usada contra ele nesta temporada — pontos na base.</p>':''}`;
     }
     body=`<div style="font:700 17px system-ui;margin-bottom:2px">Lançar na mão</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">Partida jogada fora do app. ${_on.advId?_nomeDe(_on.advId).split(' ')[0]+' recebe o placar e':'O adversário recebe o placar e'} confirma no app dele — com o mesmo prazo de 72h. Não vai contar em circuito aberto, só nas fechadas.</div>
@@ -2121,6 +2181,7 @@ function netRenderOnline(){
         ${eleg.map(u=>`<option value="${u}" ${_on.advId===u?'selected':''}>${_nomeDe(u)}${netEhAmigo(u)?' · amigo':''}</option>`).join('')}
       </select>
       <div style="font-size:11px;color:var(--ink3);margin-top:4px">Amigo em qualquer classe; fora isso, a mesma janela de ±1 classe do radar.</div>
+      ${_on.advId ? _farmAviso(_nomeDe(_on.advId).split(' ')[0]) : ''}
       <div style="display:flex;gap:8px;margin-top:10px">
         ${[['md3','Melhor de 3'],['set','Set único']].map(([v,n])=>`<button onclick="_net.maoFmt('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_on.fmt===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('')}
       </div>
@@ -2168,15 +2229,20 @@ function netRenderOnline(){
         advNivel=(S.esporte==='beach')?(_on.adv.nivelb??1200):(_on.adv.nivel??1200);
         calib=eu.calibrando; calN=eu.cal;
       }
-      const c=calcular(meuN, advNivel, venceu, _on.ctx||'amistoso', _on.fmt, !!_on.dupla, calib, calN);
+      // (53) o interruptor da zebra entra na prévia igual entra no motor
+      const c=calcular(meuN, advNivel, venceu, _on.ctx||'amistoso', _on.fmt, !!_on.dupla, calib, calN, !_on.zebraJa);
+      // (16/08) anti-farm: a MESMA conta do `pontos_creditar` — Pontos a 25%
+      // da 5ª do mês, Nível intacto. Prévia que mostra o cheio aqui mente.
+      const ptsP = _on.nPar>=4 ? _farmPts(c.dPts) : c.dPts;
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:14px 0">
         <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:var(--up)">+${c.dPts}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:${ptsP>=0?'var(--up)':'var(--dn)'}">${ptsP>0?'+':''}${ptsP}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
         <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
-      </div>${c.zebra?'<p style="text-align:center;color:var(--up);font-size:12px">Zebra — multiplicador nos pontos.</p>':''}`;
+      </div>${c.zebra?'<p style="text-align:center;color:var(--up);font-size:12px">Zebra — multiplicador nos pontos.</p>':''}${(!c.zebra && venceu && _on.zebraJa && faixa(advNivel)>faixa(meuN))?'<p style="text-align:center;color:var(--ink3);font-size:12px">Zebra já usada contra ele nesta temporada — pontos na base.</p>':''}`;
     }
     body=`<div style="font:700 17px system-ui;margin-bottom:2px">Placar vs ${_on.adv.nome}</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Seus games primeiro. Toque nos sets ou digite.</div>
+      ${_farmAviso(_on.adv.nome.split(' ')[0])}
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
         style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
       ${_linhaPlacares('Set que VOCÊ ganhou', false)}
@@ -2267,6 +2333,7 @@ async function netConvidarAmigo(){
 function netDesafiarUid(id, nome, nivel, nivelb){
   netFecharBusca();
   _on = { step:'desafio', advId:id, adv:{id, nome, nivel, nivelb} };
+  _farmContar(id);
   netRenderOnline();
 }
 window.netAbrirBusca = netAbrirBusca;

@@ -868,7 +868,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=64"></script>
+<script src="net.js?v=65"></script>
 
 <script>
 /* =========================================================================
@@ -1356,7 +1356,11 @@ function openLinha(){
   return `faltam ${dias} dias`;
 }
 
-function calcular(meu, advNivel, venceu, ctx, formato, dupla, calibrando, cal){
+/* (53) `zebraOk` espelha o décimo parâmetro do `_motor_delta`: zebra vale UMA
+   vez por par por temporada, e quem sabe se a cota já foi é quem consulta o
+   banco (o net.js põe em `_on.zebraJa`). Default true = todas as chamadas
+   antigas continuam idênticas. */
+function calcular(meu, advNivel, venceu, ctx, formato, dupla, calibrando, cal, zebraOk=true){
   const beach = ehBeach();
   let k = K_BASE;
   if(ehSetUnico(formato)) k *= 0.75;   // 09/08: era ×0,5. Melhor de 3 com super tie-break fica ×1,0
@@ -1372,7 +1376,7 @@ function calcular(meu, advNivel, venceu, ctx, formato, dupla, calibrando, cal){
   let base = BASE_PTS[ctx] ?? 6;
   if(dupla && !beach) base *= 0.6;   // 31/07 no tênis · 06/08 beach fica x1,0
   let mult = 1;
-  if(venceu){
+  if(venceu && zebraOk){                   // (53) a única porta do multiplicador
     const df = faixa(advNivel) - faixa(meu);
     mult = df>=2 ? 3 : df===1 ? 1.8 : 1;   // multiplicador de zebra
   }
