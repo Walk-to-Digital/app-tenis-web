@@ -594,6 +594,8 @@ async function netAtualizarInbox(){
   if(desafioVS && window.mostrarDesafioVS) window.mostrarDesafioVS(desafioVS);
   else if(abrirInbox) netAbrirInbox();
   else if(document.getElementById('net-inbox')) netRenderInbox();
+  // batida das salas (mig 51): sem await — recado não segura a caixa
+  netAvisos();
 }
 
 /* Aplica no MEU nível o delta de partidas confirmadas que ainda não apliquei.
@@ -703,14 +705,20 @@ async function _abrirOQueMexeu(ultima, posAntes){
     const nivelDepois = m.esporte==='beach' ? (eu.nivelB ?? 1200) : (eu.nivel ?? 1200);
     const dN = meu.dNivel || 0;
     const divDepois = divisaoDe(nivelDepois), divAntes = divisaoDe(nivelDepois - dN);
+    /* 16/08 (histerese): o anúncio de subir/cair de classe só dispara ao
+       cruzar a borda ±20 — a régua vive no `anunciarClasse` do index.html,
+       compartilhada com o `aplicar()` local pra não existirem duas. */
+    const hist = window.anunciarClasse
+      ? anunciarClasse(eu, m.esporte==='beach', nivelDepois, divAntes)
+      : { subiuDiv: divAntes!==divDepois && dN>0, caiuDiv: divAntes!==divDepois && dN<0 };
     S.ultimo = {
       adv: _chaveLocal(_advId(m)), venceu: euVenci, placar: meuPlacar,
       contexto: _ctxDoTorneio(await _torneioDe(m.torneio_id)),
       zebra: !!meu.zebra, dNivel: dN, dPts: meu.dPts || 0,
       nivel: nivelDepois, div: divDepois,
       posAntes, posDepois,
-      subiuDiv: divAntes !== divDepois && dN > 0,
-      caiuDiv:  divAntes !== divDepois && dN < 0,
+      subiuDiv: hist.subiuDiv,
+      caiuDiv:  hist.caiuDiv,
       quadros, esporte: m.esporte || 'tenis',
     };
     salvar();
@@ -935,6 +943,37 @@ function _parceirosPossiveis(excluir){
                 || (a.j.nome||'').localeCompare(b.j.nome||''));
 }
 
+/* O bloco Simples/Duplas — UM só, usado pela folha do desafio E pela do
+   "lançar na mão" (20/08). Eram duas telas que fazem a mesma pergunta, e duas
+   cópias do mesmo seletor divergem na primeira vez que uma delas muda.
+   `nomeAdv` e `rodape` são o que difere: no desafio o jogo vai acontecer e os
+   quatro precisam topar; na mão o jogo já aconteceu e só falta confirmar. */
+function _duplaBloco(nomeAdv, rodape){
+  const aba=(on,rot,val)=>`<button type="button" onclick="_net.onDupla(${val})"
+    style="flex:1;padding:10px;border-radius:10px;font:700 13px system-ui;cursor:pointer;
+           border:1px solid ${on?'var(--lime)':'var(--linha2)'};
+           background:${on?'rgba(131,224,0,.12)':'transparent'};
+           color:${on?'var(--lime)':'var(--ink2)'}">${rot}</button>`;
+  const sel=(qual,valor,excluir,rot)=>{
+    const ops=_parceirosPossiveis(excluir);
+    return `<div style="font-size:12px;color:var(--ink2);margin:8px 0 6px">${rot} ${valor?'':'<span style="color:var(--dn)">— escolha</span>'}</div>
+    <select onchange="_net.onParceiro('${qual}',this.value)"
+      style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:#fff;font:600 14px system-ui;
+             border:1px solid ${valor?'var(--linha2)':'var(--dn)'}">
+      <option value="" ${!valor?'selected':''}>Quem joga?</option>
+      ${ops.map(o=>`<option value="${o.id}" ${valor===o.id?'selected':''}>${o.j.nome}${netEhAmigo(o.id)?' · amigo':''}</option>`).join('')}
+    </select>`;
+  };
+  return `<div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🎾 Como ${rodape?'jogaram':'vão jogar'}</div>
+    <div style="display:flex;gap:6px">${aba(!_on.dupla,'Simples',false)}${aba(!!_on.dupla,'Duplas',true)}</div>
+    ${_on.dupla ? sel('meu', _on.parCri, [_on.parAdv], '👤 Seu parceiro')
+                  + sel('deles', _on.parAdv, [_on.parCri], `👤 Parceiro de ${nomeAdv}`)
+                  + `<div style="font-size:11.5px;color:var(--ink3);margin-top:7px">${rodape
+                      || 'Os quatro precisam topar. Se um recusar, o desafio morre — e vocês marcam outro.'}</div>`
+                : ''}
+    <div style="height:12px"></div>`;
+}
+
 async function _onConfirmarDesafio(){
   const adv=_on.adv;
   /* 16/08 — a data virou obrigatória (mig 34). A trava de verdade é a do
@@ -1022,11 +1061,19 @@ function netAbrirMao(){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
   const meu = window.__meusLocais || {};
   _on = { step:'mao', advId:'', sets:null, placarTxt:'',
-          fmt:'md3', localId: meu.principal || null, quadra:null, quando:null };
+          fmt:'md3', localId: meu.principal || null, quadra:null, quando:null,
+          // (20/08) duplas também se lança na mão. Nasce simples: como no
+          // desafio, duplas é escolha explícita e nunca default.
+          dupla:false, parCri:null, parAdv:null };
   netRenderOnline();
 }
 window.netAbrirMao = netAbrirMao;
-function _maoAdv(v){ _on.advId=v||''; netRenderOnline(); }
+/* Trocar de adversário LIMPA o parceiro dele: o `_parceirosPossiveis` exclui
+   os capitães, e um id que era válido com o adversário anterior pode passar a
+   ser o próprio adversário agora — a constraint `matches_quatro_distintos`
+   recusaria, com uma mensagem escrita pra quem lê SQL. */
+function _maoAdv(v){ _on.advId=v||''; if(_on.parAdv===_on.advId) _on.parAdv=null;
+                     if(_on.parCri===_on.advId) _on.parCri=null; netRenderOnline(); }
 function _maoFmt(v){ _on.fmt=v; netRenderOnline(); }
 function _maoElegiveis(){
   const eu=S.jogadores[EU];
@@ -1038,14 +1085,33 @@ function _maoElegiveis(){
 }
 async function _maoEnviar(){
   if(!_on.advId){ alert('Escolhe o adversário.'); return; }
+  /* (20/08) DUPLAS NASCE COM OS QUATRO — a trava (15a) do guard recusa o
+     INSERT sem os dois parceiros. Avisar aqui é a cortesia de sempre: a trava
+     de verdade é a do banco, esta fala a língua de quem está na tela. */
+  if(_on.dupla && (!_on.parCri || !_on.parAdv)){
+    alert(!_on.parCri ? 'Escolhe o seu parceiro.' : 'Escolhe o parceiro do adversário.');
+    return;
+  }
   const sets=_on.sets; if(!sets){ alert('Placar incompleto. Ex: 6-3 6-4'); return; }
   let g=0,p=0; sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
   if(g===p){ alert('Placar empatado — confere os sets.'); return; }
   try{
+    /* PARTIDA JÁ JOGADA NASCE 'pendente', inclusive em duplas — e isso NÃO
+       fere a decisão de 19/08 ("os quatro aceitam a partida"), que é sobre
+       MARCAR jogo, não sobre registrar jogo passado. Não há o que combinar
+       num jogo que acabou; o que existe é um placar pra confirmar, e quem
+       confirma é o capitão adversário, como já é no simples.
+
+       O banco concorda por construção: a trava (17) só dispara em
+       `desafiado → aceito` (mig 47:316), e esta partida nunca passa por
+       'aceito' — nasce 'pendente' e vai pra 'confirmada'. Os carimbos de
+       aceite ficam nulos, que é o registro honesto de que ninguém aceitou
+       nada: não houve convite. */
     const { error } = await sb.from('matches').insert({
       criador_id: MEU_UID, adversario_id: _on.advId,
       esporte: (typeof S!=='undefined' && S.esporte) ? S.esporte : 'tenis',
-      formato:_on.fmt, dupla:false, cantada:null,
+      formato:_on.fmt, dupla: !!_on.dupla, cantada:null,
+      ...(_on.dupla ? { parceiro_criador_id:_on.parCri, parceiro_adversario_id:_on.parAdv } : {}),
       status:'pendente', sets, placar:sets.map(([a,b])=>`${a}-${b}`).join(' '),
       venceu_criador: g>p, placar_por: MEU_UID,
       placar_em: new Date().toISOString(),        // o relógio das 72h começa aqui
@@ -1056,7 +1122,9 @@ async function _maoEnviar(){
     if(error) throw error;
     const nome0=_nomeDe(_on.advId).split(' ')[0];
     netFecharOnline();
-    if(window.toast) toast(`Placar lançado — ${nome0} confirma no app dele. Nada mexe até lá.`);
+    if(window.toast) toast(_on.dupla
+      ? `Duplas lançada — ${nome0} confirma no app dele. Nada mexe até lá.`
+      : `Placar lançado — ${nome0} confirma no app dele. Nada mexe até lá.`);
     netAtualizarInbox();
   }catch(e){ alert('Não deu pra lançar: '+(e.message||e)); }
 }
@@ -1850,7 +1918,9 @@ function netRenderInbox(){
        policy `partida_msg_ins` passou a aceitar mensagem nesse status. As duas
        coisas andam juntas: botão sem policy é recado que morre em 42501. */
     const viva = ['desafiado','aceito','pendente','contestada'].includes(m.status);
-    const conversar = viva ? `<button onclick="_net.abrirChatPartida('${m.id}')" title="conversar" style="flex:0 0 auto;padding:11px 13px;border-radius:12px;border:1px solid var(--linha2);background:none;color:var(--ink2);font:600 13px system-ui;cursor:pointer">💬</button>` : '';
+    // (51) recado não lido acende o botão — número aqui pode, é contagem de sala
+    const nrp = netRecadosDe('partida', m.id);
+    const conversar = viva ? `<button onclick="_net.abrirChatPartida('${m.id}')" title="conversar" style="flex:0 0 auto;padding:11px 13px;border-radius:12px;border:1px solid ${nrp?'var(--up)':'var(--linha2)'};background:none;color:${nrp?'var(--up)':'var(--ink2)'};font:600 13px system-ui;cursor:pointer">💬${nrp?` ${nrp}`:''}</button>` : '';
     return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
       <div style="font-size:14px;margin-bottom:${(acoes||conversar)?'12px':'0'}">${txt}</div>
       ${(acoes||conversar)?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">${acoes}${conversar}</div>`:''}</div>`;
@@ -1957,30 +2027,7 @@ function netRenderOnline(){
        o meu parceiro e o do adversário. Quem desafia nomeia os quatro (15a) —
        é assim que o convite chega aos outros três, e é o que faz a partida
        nascer completa em vez de virar um objeto pela metade esperando gente. */
-    const duplaH = ehContra ? '' : (()=>{
-      const aba=(on,rot,val)=>`<button type="button" onclick="_net.onDupla(${val})"
-        style="flex:1;padding:10px;border-radius:10px;font:700 13px system-ui;cursor:pointer;
-               border:1px solid ${on?'var(--lime)':'var(--linha2)'};
-               background:${on?'rgba(131,224,0,.12)':'transparent'};
-               color:${on?'var(--lime)':'var(--ink2)'}">${rot}</button>`;
-      const sel=(qual,valor,excluir,rot)=>{
-        const ops=_parceirosPossiveis(excluir);
-        return `<div style="font-size:12px;color:var(--ink2);margin:8px 0 6px">${rot} ${valor?'':'<span style="color:var(--dn)">— escolha</span>'}</div>
-        <select onchange="_net.onParceiro('${qual}',this.value)"
-          style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:#fff;font:600 14px system-ui;
-                 border:1px solid ${valor?'var(--linha2)':'var(--dn)'}">
-          <option value="" ${!valor?'selected':''}>Quem joga?</option>
-          ${ops.map(o=>`<option value="${o.id}" ${valor===o.id?'selected':''}>${o.j.nome}${netEhAmigo(o.id)?' · amigo':''}</option>`).join('')}
-        </select>`;
-      };
-      return `<div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🎾 Como vão jogar</div>
-        <div style="display:flex;gap:6px">${aba(!_on.dupla,'Simples',false)}${aba(!!_on.dupla,'Duplas',true)}</div>
-        ${_on.dupla ? sel('meu', _on.parCri, [_on.parAdv], '👤 Seu parceiro')
-                      + sel('deles', _on.parAdv, [_on.parCri], `👤 Parceiro de ${(_on.adv.nome||'').split(' ')[0]}`)
-                      + `<div style="font-size:11.5px;color:var(--ink3);margin-top:7px">Os quatro precisam topar. Se um recusar, o desafio morre — e vocês marcam outro.</div>`
-                    : ''}
-        <div style="height:12px"></div>`;
-    })();
+    const duplaH = ehContra ? '' : _duplaBloco((_on.adv.nome||'').split(' ')[0]);
     const qdoH = `
       ${duplaH}
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">🗓 Quando ${qv?'':'<span style="color:var(--dn)">— escolha o dia e a hora</span>'}</div>
@@ -2042,10 +2089,26 @@ function netRenderOnline(){
       const eu=S.jogadores[EU]; const adv=S.jogadores[_on.advId];
       let g=0,p=0; _on.sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
       const venceu=g>p;
-      const advNivel=(S.esporte==='beach')?(adv.nivelB??1200):(adv.nivel??1200);
-      const c=calcular(nivelDe(eu), advNivel, venceu, 'amistoso', _on.fmt, false, eu.calibrando, eu.cal);
+      /* (20/08) A MESMA CONTA DO OUTRO LADO. Em duplas a prévia é da MÉDIA do
+         time, no trilho da ladder, com a calibragem fora — espelho do ramo de
+         duplas do `_matches_motor` (mig 46). Antes esta prévia passava
+         `dupla:false` cravado, e desde que o "lançar na mão" aceita duplas
+         isso seria a tela prometendo um número que o banco não vai creditar. */
+      let meuN, advNivel, calib, calN;
+      if(_on.dupla){
+        const parMeu = S.jogadores[_chaveLocal(_on.parCri)];
+        const parAdv = S.jogadores[_chaveLocal(_on.parAdv)];
+        meuN     = parMeu ? _motorTime(_ladderDe(eu),  _ladderDe(parMeu)) : _ladderDe(eu);
+        advNivel = parAdv ? _motorTime(_ladderDe(adv), _ladderDe(parAdv)) : _ladderDe(adv);
+        calib=false; calN=0;
+      } else {
+        meuN = nivelDe(eu);
+        advNivel=(S.esporte==='beach')?(adv.nivelB??1200):(adv.nivel??1200);
+        calib=eu.calibrando; calN=eu.cal;
+      }
+      const c=calcular(meuN, advNivel, venceu, 'amistoso', _on.fmt, !!_on.dupla, calib, calN);
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:12px 0">
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">NÍVEL</div></div>
+        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
         <div style="text-align:center"><div style="font:700 20px system-ui;color:var(--up)">+${c.dPts}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
         <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
       </div>`;
@@ -2061,6 +2124,9 @@ function netRenderOnline(){
       <div style="display:flex;gap:8px;margin-top:10px">
         ${[['md3','Melhor de 3'],['set','Set único']].map(([v,n])=>`<button onclick="_net.maoFmt('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_on.fmt===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('')}
       </div>
+      <div style="height:12px"></div>
+      ${_on.advId ? _duplaBloco(_nomeDe(_on.advId).split(' ')[0],
+          `O jogo já aconteceu, então não há o que combinar: ${_nomeDe(_on.advId).split(' ')[0]} confirma o placar pelos dois. O Nível de duplas dos quatro mexe junto.`) : ''}
       <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Placar — seus games primeiro. Ex: <b>6-3 6-4</b></div>
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
         style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 17px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
@@ -2805,7 +2871,8 @@ async function netVerGrupo(gid){
      traz a pessoa de volta à comunidade no dia em que ela não jogou, e a folha
      se lê de cima pra baixo. Só membro vê o botão porque só membro atravessa a
      policy: oferecer a porta pra quem a fechadura vai negar é oferecer um erro. */
-  const chatBtn = meu ? `<button onclick="_net.abrirChat('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:14px">💬 Conversa da comunidade</button>` : '';
+  const nrec = netRecadosDe('grupo', gid);   // (51) "· N novas" traz de volta quem não jogou
+  const chatBtn = meu ? `<button onclick="_net.abrirChat('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid ${nrec?'var(--up)':'var(--linha2)'};background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:14px">💬 Conversa da comunidade${nrec?` · <b style="color:var(--up)">${nrec} nova${nrec===1?'':'s'}</b>`:''}</button>` : '';
   // patches da comunidade (migração 22) — todo membro cria e manda
   const patchesBtn = meu ? `<button onclick="_net.abrirPatches('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">◈ Patches da comunidade — criar e mandar</button>` : '';
   const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
@@ -2945,10 +3012,63 @@ async function _chatCarregar(){
     try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){}
   }
   netRenderChat();
+  /* li até aqui: quem viu as mensagens carimba (mig 51). Carregar É ver — a
+     folha desenha tudo o que veio. */
+  _salaCarimbar(_chat);
 }
 
-function netFecharChat(){ _chat=null; const el=document.getElementById('net-chat'); if(el) el.remove(); }
+function netFecharChat(){
+  const c=_chat;
+  _chat=null; const el=document.getElementById('net-chat'); if(el) el.remove();
+  // carimba de novo ao fechar: cobre a resposta que entrou no reload do meu envio
+  if(c) _salaCarimbar(c);
+}
 function _chatDigitou(v){ if(_chat) _chat.rascunho = v; }   // sem re-render: perderia o cursor
+
+/* ---- AS SALAS AVISAM (migração 51) --------------------------------------
+   O carimbo "até onde eu li" vive na `sala_lida`, e o número de não lidas sai
+   da `avisos_salas()` — a tela NUNCA inventa nem zera o ponto por conta
+   própria. O `S.novidades=0` do `trocarAba` é o exemplo do que NÃO copiar
+   aqui: um zero local morre no reload e mente no segundo aparelho.
+
+   O carimbo não é `now()`: é o `criado_em` da última mensagem CARREGADA.
+   Relógio de cliente torto não entra na conta, e mensagem que chegou no banco
+   depois do meu load continua não lida — porque eu não a vi mesmo. */
+async function _salaCarimbar(c){
+  if(!c || !MEU_UID || !c.msgs || !c.msgs.length) return;
+  const ultima = c.msgs[c.msgs.length-1].criado_em;
+  try{
+    const { error } = await sb.from('sala_lida').upsert({
+      player_id: MEU_UID,
+      sala: c.sala===_SALAS.grupo ? 'grupo' : 'partida',
+      sala_id: c.id,
+      lido_em: ultima,
+    });
+    if(!error) netAvisos();   // o ponto apaga vindo do banco, não daqui
+  }catch(e){}
+}
+
+/* Três batidas: boot (via o inbox do boot), fim de cada `netAtualizarInbox` e
+   `visibilitychange` (no index.html, junto do `conferirVersao`). Em erro de
+   rede o `_avisos` anterior FICA — badge que zera em erro vira badge em que
+   ninguém acredita. */
+let _avisos = null;   // null = nunca carregou; {grupo:{id:n}, partida:{id:n}}
+async function netAvisos(){
+  if(!MEU_UID) return;
+  const { data, error } = await sb.rpc('avisos_salas');
+  if(error){ console.error('[net] avisos', error); return; }   // mantém o último valor
+  const av = { grupo:{}, partida:{} };
+  (data||[]).forEach(r=>{ if(av[r.sala]) av[r.sala][r.sala_id] = r.nao_lidas; });
+  _avisos = av;
+  if(window.render) render();
+  if(document.getElementById('net-inbox')) netRenderInbox();
+}
+function netRecadosDe(tipo, id){ return (_avisos && _avisos[tipo] && _avisos[tipo][id]) || 0; }
+function netTemRecado(tipo){
+  if(!_avisos) return false;
+  return (tipo ? [tipo] : ['grupo','partida'])
+    .some(t=> Object.values(_avisos[t]).some(n=> n>0));
+}
 
 async function _chatEnviar(){
   if(!_chat) return;

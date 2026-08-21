@@ -385,6 +385,13 @@ button,input,select{font:inherit;color:inherit}
   color:var(--acc);text-shadow:0 1px 3px rgba(0,0,0,.85)}
 .ini .ic .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;line-height:17px;
   border-radius:99px;background:var(--up);color:#0A1100;font-size:10px;font-weight:800;text-align:center;padding:0 4px}
+/* (51) o ponto de recado: PONTO e não número, porque S.novidades conta AÇÃO e
+   recado não é ação. Mora embaixo pra não brigar com o badge de cima. O valor
+   vem sempre do carimbo no banco (net.js netAvisos) — nunca de um zero local. */
+.ini .ic .ponto{position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;
+  background:var(--up);border:2px solid rgba(30,23,20,.9)}
+#nav .ponto{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--up);
+  vertical-align:top;margin-top:2px}
 .ini .degrau{margin-top:11px;background:rgba(30,23,20,.72);border:1px solid var(--linha);border-radius:10px;padding:11px 14px;backdrop-filter:blur(6px)}
 .ini .degrau .top{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--ink3)}
 .ini .degrau .top b{font-family:var(--f-disp);font-size:14px;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
@@ -861,7 +868,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=63"></script>
+<script src="net.js?v=64"></script>
 
 <script>
 /* =========================================================================
@@ -1443,6 +1450,43 @@ const catNome = (cl, cat)=> cl + CAT_SUFIXO[cat];
 // 'C+' — a etiqueta que aparece na vitrine
 const classeDe = (j)=> catNome(divDe(j), categoriaDe(nivelDe(j), divDe(j)));
 
+/* 16/08 (construída só agora) — A HISTERESE DO SANFONA, no EVENTO e não na
+   etiqueta. A classe continua 100% derivada do Nível e a ficha sempre mostra a
+   verdade; o que ganha zona morta é a CELEBRAÇÃO: PROMOVIDO só dispara ao
+   cruzar a borda +20, e o rebaixamento não se anuncia até −20 abaixo dela.
+   Entre as duas, a etiqueta acompanha o Nível em silêncio.
+
+   20 pontos porque uma vitória em nível igual (+16) promove e a derrota
+   seguinte (−16) não chega a desanunciar. Histerese na ETIQUETA foi descartada
+   em 16/08: obrigaria a categoria a virar coluna com trigger de transição —
+   quebra "estado derivado não se guarda".
+
+   O estado é "qual foi a última classe ANUNCIADA" (`divAnun`/`divAnunB` no
+   jogador, por esporte, como div/divB) — estado de NOTIFICAÇÃO, não de
+   ranking: apagá-lo não muda um ponto de ninguém, só cala ou repete uma tela.
+   Quem nunca anunciou parte da classe de ANTES da partida — conta antiga não
+   celebra retroativo.
+
+   Chamada pelos DOIS aplicadores de delta: o `aplicar()` local e o
+   `_abrirOQueMexeu` do net.js (o funil real de produção). */
+function anunciarClasse(eu, beach, nivelDepois, divAntes){
+  const ORD = ['A','B','C','D'];                       // menor índice = mais alto
+  const divDepois = divisaoDe(nivelDepois);
+  const antes = (beach ? eu.divAnunB : eu.divAnun) || divAntes;
+  let anun = antes;
+  // subiu: está numa classe acima da anunciada E passou da borda de entrada +20
+  if(ORD.indexOf(divDepois) < ORD.indexOf(antes) && nivelDepois >= CLASSE_FAIXA[divDepois][0] + 20)
+    anun = divDepois;
+  // caiu: está numa classe abaixo da anunciada E desceu 20 abaixo da borda dela
+  if(ORD.indexOf(divDepois) > ORD.indexOf(antes) && nivelDepois <= CLASSE_FAIXA[antes][0] - 20)
+    anun = divDepois;
+  if(beach) eu.divAnunB = anun; else eu.divAnun = anun;
+  return {
+    subiuDiv: anun !== antes && ORD.indexOf(anun) < ORD.indexOf(antes),
+    caiuDiv:  anun !== antes && ORD.indexOf(anun) > ORD.indexOf(antes),
+  };
+}
+
 /* 16/08 — o Pontos de temporada pode ser NEGATIVO agora que a derrota debita.
    Até aqui o painel imprimia `+${dPts}` com a cor de alta, fixos — e isso
    passou despercebido por cinco dias porque o número nunca tinha sido
@@ -1464,8 +1508,8 @@ function aplicar(p){
   if(beach) eu.nivelB = (eu.nivelB ?? 1200) + r.dNivel;
   else      eu.nivel += r.dNivel;
   const divDepois = divisaoDe(nivelDe(eu));
-  const subiuDiv = divDepois!==divAntes && ['A','B','C','D'].indexOf(divDepois) < ['A','B','C','D'].indexOf(divAntes);
-  const caiuDiv  = divDepois!==divAntes && !subiuDiv;
+  // 16/08: o anúncio tem histerese de ±20; a etiqueta (div/divB) segue o Nível
+  const { subiuDiv, caiuDiv } = anunciarClasse(eu, beach, nivelDe(eu), divAntes);
   if(beach) eu.divB = divDepois; else eu.div = divDepois;
 
   /* 06/08: derramam só dentro do esporte da partida.
@@ -1809,7 +1853,8 @@ function render(){
   $('#tela').scrollTop = 0;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.t===aba));
   const bp = document.querySelector('#nav button[data-t="comunidade"]');
-  if(bp) bp.innerHTML = '<i>▣</i>Comunidade' + (S.novidades? ` <span class="badge">${S.novidades}</span>`:'');
+  if(bp) bp.innerHTML = '<i>▣</i>Comunidade' + (S.novidades? ` <span class="badge">${S.novidades}</span>`:'')
+    + ((window.netTemRecado&&netTemRecado('grupo'))? ' <span class="ponto"></span>':'');
   pintarBonecos();
   posicionarVest();
 }
@@ -1972,7 +2017,7 @@ inicio(){
       <div class="hud">
         <div class="linha1">
           <div class="temp"><span class="dot"></span>${S.semana>0?`Temporada · <b>Semana ${S.semana}/12</b>`:`<b>Pré-temporada</b> · o app ainda não lançou`}</div>
-          <div class="ic" onclick="netAbrirInbox()">✉${S.novidades?`<span class="badge">${S.novidades}</span>`:''}</div>
+          <div class="ic" onclick="netAbrirInbox()">✉${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
           <!-- 07/08: escolher a quadra virou ícone aqui. O cenário é da VITRINE
                (é o que aparece atrás de você na home), então mora na home — não
                no armário junto com a roupa. -->
@@ -2122,12 +2167,16 @@ quadro(){
      não desenha placar nenhum. */
   const meusQ = window.__meusQuadros;
   const comunidades = !meusQ ? ''
-    : meusQ.length ? meusQ.map(c=>`
+    : meusQ.length ? meusQ.map(c=>{
+      // (51) recado não lido da sala desta comunidade — vem do carimbo no banco
+      const nr = window.netRecadosDe ? netRecadosDe('grupo', c.id) : 0;
+      return `
       <div class="card clic" onclick="netVerGrupo('${c.id}')">
         <div class="linha-item">
           <div class="txt"><b>${c.nome}</b><small>${c.membros} ${c.membros===1?'jogador':'jogadores'}${c.pos?` · ${c.pos}º lugar`:''}</small></div>
+          ${nr?`<span class="pil" style="background:var(--up-bg);color:var(--up)">💬 ${nr}</span>`:''}
           <span class="pil gh">${c.pts} pts</span>
-        </div></div>`).join('')
+        </div></div>`;}).join('')
     : `<div class="card"><p class="nota">Você ainda não está em nenhuma comunidade. É nela que a partida entre membros vira ranking próprio — e onde o cinturão existe.</p></div>`;
 
   /* 12/08: esta seção lia S.feed, que é zerado no boot e nunca preenchido —
@@ -3756,7 +3805,10 @@ conferirVersao();
 
 /* app instalado passa dias aberto: a volta pro primeiro plano é a única hora
    em que dá pra perguntar de novo sem custo nenhum. */
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) conferirVersao() });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){
+  conferirVersao();
+  if(window.netAvisos) netAvisos();   // (51) a volta ao primeiro plano reconta os recados
+}});
 
 /* o `?v=` cumpriu o papel de furar o cache uma vez; limpar evita que ele fique
    grudado no atalho salvo na tela de início. */
