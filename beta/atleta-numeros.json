@@ -1,0 +1,49 @@
+{
+ "_": "Gerado a partir da calibragem do Nuno (m1-regata, m1-camiseta, m1-polo, f3-vestido). Escudo e patrocinador sao medidos por sprite: o tecido magenta e detectado, o tronco e medido, e a regra e aplicada em fracao do tronco. Nao editar a mao — regerar pelo editor.",
+ "_regra": {
+  "normal":  { "escudo": {"t": 0.329, "xLinha": 0.669, "yTronco": 0.552},
+               "patroc": {"t": 0.650, "xLinha": 0.513, "yTronco": 1.108} },
+  "vestido": { "escudo": {"t": 0.294, "xLinha": 0.528, "yTronco": 0.367},
+               "patroc": {"t": 0.503, "xLinha": 0.509, "yTronco": 0.769} }
+ },
+
+ "m1-camiseta": { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19.25,"x":65.25,"y":24.5},  "patroc": {"tamanho":37.75,"x":51.5,"y":34.25} },
+ "m1-polo":     { "atleta": {"altura":52.5,"x":44,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":14,"x":75,"y":23.5},       "patroc": {"tamanho":27.5,"x":65.25,"y":33.75} },
+ "m1-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19,"x":60,"y":25.75},      "patroc": {"tamanho":37.5,"x":52.25,"y":36.25} },
+
+ "m2-camiseta": { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19.25,"x":65.75,"y":26.5}, "patroc": {"tamanho":38,"x":51.25,"y":36.5} },
+ "m2-polo":     { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":18.75,"x":64.75,"y":25.25},"patroc": {"tamanho":36.75,"x":51.5,"y":35.25} },
+ "m2-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19.25,"x":59.25,"y":27.5}, "patroc": {"tamanho":38.25,"x":51.75,"y":37.5} },
+
+ "m3-camiseta": { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":17.75,"x":64.25,"y":24.75},"patroc": {"tamanho":35,"x":50.75,"y":34.75} },
+ "m3-polo":     { "atleta": {"altura":52.5,"x":47.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":15.75,"x":69.25,"y":24.75},"patroc": {"tamanho":31.25,"x":57.75,"y":35.25} },
+ "m3-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19.25,"x":59.5,"y":25.75}, "patroc": {"tamanho":37.75,"x":51.25,"y":36.25} },
+
+ "m4-camiseta": { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":18,"x":63.75,"y":24},      "patroc": {"tamanho":35.75,"x":51,"y":33.75} },
+ "m4-polo":     { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":16.5,"x":64.25,"y":25.25}, "patroc": {"tamanho":32.75,"x":51.5,"y":35.25} },
+ "m4-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19,"x":59,"y":24.25},      "patroc": {"tamanho":37.5,"x":51,"y":34.25} },
+
+ "m5-camiseta": { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":19.25,"x":65,"y":24},      "patroc": {"tamanho":38,"x":51.5,"y":34} },
+ "m5-polo":     { "atleta": {"altura":52.5,"x":47.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":16.75,"x":69.25,"y":24},   "patroc": {"tamanho":33,"x":57.25,"y":34.5} },
+ "m5-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":20.25,"x":60.25,"y":25.25},"patroc": {"tamanho":39.75,"x":52.5,"y":35.75} },
+
+ "f1-camiseta": { "atleta": {"altura":52.5,"x":46,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":17,"x":71,"y":28.25},     "patroc": {"tamanho":33.75,"x":59,"y":38.25} },
+ "f1-polo":     { "atleta": {"altura":52.5,"x":46.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":16.25,"x":68.5,"y":26.75}, "patroc": {"tamanho":32.25,"x":58.75,"y":36.5} },
+ "f1-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":20,"x":59.5,"y":28},       "patroc": {"tamanho":39.5,"x":52,"y":37.75} },
+ "f1-vestido":  { "atleta": {"altura":56.5,"x":47,"chao":83,"sombraLargura":51,"sombraOpacidade":23},     "escudo": {"tamanho":15,"x":58.5,"y":25.5},     "patroc": {"tamanho":25.5,"x":58.5,"y":33} },
+
+ "f2-camiseta": { "atleta": {"altura":52.5,"x":47,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":17.5,"x":68.5,"y":25.5},   "patroc": {"tamanho":34.5,"x":57.25,"y":35.5} },
+ "f2-polo":     { "atleta": {"altura":52.5,"x":46,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":16,"x":69.75,"y":24.75},   "patroc": {"tamanho":31.5,"x":59.75,"y":34.75} },
+ "f2-regata":   { "atleta": {"altura":52.5,"x":49,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":19,"x":60.5,"y":25.75},    "patroc": {"tamanho":37.5,"x":53.25,"y":35.75} },
+ "f2-vestido":  { "atleta": {"altura":56.5,"x":47.5,"chao":83,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":15.5,"x":57.5,"y":24.25},  "patroc": {"tamanho":26.5,"x":56.75,"y":31.5} },
+
+ "f3-camiseta": { "atleta": {"altura":52.5,"x":45.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":16.5,"x":71.25,"y":29.75}, "patroc": {"tamanho":32.75,"x":60.25,"y":39.25} },
+ "f3-polo":     { "atleta": {"altura":52.5,"x":45.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":16.75,"x":71.5,"y":29},    "patroc": {"tamanho":33,"x":60.75,"y":38.25} },
+ "f3-regata":   { "atleta": {"altura":52.5,"x":49.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":20.75,"x":58.5,"y":30.25}, "patroc": {"tamanho":41.25,"x":51.5,"y":40} },
+ "f3-vestido":  { "atleta": {"altura":56.5,"x":46.5,"chao":83,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":14.75,"x":60,"y":28.5},    "patroc": {"tamanho":25.25,"x":59.25,"y":36} },
+
+ "f4-camiseta": { "atleta": {"altura":52.5,"x":46.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":18,"x":70.5,"y":30.75},    "patroc": {"tamanho":35.5,"x":59,"y":40.75} },
+ "f4-polo":     { "atleta": {"altura":52.5,"x":46,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":16.5,"x":69.75,"y":31},    "patroc": {"tamanho":32.25,"x":59.25,"y":41} },
+ "f4-regata":   { "atleta": {"altura":52.5,"x":47.5,"chao":82.5,"sombraLargura":51,"sombraOpacidade":23}, "escudo": {"tamanho":18.25,"x":63,"y":30.5},    "patroc": {"tamanho":36,"x":56.25,"y":39.75} },
+ "f4-vestido":  { "atleta": {"altura":56.5,"x":46.5,"chao":83,"sombraLargura":51,"sombraOpacidade":23},   "escudo": {"tamanho":15.25,"x":61,"y":28},      "patroc": {"tamanho":26,"x":60.25,"y":35.5} }
+}

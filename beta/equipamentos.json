@@ -1,0 +1,30 @@
+{
+  "_leia_me": [
+    "ONDE COMPRAR E ENCORDOAR — a categoria Equipamentos do Encontrar.",
+    "",
+    "O Reginaldo pediu a categoria na reunião de 25/08; os AFILIADOS ele mesmo",
+    "tirou de escopo ('essa camada inicial não é necessária'). Então isto aqui",
+    "NÃO é rede de anúncio nem parceria paga: é indicação nossa, e a tela diz",
+    "isso na cara ('ninguém aqui pagou pra aparecer'). No dia em que houver",
+    "afiliado de verdade, ele NÃO entra nesta lista — entra no espaço de mídia,",
+    "que é outro inventário e tem rótulo próprio.",
+    "",
+    "MESMO MOLDE DO noticias.json: arquivo, zero tabela, zero policy. Trocar a",
+    "lista é editar aqui e publicar.",
+    "",
+    "COMO ACRESCENTAR — um objeto por lugar:",
+    "  nome    obrigatório · como o lugar se chama",
+    "  tipo    obrigatório · loja | encordoamento | ambos",
+    "  bairro  opcional    · aparece do lado do tipo",
+    "  sobre   opcional    · uma linha, no máximo ~80 caracteres",
+    "  zap     opcional    · só números com DDD (ex: 71990001234)",
+    "  site    opcional    · precisa começar com https://",
+    "",
+    "REGRA DE CURADORIA, e ela é o motivo de a lista nascer vazia:",
+    "só entra lugar que a gente conhece e conferiu. Encher isto com resultado",
+    "de busca do Google seria transformar 'indicação nossa' em mentira — e é",
+    "justamente a palavra 'nossa' que faz a lista valer alguma coisa.",
+    "Enquanto estiver vazia, a tela explica que está sendo montada."
+  ],
+  "itens": []
+}

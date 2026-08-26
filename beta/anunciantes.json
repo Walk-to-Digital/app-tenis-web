@@ -1,0 +1,48 @@
+{
+  "_leia_me": [
+    "O inventário do espaço de mídia da home. Inventário PRÓPRIO: o espaço é",
+    "vendido por nós, como as marcas do vestiário — não é rede de anúncio.",
+    "",
+    "Pra pôr um anunciante no ar:",
+    "  1. Salvar a arte em anuncios/ (JPG, largura 1080px, até 200 KB).",
+    "  2. Acrescentar um item em campanhas, abaixo.",
+    "  3. Subir o ?v= do app/index.html e rodar o publicar.sh.",
+    "",
+    "Campos:",
+    "  id         identificador curto e único. Vira a chave da contagem.",
+    "  marca      nome do anunciante, só pra quem lê este arquivo.",
+    "  img        caminho a partir da raiz do projeto. Ex: anuncios/pagbank.jpg",
+    "  link       para onde o toque leva. Deixe \"\" se a marca só quer aparecer.",
+    "  de / ate   AAAA-MM-DD, inclusive nos dois. Fora da janela, some sozinho.",
+    "  proporcao  largura/altura da arte. Ex: 1/1, 8/5, 16/9. Padrão 1/1.",
+    "  alt        descrição pra leitor de tela e pro caso de a imagem não subir.",
+    "  encaixe    \"conter\" pra peça que é LOGO (cabe inteira, com respiro).",
+    "             Omitido = cobrir, que é o certo pra peça que é foto.",
+    "  casa       true = peça da CASA (nosso próprio logo). Ela só aparece",
+    "             quando NÃO há campanha paga na janela, e sai sozinha assim",
+    "             que entrar anunciante. Não leva o rótulo Publicidade.",
+    "",
+    "Com mais de uma campanha PAGA no ar, o app alterna entre elas a cada",
+    "abertura, uma por abertura. Sem nenhuma paga, entra a peça da casa. Sem",
+    "nada, a home não mostra moldura vazia: o espaço simplesmente não existe.",
+    "",
+    "ATENÇÃO: o app ainda NÃO conta impressão nem clique somados — isso mora",
+    "no navegador de cada pessoa e não volta pra cá. Dá pra vender a primeira",
+    "vez; pra renovar, o anunciante vai pedir número, e aí precisa de tabela."
+  ],
+
+  "campanhas": [
+    {
+      "id": "casa_ranket",
+      "marca": "Ranket (peça da casa)",
+      "img": "marcas/ranket-horizontal.png",
+      "link": "",
+      "de": "2026-08-19",
+      "ate": "2027-12-31",
+      "proporcao": "3/1",
+      "encaixe": "conter",
+      "casa": true,
+      "alt": "Ranket"
+    }
+  ]
+}

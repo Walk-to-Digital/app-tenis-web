@@ -1,0 +1,27 @@
+{
+  "_leia_me": [
+    "QUEM COBRE TÊNIS — o espaço de influenciadores da vitrine pública.",
+    "",
+    "Pedido do Reginaldo (25/08): 'um espaço que a gente conversa com",
+    "influenciadores relacionados ao segmento, e disponibiliza isso pra ele como",
+    "um canal GRATUITO pra linkar com as notícias que eles tão colocando'.",
+    "Ninguém paga e ninguém recebe: é troca de audiência.",
+    "",
+    "MESMO MOLDE DO noticias.json — arquivo, zero tabela, zero policy.",
+    "",
+    "COMO ACRESCENTAR — um objeto por pessoa ou canal:",
+    "  nome    obrigatório · como a pessoa/canal se chama",
+    "  link    obrigatório · precisa começar com https://",
+    "  arroba  opcional    · o @ dela, aparece como chapéu",
+    "  sobre   opcional    · uma linha do que ela faz",
+    "  ate     opcional    · AAAA-MM-DD, o dia em que sai da página sozinha",
+    "",
+    "SEM FOTO, e é decisão, não esquecimento: foto de perfil de terceiro numa",
+    "página comercial é problema de direito de imagem que custa zero pra evitar.",
+    "",
+    "E ANTES DE ACRESCENTAR ALGUÉM: fale com a pessoa. A vitrine é pública e",
+    "indexável — pôr o nome de alguém nela sem avisar é usar a audiência dela",
+    "sem pedir, que é o oposto do que o canal gratuito deveria ser."
+  ],
+  "itens": []
+}
