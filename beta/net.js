@@ -4951,7 +4951,24 @@ async function _qsalvarInterno(){
   }
   netFecharQnova();
   await netLocais(true); await netMeusLocais(true);
-  if(window.toast) toast(`📍 <b>${nome}</b> cadastrada. Marque ela em "onde você joga".`);
+
+  /* (26/08) A MESMA FOLHA ATENDE DUAS TELAS AGORA. Quem chamou pode ser o
+     cadastro (passo 3, "onde você joga" / "onde você dá aula") ou a Ficha ›
+     Meus locais. O padrão do arquivo é perguntar quem está na tela antes de
+     avisar — o `if` de Meus locais logo abaixo já fazia isso, e o do cadastro
+     segue a mesma forma em vez de inventar um segundo mecanismo.
+
+     No cadastro a quadra nasce MARCADA e o toast muda: mandar "marque ela em
+     onde você joga" pra quem está justamente nessa tela, com ela já marcada,
+     seria instrução pra fazer o que acabou de ser feito. */
+  const noCadastro = (document.getElementById('onb')||{}).classList
+                   && document.getElementById('onb').classList.contains('on');
+  if(noCadastro && window.onbQuadraCriada){
+    window.onbQuadraCriada(novo.data.id);
+    if(window.toast) toast(`📍 <b>${nome}</b> cadastrada e marcada.`);
+  } else if(window.toast){
+    toast(`📍 <b>${nome}</b> cadastrada. Marque ela em "onde você joga".`);
+  }
   // a folha de trás está com a lista velha em mãos: redesenha com a quadra nova
   if(document.getElementById('net-locais')) netAbrirMeusLocais();
 }

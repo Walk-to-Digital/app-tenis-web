@@ -603,6 +603,19 @@ button,input,select{font:inherit;color:inherit}
 .vestir:active{transform:scale(.985)}
 /* bandeja que carrega só o botão (categoria fechada, mas troca pendente) */
 .vtray.so-vestir{padding-top:14px}
+/* 26/08: a linha de ações da bandeja. Lado a lado quando os dois existem —
+   o `margin-top` do .vestir já dá o respiro, então a linha não repete. */
+.vtray-acoes{display:flex;gap:8px;align-items:stretch}
+.vtray-acoes .vestir{margin-top:12px}
+.vtray-acoes > *{flex:1}
+/* O Concluir dentro da bandeja: mesma altura e mesmo peso do Vestir, na cor da
+   marca — é saída de fluxo, não a ação principal da tela. Quando está sozinho
+   ocupa a linha inteira (o flex:1 acima), que é o caso mais comum: escolher
+   sem trocar nada e sair. */
+.vest-concluir-tray{display:block;width:100%;margin-top:12px;border:0;border-radius:12px;
+  padding:14px;cursor:pointer;background:var(--marca);color:#FFFEFD;
+  font:800 13px system-ui;letter-spacing:.08em;text-transform:uppercase}
+.vest-concluir-tray:active{transform:scale(.985)}
 .vest-preview .vfig{position:relative;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center}
 .vest-preview .vfig .chao{position:absolute;left:0;right:0;bottom:0;height:34%;
   background:linear-gradient(180deg,transparent,rgba(11,8,6,.55) 55%,rgba(11,8,6,.9));pointer-events:none}
@@ -788,6 +801,13 @@ button,input,select{font:inherit;color:inherit}
 #onb .onb-prim:disabled{opacity:.4;cursor:default}
 #onb .onb-prim.lime{background:var(--marca)}   /* 25/08: telas novas — o fechamento também é laranja */
 #onb .nota.center{text-align:center}
+/* 26/08: a porta pra quadra particular. Tracejada e sem preenchimento de
+   propósito — é "acrescentar à lista", não uma opção da lista: se parecesse um
+   .onb-card viraria um clube a mais entre os clubes. */
+#onb .onb-quadra-nova{width:100%;margin-top:10px;padding:13px;cursor:pointer;
+  border:1px dashed var(--linha2);border-radius:12px;background:none;
+  color:var(--ink2);font:700 13px var(--f-ui);text-align:center}
+#onb .onb-quadra-nova:active{transform:scale(.99)}
 
 /* ===== SALA DE TROFÉUS (Bloco 3) — overlay dentro do #fone ===== */
 #trofeus{position:absolute;inset:0;z-index:40;display:none;overflow:hidden;background:#0A0806}
@@ -917,7 +937,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=74"></script>
+<script src="net.js?v=75"></script>
 
 <script>
 /* =========================================================================
@@ -2856,7 +2876,12 @@ vestiario(){
     <div class="vest" style="--vest-url:url('../vestiario/${vst}.jpg')">
       <div class="cena"></div>
       <div class="scrim"></div>
-      ${cadVest?`<button class="vest-concluir" onclick="voltarVestCad()">Concluir e voltar ao cadastro ✓</button>`:''}
+      <!-- 26/08: o Concluir só FLUTUA quando não há bandeja. Com uma categoria
+           aberta ele nasce dentro da própria bandeja, lá embaixo — os dois
+           disputavam o mesmo rodapé e o botão (z-index 30) cobria a bandeja
+           (z-index 7): as opções renderizavam atrás dele e o passo do
+           personagem não fechava. -->
+      ${cadVest && !vestAba?`<button class="vest-concluir" onclick="voltarVestCad()">Concluir e voltar ao cadastro ✓</button>`:''}
 
       <!-- 06/08: o personagem É o preview. A camisa 2D que ficava ao lado saiu.
            07/08: o palco é faixa fixa e o painel rola abaixo dele, não por baixo.
@@ -2883,7 +2908,12 @@ vestiario(){
       </div>
 
       ${(()=>{ const bt = vestPendente() ? `<button class="vestir" onclick="vestir()">Vestir</button>` : '';
-        if(vestAba) return `<div class="vtray">${bandejaVest(eu, vst, BONECOS, PALETA)}${bt}</div>`;
+        /* (26/08) O Concluir viaja PRA DENTRO da bandeja enquanto ela está
+           aberta. Vive no fluxo normal dela, então nenhum dos dois precisa
+           saber a altura do outro — que é o defeito de dois `position:absolute`
+           no mesmo canto. Fora do cadastro (`cadVest` falso) nada muda. */
+        const cc = cadVest ? `<button class="vest-concluir-tray" onclick="voltarVestCad()">Concluir ✓</button>` : '';
+        if(vestAba) return `<div class="vtray">${bandejaVest(eu, vst, BONECOS, PALETA)}${(bt||cc)?`<div class="vtray-acoes">${bt}${cc}</div>`:''}</div>`;
         // fechou a categoria mas não vestiu: o botão não pode sumir junto
         return bt ? `<div class="vtray so-vestir">${bt}</div>` : '';
       })()}
@@ -4738,6 +4768,35 @@ function onbProfOk(){
 }
 function onbVerSenha(){ onb.verSenha=!onb.verSenha; renderOnb() }
 // marca/desmarca um local na Ficha Esportiva — a ordem de marcação decide o principal
+/* (26/08) A PORTA PRA QUADRA PARTICULAR NO CADASTRO.
+   A folha já existe inteira (`_net.criarQuadra`, net.js) e já era alcançável
+   por Ficha › Meus locais — só que DEPOIS do cadastro, e a pergunta "onde você
+   joga?" é feita AQUI. Reusar a folha em vez de escrever uma segunda é o que
+   impede as duas de divergirem na primeira correção que só uma receber.
+
+   O `_sheet` dela é `position:fixed; z-index:10000` e o cadastro é 40, então
+   ela abre por cima sem nenhum ajuste. */
+function onbQuadraNova(){
+  if(!(window._net && _net.criarQuadra)){
+    toast('Sem conexão com o servidor agora — dá pra cadastrar a quadra depois, na sua ficha.');
+    return;
+  }
+  _net.criarQuadra();
+}
+
+/* Chamada pelo net.js quando a quadra é salva com o cadastro aberto.
+   Auto-MARCA a quadra nova: quem acabou de cadastrar a própria quadra já
+   respondeu "é aqui que eu jogo" no ato de cadastrar — nascer desmarcada
+   pediria um segundo toque pra dizer o que já foi dito. E se for a primeira
+   da lista, vira a principal, que também é o que se espera. */
+window.onbQuadraCriada = function(id){
+  if(typeof onb==='undefined' || !onb || !id) return;
+  onb.locSel = onb.locSel||[];
+  if(!onb.locSel.includes(id)) onb.locSel.push(id);
+  onb.locais = undefined;         // força o recarregamento da lista no render
+  renderOnb();
+};
+
 function onbLocal(id){
   onb.locSel = onb.locSel||[];
   const i=onb.locSel.indexOf(id);
@@ -5045,6 +5104,8 @@ function renderOnb(){
              value="${(onb.apresentacao||'').replace(/"/g,'&quot;')}" oninput="onbSet2('apresentacao',this.value)">
       <p class="nota" style="margin:14px 0 6px"><b>Onde você dá aula?</b> Marque quantos quiser.</p>
       <div class="onb-cards">${onb.locais===null?'<p class="nota">Carregando os clubes…</p>':(linhas||'<p class="nota">Nenhum clube cadastrado ainda — dá pra seguir sem, e você marca depois.</p>')}</div>
+        <button class="onb-quadra-nova" onclick="onbQuadraNova()">+ Minha quadra não está na lista</button>
+        <p class="nota" style="margin-top:6px;font-size:11px">A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b> — não entra na busca dos outros.</p>
       <p class="nota" style="margin:16px 0 6px"><b>Você também joga?</b> Dá pra ser as duas coisas — e dá pra mudar depois.</p>
       <div class="seg2">
         <button class="${onb.joga===true?'on':''}" onclick="onbJoga(true)">Sim, também compito</button>
@@ -5098,6 +5159,8 @@ function renderOnb(){
         <button class="onb-link" onclick="onbAbrirQuiz()">Não sei meu nível — me ajuda a escolher</button>
         <p class="nota" style="margin:14px 0 6px"><b>Onde você joga?</b> Não precisa ser sócio — é onde você costuma jogar. O primeiro vira o principal.</p>
         <div class="onb-cards">${onb.locais===null?'<p class="nota">Carregando os clubes…</p>':(linhas||'<p class="nota">Nenhum clube cadastrado ainda — dá pra seguir sem, e você marca depois na sua ficha.</p>')}</div>
+        <button class="onb-quadra-nova" onclick="onbQuadraNova()">+ Minha quadra não está na lista</button>
+        <p class="nota" style="margin-top:6px;font-size:11px">A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b> — não entra na busca dos outros.</p>
         <div class="onb-nav"><button class="onb-prim" onclick="onbNext()" ${podeAvancar?'':'disabled'}>Avançar</button></div>`;
     }
   } else if(onb.step===4){
