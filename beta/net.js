@@ -4361,16 +4361,66 @@ async function netEnviarLogin(email, senha){
   // logou → recarrega pra o boot hidratar a conta do banco
   location.reload();
 }
+/* (26/08) ACESSAR MINHA CONTA — tela do Figma (node 27:5).
+   Medidas do desenho divididas por 2: o canvas é 1080 de largura, que é 2x.
+   O símbolo vem de `marcas/ranket-r.png`, que o app já publica — nenhum asset
+   novo entrou por esta tela.
+   O olho da senha é `_net.olhoSenha`, e o "Cadastre-se" fecha a folha e abre o
+   cadastro, que é o que o desenho promete ao pôr os dois na mesma tela. */
 function netAbrirLogin(){
-  _sheet('net-login', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Acessar minha conta</div>
-      <button onclick="document.getElementById('net-login').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:var(--ink2);margin:8px 0 12px">Entre com o email e a senha da sua conta.</div>
-    <input id="nl-email" type="email" placeholder="seu email" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="email" inputmode="email"/>
-    <input id="nl-senha" type="password" placeholder="sua senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:10px" autocomplete="current-password"/>
-    <button onclick="_net.enviarLogin(document.getElementById('nl-email').value, document.getElementById('nl-senha').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:12px">Entrar</button>
-    <button onclick="_net.esqueciSenha(document.getElementById('nl-email').value)" style="width:100%;padding:11px;border:none;background:none;color:var(--ink2);font:600 13px system-ui;cursor:pointer;margin-top:4px;text-decoration:underline">Esqueci minha senha</button>`);
+  _sheet('net-login', `
+    <button onclick="document.getElementById('net-login').remove()"
+      style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--ink2);font-size:26px;line-height:1;cursor:pointer">&times;</button>
+
+    <div style="display:flex;align-items:center;gap:14px;margin:6px 0 26px">
+      <img src="../marcas/ranket-r.png" alt="" style="width:39px;height:auto;display:block">
+      <div>
+        <div style="font:800 22px var(--f-disp),system-ui;color:#fff;line-height:1.1">Bem-vindo ao Ranket</div>
+        <div style="font:400 14px system-ui;color:var(--ink2);margin-top:3px">Faça o login e acesse sua conta.</div>
+      </div>
+    </div>
+
+    <input id="nl-email" type="email" placeholder="E-mail"
+      style="width:100%;padding:14px 18px;border-radius:14px;border:1px solid rgba(255,254,253,.55);background:transparent;color:#fff;font:400 15px system-ui"
+      autocomplete="email" inputmode="email" autocapitalize="off"/>
+
+    <div style="position:relative;margin-top:12px">
+      <input id="nl-senha" type="password" placeholder="Senha"
+        style="width:100%;padding:14px 52px 14px 18px;border-radius:14px;border:1px solid rgba(255,254,253,.55);background:transparent;color:#fff;font:400 15px system-ui"
+        autocomplete="current-password"/>
+      <button onclick="_net.olhoSenha('nl-senha',this)" aria-label="Mostrar senha"
+        style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink2);padding:12px;cursor:pointer;display:flex;align-items:center"><svg viewBox="0 0 35 23" width="19" height="13" fill="none" aria-hidden="true" style="display:block"><path d="M2.65 14.61C5.79 17.71 11.27 22 17.5 22s11.71-4.29 14.85-7.39c.83-.82 1.24-1.23 1.51-2.03.19-.57.19-1.6 0-2.17-.27-.8-.68-1.21-1.51-2.03C29.21 5.29 23.73 1 17.5 1S5.79 5.29 2.65 8.39c-.83.82-1.24 1.23-1.51 2.03-.19.57-.19 1.6 0 2.17.27.8.68 1.21 1.51 2.02Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.97 11.5c0 1.93 1.58 3.5 3.53 3.5s3.53-1.57 3.53-3.5S19.45 8 17.5 8s-3.53 1.57-3.53 3.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <button onclick="_net.esqueciSenha(document.getElementById('nl-email').value)"
+      style="background:none;border:none;color:#fff;font:400 12px system-ui;text-decoration:underline;cursor:pointer;padding:12px 0 0">Esqueci minha senha</button>
+
+    <button onclick="_net.enviarLogin(document.getElementById('nl-email').value, document.getElementById('nl-senha').value)"
+      style="width:100%;padding:16px;border-radius:14px;border:none;background:var(--marca);color:var(--marca-ink);font:800 15px system-ui;cursor:pointer;margin-top:18px">Entrar</button>
+
+    <button onclick="document.getElementById('net-login').remove(); if(window.abrirCadastro) abrirCadastro();"
+      style="width:100%;padding:16px;border-radius:14px;border:none;background:#121212;color:var(--ink2);font:400 15px system-ui;cursor:pointer;margin-top:12px">Ainda não tem conta? <b style="color:var(--ink2)">Cadastre-se</b></button>
+
+    <p style="text-align:center;color:#fff;font:400 11px system-ui;margin:22px 0 2px;opacity:.75">O Ranket é somente para maiores de 18 anos.</p>`);
   const el=document.getElementById('nl-email'); if(el) el.focus();
+}
+/* O olho: alterna o tipo do campo e o próprio ícone. Preserva a posição do
+   cursor — trocar `type` zera a seleção em alguns navegadores, e quem toca no
+   olho está no meio da digitação. */
+function netOlhoSenha(id, bt){
+  const el=document.getElementById(id); if(!el) return;
+  const pos=el.selectionStart;
+  const mostrando = el.type==='text';
+  el.type = mostrando ? 'password' : 'text';
+  /* O estado sai pela COR (o `currentColor` do SVG), não por um segundo
+     glifo: o desenho entregou UM ícone de olho e não a variante riscada, e
+     inventar o olho cortado seria desenhar arte que o designer não fez. */
+  if(bt){
+    bt.style.color = mostrando ? 'var(--ink2)' : 'var(--acc)';
+    bt.setAttribute('aria-label', mostrando ? 'Mostrar senha' : 'Esconder senha');
+  }
+  el.focus();
+  try{ el.setSelectionRange(pos,pos); }catch(e){}
 }
 window.netAbrirLogin = netAbrirLogin;
 
@@ -5906,7 +5956,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   torneioPlacarOrg:netTorneioPlacarOrg, orgEnviar:_onEnviarOrg, meusCampeonatos:netMeusCampeonatos,
   buscarGrupos:netBuscarGrupos, convidarAmigo:netConvidarAmigo,
   abrirLogin:netAbrirLogin, enviarLogin:netEnviarLogin,
-  esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha,
+  esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha, olhoSenha:netOlhoSenha,
   abrirAdm:netAbrirAdm, fecharAdm:netFecharAdm, admAba:_admAba, admBuscar:_admBuscar,
   admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
   admBanir:_admBanir, admAnular:_admAnular, admTirarDoGrupo:_admTirarDoGrupo,   // 18/08 (mig 41)

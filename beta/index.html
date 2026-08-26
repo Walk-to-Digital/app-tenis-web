@@ -308,7 +308,13 @@ button,input,select{font:inherit;color:inherit}
   transition:opacity .32s ease;
 }
 #splash.sai{opacity:0;pointer-events:none}
-#splash img{width:132px;height:auto;opacity:.96}
+#splash .marca{display:flex;flex-direction:column;align-items:center;gap:14px}
+#splash img{width:212px;height:auto;opacity:.96;display:block}
+/* a assinatura: caixa alta, espaçada, com os pontos em lime — o mesmo ritmo do
+   desenho, onde ela é o que sustenta a marca no vazio da tela */
+#splash .assina{font:800 12px var(--f-ui),system-ui;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--ink);opacity:.92;white-space:nowrap}
+#splash .assina i{color:var(--acc);font-style:normal;margin:0 2px}
 #splash .pulso{
   width:34px;height:3px;border-radius:99px;background:var(--linha2);overflow:hidden;position:relative;
 }
@@ -772,16 +778,39 @@ button,input,select{font:inherit;color:inherit}
 #onb .onb-fine{font-size:10.5px;color:var(--ink3);text-align:center;margin-top:8px;line-height:1.5}
 #onb .big{width:100%;padding:15px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:15px;cursor:pointer;font-family:var(--f-ui)}
 #onb .big.alt{background:rgba(20,26,23,.72);color:var(--ink);border:1px solid var(--linha2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-#onb .onb-head{margin:4px 0 16px}
-#onb .onb-head.center{text-align:center}
-#onb .onb-kick{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--up);font-weight:700;margin-bottom:7px}
+/* 26/08 (telas do Figma) — o KICKER passa a vir ABAIXO do título.
+   `column-reverse` em vez de mexer no markup: a ordem "kick, depois h2" se
+   repete em NOVE telas do cadastro, e trocar as nove à mão é nove chances de
+   deixar uma pra trás. O CSS vira a ordem de uma vez, e quem escrever a décima
+   tela continua escrevendo na ordem antiga sem quebrar nada.
+   A cor do kick já era `--up` (#83E000) — idêntica ao verde do desenho. */
+#onb .onb-head{margin:4px 0 16px;display:flex;flex-direction:column-reverse;align-items:flex-start}
+#onb .onb-head.center{text-align:center;align-items:center}
+#onb .onb-kick{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--up);font-weight:700;margin:6px 0 0}
 #onb .onb-head h2{font-family:var(--f-disp);font-size:24px;line-height:1.14;letter-spacing:.01em}
-.onb-input{width:100%;padding:15px;border-radius:16px;background:rgba(30,23,20,.72);border:1px solid var(--linha2);color:var(--ink);font-size:17px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);margin-bottom:12px}
+/* o título ganha o ícone circular do desenho, quando a tela tiver um */
+#onb .onb-head .tt{display:flex;align-items:center;gap:10px}
+#onb .onb-head .tt .ico{flex:0 0 26px;width:26px;height:26px;border-radius:50%;
+  border:1.5px solid var(--acc);display:flex;align-items:center;justify-content:center;
+  font-size:13px;line-height:1;color:var(--acc)}
+/* 26/08: borda BRANCA nos campos, como no desenho — a `--linha2` some no fundo
+   escuro e o campo parecia um retângulo sem contorno.
+   ⚠️ ESCALA: o Figma desenha 1px num canvas de 1080, que é 2x — ou seja, MEIO
+   pixel em CSS. Copiada como 1px de branco puro, a borda dobra de peso e vira
+   a coisa mais forte da tela (medido: o campo gritava mais que o botão de
+   ação). `.55` de opacidade devolve o peso PERCEBIDO do desenho na espessura
+   que o navegador sabe desenhar. É a mesma decisão pra qualquer traço de 1px
+   que vier deste arquivo. */
+.onb-input{width:100%;padding:15px;border-radius:16px;background:rgba(30,23,20,.72);border:1px solid rgba(255,254,253,.55);color:var(--ink);font-size:17px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);margin-bottom:12px}
 .onb-input:focus{outline:none;border-color:var(--acc)}
 /* 25/08: o seletor perdeu o escopo #onb de propósito — o formulário de
    disponibilidade do radar usa a mesma peça fora do onboarding */
 #onb .onb-preview{position:relative;height:236px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:10px}
-#onb .onb-preview.tall{height:300px}
+/* 26/08 (Figma, node 29:416): no desenho o personagem ocupa quase toda a
+   tela, de pé sobre a quadra que já é o fundo do cadastro. `min-height` com
+   `vh` porque a altura útil muda muito entre um iPhone SE e um Pro Max, e
+   altura fixa cortava os pés num e sobrava no outro. */
+#onb .onb-preview.tall{height:auto;min-height:46vh;flex:1}
 #onb .onb-preview .glow{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:200px;height:56px;border-radius:50%;background:radial-gradient(closest-side,var(--camisa),transparent);opacity:.32;filter:blur(6px)}
 #onb .onb-preview .boneco{position:relative;z-index:1;height:100%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}
 #onb .onb-preview .boneco img{height:100%;width:auto;display:block}
@@ -799,6 +828,11 @@ button,input,select{font:inherit;color:inherit}
 #onb .onb-nav{margin-top:auto;padding-top:18px}
 #onb .onb-prim{width:100%;padding:16px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:15px;letter-spacing:0;cursor:pointer;font-family:var(--f-ui)}
 #onb .onb-prim:disabled{opacity:.4;cursor:default}
+/* 26/08: o secundário do desenho é BOTÃO de fundo escuro, não link sublinhado
+   — mesma altura e mesmo raio do primário, e é isso que faz os dois lerem como
+   duas saídas do mesmo peso em vez de "a ação e a desistência". */
+#onb .onb-sec{width:100%;padding:16px;border:0;border-radius:var(--rp);background:#121212;
+  color:var(--ink2);font-weight:600;font-size:15px;cursor:pointer;font-family:var(--f-ui);margin-top:12px}
 #onb .onb-prim.lime{background:var(--marca)}   /* 25/08: telas novas — o fechamento também é laranja */
 #onb .nota.center{text-align:center}
 /* 26/08: a porta pra quadra particular. Tracejada e sem preenchimento de
@@ -924,8 +958,15 @@ button,input,select{font:inherit;color:inherit}
 
   <!-- 18/08: a splash é markup, não JS — tem que estar pintada antes de o
        Supabase e o net.js sequer começarem a baixar. -->
+  <!-- 26/08 (Figma, node 27:26): a splash passa a usar o LOGO HORIZONTAL com a
+       assinatura embaixo. O vertical empilhava a bola sobre o "R" e ficava
+       pequeno demais no meio da tela; o desenho resolve dando largura à marca.
+       Os dois PNGs já são publicados — nenhum asset novo. -->
   <div id="splash">
-    <img src="../marcas/ranket-vertical.png" alt="Ranket">
+    <div class="marca">
+      <img src="../marcas/ranket-horizontal.png" alt="Ranket">
+      <div class="assina">Marque <i>·</i> Jogue <i>·</i> Pontue</div>
+    </div>
     <div class="pulso"></div>
   </div>
 
@@ -937,7 +978,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=75"></script>
+<script src="net.js?v=77"></script>
 
 <script>
 /* =========================================================================
@@ -5167,23 +5208,30 @@ function renderOnb(){
     const eu2=S.jogadores[EU];
     body=`
       <div class="onb-head"><div class="onb-kick">Passo 4 de 4</div><h2>Ajustar personagem</h2></div>
-      <div class="onb-preview" style="--camisa:${eu2.cor}">
+      <p class="nota" style="margin:2px 0 6px">Acesse o vestiário e personalize seu personagem de acordo com suas preferências.</p>
+      <div class="onb-preview tall" style="--camisa:${eu2.cor}">
         <div class="glow"></div>
         <div class="boneco"><img src="../bonecos-t/${eu2.bon}.png" alt=""></div>
       </div>
-      <p class="nota center" style="margin:8px 0 18px">Acesse o vestiário e personalize seu personagem de acordo com suas preferências.</p>
       <div class="onb-nav">
         <button class="onb-prim" onclick="irVestCad()">Ir para o vestiário</button>
-        <button class="onb-link" onclick="onbNext()" style="margin-top:12px">Manter como está</button>
+        <button class="onb-sec" onclick="onbNext()">Manter como está</button>
       </div>`;
   } else {
+    /* (26/08 — Figma, node 29:482) O botão vive DENTRO do bloco central, não
+       colado no rodapé: no desenho ele fecha o pensamento logo abaixo da
+       frase, com a tela respirando embaixo. Empurrado pro fim pelo `onb-nav`,
+       a mensagem e a saída ficavam em pontas opostas de uma tela quase vazia.
+       Aqui o kicker fica ACIMA do título, e é assim no desenho também — por
+       isso esta tela usa `onb-brand`, que o `column-reverse` do `onb-head`
+       não alcança. */
     body=`
       <div class="onb-brand">
         <div class="onb-kick">Tudo pronto</div>
         <h1 style="text-transform:none;font-size:26px">Let's Match, Let's Ranket</h1>
         <p>${(onb.nome||'Jogador').split(' ')[0]}, você está no jogo.<br>Um novo ciclo começa aqui.</p>
-      </div>
-      <div class="onb-nav"><button class="onb-prim" onclick="completarCadastro()">Acessar o app</button></div>`;
+        <button class="onb-prim" style="max-width:320px;margin-top:14px" onclick="completarCadastro()">Acessar o app</button>
+      </div>`;
   }
 
   el.innerHTML = `<div class="onb-bg"></div><div class="onb-wrap">
