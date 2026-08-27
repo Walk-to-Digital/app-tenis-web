@@ -978,7 +978,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787853520"></script>
+<script src="net.js?v=1787857194"></script>
 
 <script>
 /* =========================================================================
@@ -1900,7 +1900,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787853520"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787857194"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2002,7 +2002,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787853520"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787857194"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2464,6 +2464,13 @@ function aulasCarregar(){
             .catch(()=>{ window.__aulas=[]; render(); });
 }
 function aulaSet(k,v,quieto){ window.__aulaDraft=window.__aulaDraft||{}; window.__aulaDraft[k]=v; if(!quieto) render(); }
+function aulaLocal(v){
+  const d=window.__aulaDraft=window.__aulaDraft||{};
+  if(v){ const l=((window.__lugares)||[]).find(x=>x.id===v);
+    d.local_id=v; d.local_txt=(l&&l.nome)||''; }
+  else { d.local_id=null; d.local_txt=''; }
+  render();
+}
 function aulaDia(i){ const d=window.__aulaDraft=window.__aulaDraft||{}; d.dias=d.dias||[];
   d.dias=d.dias.includes(i)? d.dias.filter(x=>x!==i) : [...d.dias,i].sort((a,b)=>a-b); render(); }
 async function aulaSalvar(){
@@ -2628,7 +2635,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787853520"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1787857194"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3546,8 +3553,21 @@ aulaNova(){
           <div class="grade" style="flex:2">${[30,60,90].map(m=>chip('duracao_min',m,m+'min')).join('')}</div>
         </div>
         <div class="rot">Onde</div>
-        <input class="onb-input" placeholder="Clube Bahiano de Tênis" maxlength="110"
-               value="${(d.local_txt||'').replace(/"/g,'&quot;')}" oninput="aulaSet('local_txt',this.value,true)">
+        <!-- 27/08: clube cadastrado PRIMEIRO (metade barata do pedido de
+             localização): local_id herda o endereço de verdade — é ele que faz
+             o mapa da folha da aula apontar pro lugar certo, não pra uma busca
+             por nome. Texto livre continua como saída pra lugar sem cadastro. -->
+        ${(()=>{ if(typeof lugCarregar==='function') lugCarregar();
+          const ls=((window.__lugares)||[]).filter(l=>l.origem!=='jogador');
+          if(!ls.length) return `<input class="onb-input" placeholder="Clube Bahiano de Tênis" maxlength="110"
+               value="${(d.local_txt||'').replace(/"/g,'&quot;')}" oninput="aulaSet('local_txt',this.value,true)">`;
+          return `<select class="onb-input" onchange="aulaLocal(this.value)">
+            <option value="" ${!d.local_id?'selected':''}>Outro lugar (escrever abaixo)</option>
+            ${ls.map(l=>`<option value="${l.id}" ${d.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
+          </select>
+          ${!d.local_id?`<input class="onb-input" placeholder="Nome do lugar" maxlength="110"
+               value="${(d.local_txt||'').replace(/"/g,'&quot;')}" oninput="aulaSet('local_txt',this.value,true)">`:''}`;
+        })()}
         <div class="rot" style="margin-top:8px">Modalidade</div>
         <div class="seg2">${['tenis','beach'].map(e=>`<button class="${d.esporte===e?'on':''}" onclick="aulaSet('esporte','${e}')">${e==='beach'?'Beach Tennis':'Tênis'}</button>`).join('')}</div>
         <div class="rot" style="margin-top:8px">Limites <span style="color:var(--ink3);font-weight:400">· opcional</span></div>
@@ -4665,6 +4685,53 @@ function trofeusConquistados(){
     if(advs.size>=5)     g.add('cinco');
     if(zebra)  g.add('zebra');
     if(rapido) g.add('rapido');
+
+    /* 27/08 — os selos de TEMPORADA. Regra honesta: os três só podem acender
+       quando a temporada está no fim (semana 12+) — acender "semana cheia" na
+       primeira semana seria o vazio mentindo com cara de conquista. */
+    const T = window.__temporada;
+    if(T && T.inicio && T.fim){
+      const ini = Date.parse(T.inicio), fim = Date.parse(T.fim);
+      const agora = Math.min(Date.now(), fim);
+      const semanas = Math.floor((agora - ini)/(7*24*3600e3)) + 1;
+      const minhasNaTemp = todas.filter(m=>{
+        const c = Date.parse(m.confirmed_at); return c >= ini && c <= fim; });
+      if(semanas >= 12){
+        const cheias = new Set(minhasNaTemp.map(m=>
+          Math.floor((Date.parse(m.confirmed_at)-ini)/(7*24*3600e3))));
+        let todasSemanas = true;
+        for(let w=0; w<semanas && w<12; w++) if(!cheias.has(w)) todasSemanas = false;
+        if(todasSemanas && minhasNaTemp.length) g.add('semana');
+        if(minhasNaTemp.length) g.add('temporada');
+        const abertas = ((window.__minhasPartidas)||[]).filter(m=>
+          m.status==='pendente' || m.status==='contestada');
+        if(!abertas.length && minhasNaTemp.length) g.add('limpo');
+      }
+    }
+
+    /* SUBIU DE CLASSE — reconstrução: o Nível de hoje menos a soma dos deltas
+       dá o ponto de partida; andando os deltas na ordem, qualquer travessia de
+       borda pra cima acende. Vale pros dois trilhos de simples. */
+    const eu = (typeof S!=='undefined' && typeof EU!=='undefined' && S.jogadores[EU]) || {};
+    const trilho = (nivelHoje, esporte)=>{
+      if(nivelHoje==null || typeof divisaoDe!=='function') return false;
+      const minhas = todas
+        .filter(m=> (m.esporte||'tenis')===esporte && !m.dupla && m.confirmed_at)
+        .sort((a,b)=> Date.parse(a.confirmed_at)-Date.parse(b.confirmed_at))
+        .map(m=> (meuDelta(m)||{}).dNivel || 0);
+      let n = nivelHoje - minhas.reduce((t,d)=>t+d, 0);
+      let div = divisaoDe(n);
+      for(const d of minhas){
+        n += d; const nd = divisaoDe(n);
+        if('DCBA'.indexOf(nd) > 'DCBA'.indexOf(div)) return true;
+        div = nd;
+      }
+      return false;
+    };
+    if(trilho(eu.nivel,'tenis') || trilho(eu.nivelB,'beach')) g.add('subiu');
+
+    // DEFENDEU — apurado assíncrono ao abrir a sala (reinados + membros)
+    if(window.__defendi) g.add('defendeu');
     return g;
   }
 
@@ -4729,6 +4796,29 @@ function abrirTrofeus(){ trSel=null; let el=$('#trofeus'); if(el) el.classList.a
      sala abre na hora e a coroa se corrige quando o dado chega. */
   if(window._net && _net.uid && _net.uid() && _net.meusGrupos)
     _net.meusGrupos().then(()=>{ desenharTrofeus() }).catch(()=>{});
+  /* 27/08 — o selo Defendeu: reinado meu + vitória minha contra membro do
+     grupo DENTRO da janela do reinado. As duas tabelas são de leitura aberta;
+     as partidas vêm do espelho do inbox. Apura uma vez por abertura. */
+  (async ()=>{ try{
+    const uid = _net.uid && _net.uid(); if(!uid || !window._net) return;
+    const sb2 = _net.sb; if(!sb2) return;
+    const { data: reins } = await sb2.from('cinturao_reinados').select('*').eq('player_id', uid);
+    if(!reins || !reins.length) return;
+    const gids = [...new Set(reins.map(r=>r.grupo_id))];
+    const { data: membs } = await sb2.from('grupo_membros').select('grupo_id,player_id').in('grupo_id', gids);
+    const minhas = ((window.__minhasPartidas)||[]).filter(m=>m.status==='confirmada');
+    const defendi = reins.some(r=>{
+      const ini = Date.parse(r.inicio), fim = r.fim ? Date.parse(r.fim) : Date.now();
+      const donos = new Set((membs||[]).filter(x=>x.grupo_id===r.grupo_id && x.player_id!==uid).map(x=>x.player_id));
+      return minhas.some(m=>{
+        const c = Date.parse(m.confirmed_at); if(!(c>=ini && c<=fim)) return false;
+        const venci = m.criador_id===uid ? m.venceu_criador : !m.venceu_criador;
+        const adv = m.criador_id===uid ? m.adversario_id : m.criador_id;
+        return venci && donos.has(adv);
+      });
+    });
+    if(defendi && !window.__defendi){ window.__defendi = true; desenharTrofeus(); }
+  }catch(e){} })();
 }
 function fecharTrofeus(){ const el=$('#trofeus'); if(el) el.classList.remove('on') }
 function selTrofeu(id){ trSel = trSel===id?null:id; desenharTrofeus() }

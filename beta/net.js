@@ -2585,8 +2585,16 @@ async function netBuscarGrupos(q){
 let _temp;
 async function netTemporada(){
   if(_temp !== undefined) return _temp;
-  try{ const r = await sb.rpc('temporada_atual'); _temp = (r && r.data != null) ? r.data : null; }
-  catch(e){ _temp = null; }
+  /* 27/08: a linha INTEIRA, não só o número — os selos de temporada (semana
+     cheia, fim de temporada, nada pendente) precisam de inicio/fim. O retorno
+     segue sendo o `n`, que é o que todo chamador espera. */
+  try{
+    const r = await sb.from('temporadas').select('n,inicio,fim')
+      .lte('inicio', new Date().toISOString()).gte('fim', new Date().toISOString())
+      .order('n',{ascending:false}).limit(1).maybeSingle();
+    window.__temporada = r.data || null;
+    _temp = r.data ? r.data.n : null;
+  }catch(e){ _temp = null; }
   return _temp;
 }
 
@@ -2701,17 +2709,23 @@ async function netDestaques(force){
        vitórias e a estreia precisam de história anterior aos sete dias. Quem
        recorta por data é cada destaque, abaixo. */
 
+    /* 27/08 (mig 71): as duas consultas diretas viam só o que a RLS deixava —
+       as MINHAS partidas — e os destaques saíam de amostra recortada em
+       silêncio. A praça (definer) devolve o movimento inteiro: ids, deltas e
+       carimbos, sem placar nem combinado. O shape volta ao que o cálculo
+       abaixo sempre esperou. */
     const [ps, ls] = await Promise.all([
-      sb.from('matches')
-        .select('id,criador_id,adversario_id,venceu_criador,delta_criador,delta_adversario,confirmed_at')
-        .eq('status','confirmada').eq('esporte',esp)
-        .order('confirmed_at',{ascending:false}).limit(500),
-      t == null ? Promise.resolve({data:[]}) : sb.from('pontos_lancamentos')
-        .select('player_id,pontos,criado_em')
-        .eq('temporada',t).eq('esporte',esp).eq('escopo','geral'),
+      sb.rpc('praca_partidas', { p_esporte: esp, p_limite: 500 }),
+      t == null ? Promise.resolve({data:[]})
+                : sb.rpc('praca_lancamentos', { p_esporte: esp, p_temporada: t }),
     ]);
-    const partidas = (ps.data||[]).filter(m=>m.confirmed_at);
-    const lanc     = ls.data || [];
+    const partidas = (ps.data||[]).filter(m=>m.confirmed_at).map(m=>({
+      id: m.id, criador_id: m.criador_id, adversario_id: m.adversario_id,
+      venceu_criador: m.venceu_criador, confirmed_at: m.confirmed_at,
+      delta_criador:    { dNivel: m.dnivel_c, zebra: m.zebra_c },
+      delta_adversario: { dNivel: m.dnivel_a, zebra: m.zebra_a },
+    }));
+    const lanc = ls.data || [];
 
     /* ---- 1. quem mais subiu: quadro de hoje contra o de sete dias atrás ---
        Quem não tinha lançamento antes do corte não "subiu" — ele estreou, e é
