@@ -4083,12 +4083,17 @@ ficha(){
       </div>
     </div>
 
-    <div class="sec">
+    ${/* 26/08: título ainda não existe — não há tabela `titulos`, não há coluna
+         de expiração e não há regra de emissão. `S.titulos` nasce [] e nada nunca
+         escreve, então a seção renderizava um cabeçalho órfão dizendo "expiram"
+         sobre coisa nenhuma — o mesmo defeito do "Ace Open · 52 dias". Some
+         enquanto estiver vazia; o render volta inteiro no dia que houver regra. */
+      (S.titulos && S.titulos.length) ? `<div class="sec">
       <div class="rot">Títulos <span>expiram</span></div>
       ${S.titulos.map(t=>`<div class="card"><div class="linha-item">
         <div class="txt"><b>${t.t}</b><small>${t.d}</small></div>
         <span class="pil acc">Ativo</span></div></div>`).join('')}
-    </div>
+    </div>` : ''}
 
     <div class="sec">
       <div class="rot">Histórico</div>
@@ -4456,14 +4461,68 @@ const _patArte=(id)=>{ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(
 // (UTC-3) puxaria 01/08 pra "jul/2026"
 const _mesAno=d=>{ try{ const [a,m]=String(d).slice(0,10).split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m-1]+'/'+a }catch(e){ return '' } };
 
-// quais troféus o jogador já conquistou, derivado do histórico real
+/* quais selos o jogador já conquistou.
+
+   26/08: passou a derivar de `window.__minhasPartidas` (o `select('*')` que o
+   inbox já faz) em vez de `S.historico`. Três motivos:
+     1. `S.historico` é do APARELHO — em celular novo nasce vazio, e a sala dizia
+        que quem tem 40 jogos nunca registrou nenhum;
+     2. contava `h.length` cru, incluindo W.O. e cancelada — partida que NÃO
+        aconteceu inflava "1ª partida", "Dez" e "Cinquenta". A ficha já filtrava
+        `!h.tipo` (linha do Histórico); a sala não;
+     3. `zebra`, `placar_em`, `placar_por` e `confirmed_at` só existem na linha do
+        banco — eram exatamente os sinais que faltavam.
+   O histórico local fica como reserva pra quando a lista ainda não chegou. */
 function trofeusConquistados(){
-  const h=S.historico||[]; const advs=new Set(h.map(x=>x.adv)); const g=new Set();
+  const g=new Set();
+  const uid = (window._net && _net.uid && _net.uid()) || null;
+  const todas = ((window.__minhasPartidas)||[]).filter(m=>m.status==='confirmada');
+
+  if(uid && todas.length){
+    // em duplas eu posso ocupar 4 assentos — o delta e o lado dependem de qual
+    const ladoCri = (m)=> m.criador_id===uid || m.parceiro_criador_id===uid;
+    const meuDelta = (m)=> m.criador_id===uid             ? m.delta_criador
+                         : m.adversario_id===uid          ? m.delta_adversario
+                         : m.parceiro_criador_id===uid    ? m.delta_parceiro_criador
+                         : m.parceiro_adversario_id===uid ? m.delta_parceiro_adversario
+                         : null;
+    const advs=new Set(); let zebra=false, rapido=false;
+    todas.forEach(m=>{
+      (ladoCri(m) ? [m.adversario_id, m.parceiro_adversario_id]
+                  : [m.criador_id,    m.parceiro_criador_id]).forEach(a=>{ if(a) advs.add(a) });
+      const meu = meuDelta(m);
+      const venci = ladoCri(m) ? m.venceu_criador : !m.venceu_criador;
+      /* o motor carimba `zebra` no jsonb do delta (`calcular()`), e o campo
+         existe nos DOIS lados da linha — sem exigir que a vitória seja minha,
+         eu ganharia o selo levando de 3 de alguém acima. */
+      if(venci && meu && meu.zebra===true) zebra=true;
+      /* "confirmou o placar do adversário em menos de 1h": só capitão confirma
+         (trava 19), o placar tem que ter sido lançado pelo OUTRO, e fechada por
+         prazo não conta — ali ninguém confirmou, o relógio é que fechou. */
+      const souCapitao = (m.criador_id===uid || m.adversario_id===uid);
+      if(souCapitao && !m.fechada_por_prazo && m.placar_por && m.placar_por!==uid
+         && m.placar_em && m.confirmed_at){
+        const dt = Date.parse(m.confirmed_at) - Date.parse(m.placar_em);
+        if(dt>=0 && dt<3600e3) rapido=true;
+      }
+    });
+    if(todas.length>=1)  g.add('primeira');
+    if(todas.length>=10) g.add('dez');
+    if(todas.length>=50) g.add('cinquenta');
+    if(advs.size>=5)     g.add('cinco');
+    if(zebra)  g.add('zebra');
+    if(rapido) g.add('rapido');
+    return g;
+  }
+
+  // reserva: histórico do aparelho, já sem W.O. nem cancelada (`x.tipo`)
+  const h=(S.historico||[]).filter(x=>!x.tipo);
+  const advs=new Set(h.map(x=>x.adv));
   if(h.length>=1)  g.add('primeira');
   if(h.length>=10) g.add('dez');
   if(h.length>=50) g.add('cinquenta');
   if(advs.size>=5) g.add('cinco');
-  if(h.some(x=>x.venceu && x.dpts>=x.dnivel && x.dnivel>0 && x.dpts> x.dnivel*1.5)) {} // zebra: sinal não guardado ainda
+  if(h.some(x=>x.venceu && x.zebra===true)) g.add('zebra');
   return g;
 }
 
@@ -4510,6 +4569,13 @@ function abrirTrofeus(){ trSel=null; let el=$('#trofeus'); if(el) el.classList.a
   // 11/08 (noite): patches do banco (migração 22) — o que chega de outra conta
   if(window._net && _net.uid && _net.uid() && _net.meusPatches)
     _net.meusPatches().then(l=>{ _patsBanco=l||[]; desenharTrofeus() }).catch(()=>{});
+  /* 26/08: e os grupos, pelo cinturão. O espelho `__meusGrupos` é preenchido no
+     boot, mas o cinturão troca de mão DURANTE a sessão (`_cinturaoTentarPassar`
+     roda a cada confirmação) — sem reconsultar, quem acabou de tomar o cinturão
+     abriria a sala e leria que ele é de outro. Mesmo padrão dos três acima: a
+     sala abre na hora e a coroa se corrige quando o dado chega. */
+  if(window._net && _net.uid && _net.uid() && _net.meusGrupos)
+    _net.meusGrupos().then(()=>{ desenharTrofeus() }).catch(()=>{});
 }
 function fecharTrofeus(){ const el=$('#trofeus'); if(el) el.classList.remove('on') }
 function selTrofeu(id){ trSel = trSel===id?null:id; desenharTrofeus() }
@@ -4551,13 +4617,32 @@ function desenharTrofeus(){
     : trAba==='patches' ? `<b>${patches.length}</b> ◈`
     : `<b>${_camps.length+_trofs.length}</b> 🏆`;
 
-  const temCint=false;   // cinturão só quando o jogador for dono na comunidade
+  /* 26/08: era `const temCint=false` fixo. Dois defeitos num literal só:
+     o fio nunca foi ligado (as colunas existem desde a migração 11 e
+     `netMeusGrupos` já as trazia no `select('*')`), e o texto do estado negativo
+     dizia "Sem dono na sua comunidade" quando `false` significava "não é MEU" —
+     com o cinturão na mão de outra pessoa, a sala AFIRMAVA que ele não tinha
+     dono. São três estados, e espremer três num booleano faz o app mentir. */
+  const _cint = (()=>{
+    const uid = (window._net && _net.uid && _net.uid()) || null;
+    const esp = (typeof S!=='undefined' && S.esporte) || 'tenis';
+    // cinturão é por comunidade E por esporte — trocar de esporte troca a lente
+    const g = ((window.__meusGrupos)||[]).find(x=> x && x.cinturao && (x.esporte||'tenis')===esp);
+    if(!g) return {tem:false, ligado:false, grupo:null, dono:null};
+    return {tem: !!(uid && g.cinturao_dono_id===uid), ligado:true, grupo:g, dono:g.cinturao_dono_id};
+  })();
+  const temCint = _cint.tem;
+  // `_nomeDe` mora no net.js e não está no mapa do `_net` — chamada defensiva
+  const _nomeCint = (u)=>{ try{ return (typeof _nomeDe==='function' && u) ? _nomeDe(u) : 'alguém' }catch(e){ return 'alguém' } };
+  const _rotCint = _cint.tem    ? 'Cinturão · '+((_cint.grupo&&_cint.grupo.nome)||'sua comunidade')
+                 : _cint.ligado ? 'Com '+_nomeCint(_cint.dono)
+                 :                'Sem cinturão na sua comunidade';
   const camadas=[];
   // cinturão sozinho no topo, em TODA aba — é a coroa da sala (Título em disputa)
   const yC=yDe(TR_PRATELEIRAS[0]);
   camadas.push(`<div class="tr-prat" style="bottom:${Th-yC}px">
     <button class="tr-peca coroa ${temCint?'tem':'nao'} ${trSel==='cint'?'sel':''}" onclick="selTrofeu('cint')">
-      <img data-src="../trofeus/cinturao.png" style="height:78px" alt=""><em>${temCint?'Cinturão da Comunidade':'Sem dono na sua comunidade'}</em></button>
+      <img data-src="../trofeus/cinturao.png" style="height:78px" alt=""><em>${_rotCint}</em></button>
   </div>`);
 
   // as 4 prateleiras (12 vagas) mostram o objeto da aba ativa
@@ -4605,8 +4690,14 @@ function desenharTrofeus(){
     if(p) det=`<b>◈ ${p.t} <span class="tr-pill tem">pertencimento</span></b>
       <p>${p.adm?'Entregue pelo app':'Mandado por '+quem(p.de)+' na sua comunidade'}. Patch não se ganha — se recebe.</p>`;
   } else if(trSel==='cint'){
-    det=`<b>Cinturão da Comunidade <span class="tr-pill ${temCint?'tem':'nao'}">${temCint?'com você':'sem dono'}</span></b>
-      <p>${temCint?'Defenda jogando — quem te vencer na comunidade leva.':'Vença o dono do cinturão numa partida da comunidade pra tomar.'}</p>`;
+    const _pillC = _cint.tem ? 'com você' : _cint.ligado ? 'com '+_nomeCint(_cint.dono) : 'sem cinturão';
+    const _txtC  = _cint.tem
+      ? 'Defenda jogando — quem te vencer na comunidade leva.'
+      : _cint.ligado
+      ? 'Vença '+_nomeCint(_cint.dono)+' numa partida da comunidade pra tomar.'
+      : 'Nenhuma comunidade sua tem cinturão ligado — quem liga é o gestor, na tela da comunidade.';
+    det=`<b>Cinturão da Comunidade <span class="tr-pill ${temCint?'tem':'nao'}">${_pillC}</span></b>
+      <p>${_txtC}</p>`;
   } else {
     const p=TR_PECAS.find(x=>x.id===trSel);
     if(p) det=`<b>${p.n} <span class="tr-pill ${got.has(p.id)?'tem':'nao'}">${got.has(p.id)?'conquistado':'bloqueado'}</span></b><p>${p.c}</p>`;

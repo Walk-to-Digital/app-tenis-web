@@ -456,6 +456,13 @@ function netParsePlacar(txt){
 /* ---- Realtime + caixa de partidas ------------------------------------- */
 let _canal = null;
 let _inbox = [];
+/* 26/08: a query do inbox já pede `select('*')` com 'confirmada' e sem limite —
+   e o filtro lá embaixo jogava o resto fora. Guardar o array inteiro custa ZERO
+   consulta e é o que destrava os selos da Sala de Conquistas: `zebra` (dentro do
+   jsonb do delta), `placar_em`, `placar_por`, `confirmed_at` e
+   `fechada_por_prazo` só existem aqui — o `S.historico` é do APARELHO e nasce
+   vazio em celular novo. */
+let _todasMinhas = [];
 const _expirando = {};   // guarda de reentrada do vencimento do cinturão
 let _inboxStatus = {};   // matchId → última chave de estado vista (ver _chaveEstado)
 
@@ -599,6 +606,8 @@ async function netAtualizarInbox(){
   // 'cancelado' entra aqui junto de 'recusado' por defesa em profundidade: a
   // query acima já não pede esse status, mas quem mexer nela um dia não vai
   // lembrar deste filtro — e partida cancelada na caixa é card zumbi.
+  _todasMinhas = data || [];
+  window.__minhasPartidas = _todasMinhas;   // espelho: render da sala é síncrono
   _inbox = data.filter(m=> m.status!=='confirmada' && m.status!=='recusado' && m.status!=='cancelado');
   /* 13/08: pedido de amizade também pede a minha ação, então entra na mesma
      conta. Sem isto o pedido chega e o ✉ não acende — e ninguém abre uma caixa
@@ -663,8 +672,12 @@ function netAplicarConfirmadas(list){
     // 11/08: `porPrazo` viaja junto com a partida. Sem ele o jogador vê meio
     // ponto na ficha e não tem como saber por quê — estado invisível vira bug
     // fantasma, e ele vai achar que o motor errou.
+    /* 26/08: `zebra` vinha no delta e era descartado aqui — por isso o selo de
+       Zebra tinha um `if(){}` vazio na sala com o comentário "sinal não guardado
+       ainda". O sinal existe desde que o motor foi pro servidor. */
     S.historico.unshift({ adv:_advId(m), venceu:euVenci, placar:meuPlacar,
       dnivel:meu.dNivel||0, dpts:meu.dPts||0, quando:'agora',
+      zebra: meu.zebra===true,
       porPrazo: !!m.fechada_por_prazo });
     S.deltasAplicados.push(m.id); mexeu=true;
     ultima = { m, meu, euVenci, meuPlacar };
@@ -2479,6 +2492,11 @@ async function netMeusGrupos(){
   const todos=[...meus,...abertos]; const cont={};
   if(todos.length){ const c=await sb.from('grupo_membros').select('grupo_id').in('grupo_id',todos.map(g=>g.id));
     (c.data||[]).forEach(x=>cont[x.grupo_id]=(cont[x.grupo_id]||0)+1); }
+  /* 26/08: espelho pra render síncrono, mesmo padrão do `__meusQuadros`. O
+     `select('*')` acima JÁ traz `cinturao`, `cinturao_dono_id` e
+     `cinturao_desde` — a Sala de Conquistas mostrava "sem dono" fixo porque o
+     dado morria nesta linha, não porque faltava no banco. */
+  window.__meusGrupos = meus;
   return {meus,abertos,papel,pedido,cont};
 }
 
@@ -6000,7 +6018,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
      escolhido nunca chegava em `_on.quando` e a partida saía sem hora. */
   onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
   cancelarDesafio:netCancelarDesafio,
-  gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus,
+  gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
   admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
