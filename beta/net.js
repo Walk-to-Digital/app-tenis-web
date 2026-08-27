@@ -3442,7 +3442,7 @@ window.netAdsRelatorio = netAdsRelatorio;
    policy de escrita, porque quem recebe bonificação não preenche a lista. */
 async function netProfessores(){
   const { data, error } = await sb.from('professores')
-    .select('player_id, contato, apresentacao, aceitando_ate, ativo, atuacao')
+    .select('player_id, contato, apresentacao, aceitando_ate, ativo, atuacao, especialidades')
     .eq('ativo', true);
   if(error){ console.error('[net] professores', error); return null; }
   return data || [];
@@ -3511,10 +3511,11 @@ async function netVerProfessor(pid){
     <div style="margin-top:8px">${profAceitando && profAceitando(pr) ? '<span class="pil up">Pegando aluno</span>' : '<span class="pil gh">Turma fechada agora</span>'}</div>
     ${pr.apresentacao?`<p style="margin-top:10px">${_admEsc(pr.apresentacao)}</p>`:''}
     ${pr.atuacao?`<p class="nota" style="margin-top:6px">◎ Atua em: ${_admEsc(pr.atuacao)}</p>`:''}
+    ${pr.especialidades?`<p class="nota" style="margin-top:4px">🎯 ${_admEsc(pr.especialidades)}</p>`:''}
     <div class="rot" style="margin-top:14px">Turmas</div>
     ${aulas.length ? aulas.map(a=>`<div class="card" style="margin-top:6px">
         <b style="font-size:14px">${DIAS[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
-        <small style="display:block;color:var(--ink3)">${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+_admEsc(a.local_txt):''}${vagas(a)}${faixa(a)}</small>
+        <small style="display:block;color:var(--ink3)">${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+_admEsc(a.local_txt):''}${vagas(a)}${faixa(a)}</small>
       </div>`).join('') : '<p class="nota">Nenhuma turma aberta agora.</p>'}
     ${!sou ? `<div style="display:flex;gap:8px;margin-top:14px">
       ${profAceitando && profAceitando(pr) ? `<button class="btn" style="flex:1" onclick="profPedir('${pid}');document.getElementById('net-vprof').remove()">Quero ser aluno</button>`:''}
@@ -3563,6 +3564,7 @@ async function netSalvarProfessor(d){
     contato: (d.contato||'').trim() || null,
     apresentacao: (d.apresentacao||'').trim() || null,
     atuacao: (d.atuacao||'').trim() || null,          // 27/08 (mig 68)
+    especialidades: (d.especialidades||'').trim() || null,  // 27/08 (mig 69)
     aceitando_ate: d.aceitandoAte || null };
   const { error } = await sb.from('professores').upsert(linha);
   return { erro: error ? error.message : null };

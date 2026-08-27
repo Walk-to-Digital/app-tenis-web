@@ -978,7 +978,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787845479"></script>
+<script src="net.js?v=1787849741"></script>
 
 <script>
 /* =========================================================================
@@ -1893,7 +1893,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787845479"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787849741"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -1995,7 +1995,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787845479"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787849741"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2464,6 +2464,13 @@ async function aulaSalvar(){
   const dias=(d.dias&&d.dias.length)? d.dias : (d.dia_semana!==undefined&&d.dia_semana!==null? [d.dia_semana] : []);
   if(!dias.length){ alert('Escolha pelo menos um dia da semana.'); return; }
   if(!d.hora){ alert('Escolha a hora.'); return; }
+  /* 27/08: o Nuno digitou 16 no QA — o input tem min=18 mas min não barra
+     digitação. Barrar AQUI, com o porquê, em vez de deixar o banco recusar
+     com mensagem de constraint. */
+  if((d.idade_min && d.idade_min<18) || (d.idade_max && d.idade_max<18)){
+    alert('A faixa etária começa em 18 — o Ranket é só para maiores.'); return; }
+  if(d.idade_min && d.idade_max && d.idade_min > d.idade_max){
+    alert('A idade "de" não pode ser maior que a idade "até".'); return; }
   /* uma criação POR DIA, e o resultado nunca é silencioso pela metade: se a
      terça entrou e a quinta falhou, a mensagem diz exatamente isso — meia
      verdade calada aqui viraria aula fantasma na grade. */
@@ -2562,6 +2569,7 @@ function professoresHTML(){
           <b style="font-size:15px">${nome}</b>
           ${p.apresentacao?`<small>${p.apresentacao}</small>`:''}
           ${p.atuacao?`<small>◎ ${p.atuacao}</small>`:''}
+          ${p.especialidades?`<small>🎯 ${p.especialidades}</small>`:''}
           ${lugar?`<small>📍 ${lugar}</small>`:''}
           <div style="margin-top:7px">${profAceitando(p)
             ? '<span class="pil up">Pegando aluno</span>'
@@ -2585,7 +2593,7 @@ function professoresHTML(){
         const fx=(a.idade_min||a.idade_max)? ' · '+(a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos') : '';
         return `<div class="card oc" onclick="_net.verProfessor&&_net.verProfessor('${a.professor_id}')" style="cursor:pointer">
           <div class="linha-item"><div class="av">🗓</div><div class="txt">
-            <b style="font-size:14px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+            <b style="font-size:14px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)} <span style="color:var(--ink3);font-weight:400">· ${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))}</span></b>
             <small>${pn}${a.local_txt?' · '+a.local_txt:''}${a.max_alunos?' · até '+a.max_alunos+' alunos':''}${fx}</small>
           </div><div class="seta">›</div></div></div>`; }).join('')}` : '';
   return `<div class="sec">
@@ -2612,7 +2620,7 @@ async function profPedir(id){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787845479"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1787849741"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3374,8 +3382,8 @@ souProfessor(){
     window.__profDraft = null;
     _net.meuProfessor().then(r=>{
       window.__profDraft = r ? {contato:r.contato||'', apresentacao:r.apresentacao||'',
-        atuacao:r.atuacao||'', aceitandoAte:r.aceitando_ate? r.aceitando_ate.slice(0,10):'', ativo:r.ativo!==false}
-        : {contato:'', apresentacao:'', atuacao:'', aceitandoAte:'', ativo:true};
+        atuacao:r.atuacao||'', especialidades:r.especialidades||'', aceitandoAte:r.aceitando_ate? r.aceitando_ate.slice(0,10):'', ativo:r.ativo!==false}
+        : {contato:'', apresentacao:'', atuacao:'', especialidades:'', aceitandoAte:'', ativo:true};
       render();
     }).catch(()=>{ window.__profDraft={contato:'',apresentacao:'',atuacao:'',aceitandoAte:'',ativo:true}; render(); });
   }
@@ -3396,6 +3404,10 @@ souProfessor(){
         <input class="onb-input" placeholder="Pituba e Itaigara · Clube Espanhol · até 10 km" maxlength="140"
                value="${(d.atuacao||'').replace(/"/g,'&quot;')}" oninput="profSet('atuacao',this.value,true)">
         <p class="nota">Nas suas palavras: bairros, clubes, raio. Aparece no seu card e no seu perfil.</p>
+        <div class="rot">Especialidades</div>
+        <input class="onb-input" placeholder="Backhand · saque · aula pra iniciantes" maxlength="140"
+               value="${(d.especialidades||'').replace(/"/g,'&quot;')}" oninput="profSet('especialidades',this.value,true)">
+        <p class="nota">Golpes, público, estilo — o que você destaca do seu trabalho.</p>
         <div class="rot">Estou pegando aluno até</div>
         <input class="onb-input" type="date" max="${em90}" value="${d.aceitandoAte||''}" onchange="profSet('aceitandoAte',this.value,true)">
         <p class="nota">Data e não interruptor: quem liga e esquece ficaria "pegando aluno" pra sempre. Passou, você renova em dois toques.</p>
