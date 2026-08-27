@@ -978,7 +978,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787849741"></script>
+<script src="net.js?v=1787852430"></script>
 
 <script>
 /* =========================================================================
@@ -1697,7 +1697,14 @@ function ehProfessor(){ const p=window.__perfil; return !!(p && p.perfil==='prof
 function euJogo(){ const p=window.__perfil; return !p || p.joga !== false; }
 function navAbas(){
   const chat = {t:'chat', i:'💬', r:'Chat'};
-  if(!ehProfessor()) return [
+  /* 27/08 (mig 70, decisão do Nuno): quem é aluno ganha a aba Aulas NA BARRA —
+     a superfície que faltava. Seis itens só pra quem tem aula; os outros
+     seguem com cinco. O espelho `__souAluno` é preenchido no boot. */
+  if(!ehProfessor()) return window.__souAluno ? [
+    {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Encontrar'},
+    {t:'aulasAluno', i:'🗓', r:'Aulas'},
+    {t:'comunidade', i:'▣', r:'Comunidade'}, chat, {t:'vestiario', i:'❖', r:'Vestiário'},
+  ] : [
     {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Encontrar'},
     {t:'comunidade', i:'▣', r:'Comunidade'}, chat, {t:'vestiario', i:'❖', r:'Vestiário'},
   ];
@@ -1893,7 +1900,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787849741"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787852430"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -1995,7 +2002,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787849741"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787852430"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2595,7 +2602,7 @@ function professoresHTML(){
           <div class="linha-item"><div class="av">🗓</div><div class="txt">
             <b style="font-size:14px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)} <span style="color:var(--ink3);font-weight:400">· ${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))}</span></b>
             <small>${pn}${a.local_txt?' · '+a.local_txt:''}${a.max_alunos?' · até '+a.max_alunos+' alunos':''}${fx}</small>
-          </div><div class="seta">›</div></div></div>`; }).join('')}` : '';
+          </div><div class="odir"><button class="oconv" onclick="event.stopPropagation();profPedir('${a.professor_id}','${a.id}')">Pedir vaga</button></div></div></div>`; }).join('')}` : '';
   return `<div class="sec">
       <div class="rot">Professores <span>${Lv.length}</span></div>
       <p class="nota" style="margin-bottom:12px">O contato aqui é público pra quem tem conta — declarar-se professor é pendurar a placa.</p>
@@ -2604,11 +2611,12 @@ function professoresHTML(){
       ${cta}
     </div>`;
 }
-async function profPedir(id){
+async function profPedir(id, aulaId){
   if(!window._net || !_net.alunoPedir) return;
-  const r = await _net.alunoPedir(id, S.esporte||'tenis');
+  const r = await _net.alunoPedir(id, S.esporte||'tenis', aulaId||null);
   if(r.erro){ alert('Não deu: '+r.erro); return; }
-  toast('Pedido enviado — quem confirma é o professor.');
+  toast(aulaId ? 'Vaga pedida — o professor confirma e você já entra na turma.'
+               : 'Pedido enviado — quem confirma é o professor.');
 }
 
 /* ------- 25/08: EQUIPAMENTOS -------
@@ -2620,7 +2628,7 @@ async function profPedir(id){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787849741"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1787852430"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -2913,6 +2921,21 @@ inicio(){
            das ações. Continua depois do "Marcar jogo", que é a única posição
            que ele não pode ocupar: ali competiria com o registro da partida,
            que é o elo frágil do ciclo. -->
+      ${(()=>{ /* 27/08 (mig 70): a próxima aula na cara do aluno */
+        const M=window.__minhasAulas; if(!M||(!M.recorrentes.length&&!M.avulsas.length)) return '';
+        const ag=new Date(); let prox=null;
+        M.recorrentes.forEach(a=>{ const d=new Date(ag);
+          d.setDate(d.getDate()+((a.dia_semana-d.getDay()+7)%7));
+          d.setHours(+String(a.hora||'0').slice(0,2),+String(a.hora||'0').slice(3,5)||0,0,0);
+          if(d<=ag) d.setDate(d.getDate()+7);
+          if(!prox||d<prox.q) prox={q:d, tx:(S.jogadores[a.professor_id]||{}).nome||'Professor', l:a.local_txt}; });
+        M.avulsas.filter(x=>x.estado==='aceita').forEach(x=>{ const d=new Date(x.quando);
+          if(d>ag&&(!prox||d<prox.q)) prox={q:d, tx:(S.jogadores[x.professor_id]||{}).nome||'Professor', l:x.local_txt}; });
+        if(!prox) return '';
+        return `<div class="sec"><div class="card clic" onclick="trocarAba('aulasAluno')"><div class="linha-item">
+          <div class="av">🗓</div><div class="txt"><b>Sua próxima aula</b>
+          <small>${prox.q.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})} · ${prox.q.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · ${prox.tx}${prox.l?' · '+prox.l:''}</small></div>
+          <div class="seta">›</div></div></div></div>`; })()}
       ${adsHTML()}
 
       <!-- 06/08: uma faixa só. A versão anterior tinha um carrossel de atalhos
@@ -3474,6 +3497,34 @@ aulas(){
 },
 
 /* ---------------- AULA NOVA (25/08, mig 66) ---------------- */
+/* ── 27/08 (mig 70): MINHAS AULAS — o lado do aluno ─────────────────────── */
+aulasAluno(){
+  const M = window.__minhasAulas;
+  if(M===undefined && window.netMinhasAulas){ netMinhasAulas().then(()=>render()); }
+  const nomeP = (id)=> (S.jogadores[id]||{}).nome || 'Professor';
+  const EST = {pedida:'aguardando o professor', aceita:'confirmada', recusada:'recusada', cancelada:'cancelada'};
+  const rec = (M&&M.recorrentes)||[], av = (M&&M.avulsas)||[], exc = (M&&M.excecoes)||[];
+  const excDe = (aid)=> exc.filter(e=>e.aula_id===aid)
+    .map(e=>`<small style="display:block;color:var(--down)">✕ ${new Date(e.dia+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})} não tem aula</small>`).join('');
+  const corpo = (!M)
+    ? '<div class="card"><p class="nota">Carregando…</p></div>'
+    : (!rec.length && !av.length)
+    ? `<div class="card"><p class="nota">Você ainda não está em nenhuma turma. Quem procura professor acha em <b>Encontrar › Professores</b> — e as turmas com vaga ficam lá também.</p>
+       <button class="btn" style="margin-top:10px" onclick="trocarAba('radar')">Procurar professor</button></div>`
+    : `${rec.length?`<div class="rot">Minhas turmas</div>`:''}
+       ${rec.map(a=>`<div class="card" style="margin-bottom:8px">
+         <b style="font-size:15px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+         <small style="display:block;color:var(--ink3)">${nomeP(a.professor_id)} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+a.local_txt:''}</small>
+         ${excDe(a.id)}
+       </div>`).join('')}
+       ${av.length?`<div class="rot" style="margin-top:10px">Aulas avulsas</div>`:''}
+       ${av.map(x=>`<div class="card" style="margin-bottom:8px">
+         <b style="font-size:15px">${new Date(x.quando).toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})} · ${new Date(x.quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</b>
+         <small style="display:block;color:var(--ink3)">${nomeP(x.professor_id)} · <span class="pil ${x.estado==='aceita'?'up':'gh'}">${EST[x.estado]||x.estado}</span></small>
+         ${x.estado!=='cancelada'&&x.estado!=='recusada'?`<button class="operf" style="margin-top:8px" onclick="_net.avulsaResponder('${x.id}','cancelada','Aula cancelada.')">Cancelar</button>`:''}
+       </div>`).join('')}`;
+  return {titulo:'Minhas aulas', html:`<div class="pad">${corpo}</div>`};
+},
 aulaNova(){
   const d = window.__aulaDraft = window.__aulaDraft || {duracao_min:60, esporte:'tenis'};
   const chip=(k,v,t)=>`<button class="chip ${d[k]===v?'on':''}" onclick="aulaSet('${k}',${typeof v==='number'?v:`'${v}'`})">${t}</button>`;
@@ -3519,6 +3570,7 @@ aulaNova(){
 /* ---------------- MINHA TURMA (25/08, mig 62) ---------------- */
 turma(){
   turmaCarregar();
+  if(typeof aulasCarregar==='function') aulasCarregar();   // (70) o card do pedido lê __aulas
   const T = window.__turma;
   if(T===undefined) return {titulo:'Turma', html:'<div class="pad"><div class="card"><p class="nota">Carregando…</p></div></div>'};
   const nomeDe=(id)=> (S.jogadores[id]||{}).nome || 'Jogador';
@@ -3531,8 +3583,18 @@ turma(){
       ${pedidos.map(p=>{
         const outro = p.treinador_id===meuUid ? p.aluno_id : p.treinador_id;
         const souTreinador = p.treinador_id===meuUid;
+        /* (70) o pedido diz QUAL turma, e a posição na fila quando há disputa */
+        const au = p.aula_id && (window.__aulas||[]).find(a=>a.id===p.aula_id);
+        const fila = p.aula_id ? pedidos.filter(x=>x.aula_id===p.aula_id)
+          .sort((a,b)=>new Date(a.criado_em)-new Date(b.criado_em)) : [];
+        const pos = fila.length>1 ? ' · '+(fila.findIndex(x=>x.aluno_id===p.aluno_id)+1)+'º da fila' : '';
+        /* sem o cache de aulas na mão, não afirmar nada — "desligada" só quando
+           o cache EXISTE e a turma não está nele (mesma lição do rótulo do
+           recorte: afirmar sem medir é mentir com cara de dado) */
+        const alvo = au ? ` → ${DIAS_LONGO[au.dia_semana]} ${(au.hora||'').slice(0,5)}${pos}`
+                   : (p.aula_id && window.__aulas ? ' → turma desligada' : '');
         return `<div class="card"><div class="linha-item">
-          <div class="txt"><b>${nomeDe(outro)}</b><small>${souTreinador?'quer ser seu aluno':'quer ser seu professor'} · ${ESP[p.esporte]||p.esporte}</small></div>
+          <div class="txt"><b>${nomeDe(outro)}</b><small>${souTreinador?'quer vaga':'quer ser seu professor'}${alvo} · ${ESP[p.esporte]||p.esporte}</small></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="operf" style="flex:1" onclick="turmaResponder('${outro}','${p.esporte}',false)">Recusar</button>
@@ -3541,6 +3603,17 @@ turma(){
       }).join('')}
     </div>` : '';
 
+  const avs = (T.avulsas||[]);
+  const secAvulsas = avs.length ? `<div class="sec">
+      <div class="rot">Aulas avulsas pedidas <span>${avs.length}</span></div>
+      ${avs.map(x=>`<div class="card">
+        <b>${nomeDe(x.aluno_id)}</b>
+        <small style="display:block;color:var(--ink3)">${new Date(x.quando).toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})} · ${new Date(x.quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${x.msg?` · "${x.msg}"`:''}</small>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="operf" style="flex:1" onclick="_net.avulsaResponder('${x.id}','recusada','Pedido recusado.')">Recusar</button>
+          <button class="oconv" style="flex:1" onclick="_net.avulsaResponder('${x.id}','aceita','Aula confirmada — combine os detalhes no chat.')">Aceitar</button>
+        </div></div>`).join('')}
+    </div>` : '';
   const secAlunos = `<div class="sec">
       <div class="rot">Meus alunos <span>${(T.alunos||[]).length}</span></div>
       ${(T.alunos||[]).length
@@ -3571,7 +3644,7 @@ turma(){
            <button class="btn" style="margin-top:11px" onclick="turmaCriarGrupo()">Criar a turma</button></div>`}
     </div>` : '';
 
-  return {titulo:'Turma', html: secPed + secAlunos + secProf + secGrupo + `
+  return {titulo:'Turma', html: secPed + secAvulsas + secAlunos + secProf + secGrupo + `
     <div class="sec"><div class="card"><p class="nota">Um aluno tem um professor por esporte. É a trava mais barata contra inflar turma: pra ter 200 alunos seriam 200 pessoas abrindo mão do próprio professor.</p></div></div>`};
 },
 

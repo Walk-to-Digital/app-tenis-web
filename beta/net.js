@@ -256,6 +256,7 @@ async function netBoot(eu){
     // sou ADM do app? acende a porta de entrada da aba ADM (migração 18)
     try{ await netCheckAdm(); }catch(e){}
     try{ await netCheckPerfil(); }catch(e){}   // (66) o papel decide a nav e a home
+    try{ await netMinhasAulas(); }catch(e){}   // (70) e a matrícula liga a aba Aulas do aluno
     // as comunidades reais e minha posição em cada uma (12/08) — mesmo padrão
     try{ await netMeusQuadros(); }catch(e){}
     // destaque por movimento na comunidade (12/08)
@@ -3453,6 +3454,63 @@ async function netProfessores(){
    toque, e ninguém pede professor sem olhar quem ele é. A folha junta o que já
    existia espalhado (apresentação, lugar, aceitando) com o que a mig 68 traz
    (atuação, turmas com vaga, elogios). */
+/* ── 27/08 (mig 70) · O LADO DO ALUNO ───────────────────────────────────────
+   `__minhasAulas` é o espelho que liga a aba "Aulas" do aluno na barra: quem
+   tem matrícula ou avulsa viva ganha a superfície que faltava. */
+async function netMinhasAulas(){
+  if(!MEU_UID){ window.__minhasAulas = null; return null; }
+  try{
+    const [aa, av] = await Promise.all([
+      sb.from('aula_alunos').select('aula_id').eq('aluno_id', MEU_UID),
+      sb.from('aulas_avulsas').select('*').eq('aluno_id', MEU_UID)
+        .in('estado',['pedida','aceita'])
+        .gte('quando', new Date(Date.now()-3600e3).toISOString()).order('quando'),
+    ]);
+    const ids = (aa.data||[]).map(x=>x.aula_id);
+    let rec = [], exc = [];
+    if(ids.length){
+      rec = (await sb.from('aulas').select('*').in('id', ids).eq('ativa', true)).data || [];
+      exc = (await sb.from('aula_excecoes').select('*').in('aula_id', ids)
+               .gte('dia', new Date().toISOString().slice(0,10))).data || [];
+    }
+    const m = { recorrentes: rec, excecoes: exc, avulsas: av.data || [] };
+    window.__minhasAulas = m;
+    window.__souAluno = !!(rec.length || m.avulsas.length);
+    if(window.pintarNav){ try{ pintarNav(); }catch(e){} }
+    return m;
+  }catch(e){ console.error('[net] minhas aulas', e); return null; }
+}
+async function netAvulsaPedir(profId, quando, msg){
+  if(!MEU_UID) return { erro:'sem conta' };
+  const { error } = await sb.from('aulas_avulsas').insert({
+    professor_id: profId, aluno_id: MEU_UID, quando: quando,
+    esporte: (typeof S!=='undefined' && S.esporte) || 'tenis',
+    msg: (msg||'').trim() || null });
+  return { erro: error ? error.message : null };
+}
+async function netAvulsaResponder(id, novo){
+  const { error } = await sb.from('aulas_avulsas').update({ estado: novo }).eq('id', id);
+  return { erro: error ? error.message : null };
+}
+async function _avulsaEnviarUI(pid){
+  const d = document.getElementById('av-data'), h = document.getElementById('av-hora');
+  const m = document.getElementById('av-msg');
+  if(!d || !d.value || !h || !h.value){ alert('Escolha a data e a hora.'); return; }
+  const quando = new Date(d.value + 'T' + h.value);
+  if(!(quando > new Date())){ alert('A aula tem que ser no futuro.'); return; }
+  const r = await netAvulsaPedir(pid, quando.toISOString(), m ? m.value : '');
+  if(r.erro){ alert('Não deu: '+r.erro); return; }
+  toast('Pedido enviado — o professor responde por aqui.');
+  const el = document.getElementById('net-vprof'); if(el) el.remove();
+  netMinhasAulas();
+}
+async function _avulsaResponderUI(id, novo, msgOk){
+  const r = await netAvulsaResponder(id, novo);
+  if(r.erro){ alert('Não deu: '+r.erro); return; }
+  toast(msgOk);
+  if(window.turmaCarregar){ window.__turmaLoad=false; window.__turma=undefined; }
+  netMinhasAulas(); if(window.render) render();
+}
 async function netTurmasAbertas(){
   // a policy aulas_sel_vitrine (68 D) decide o que aparece: turma ativa de
   // professor ativo. Antes da 68 rodar, isto devolve só as MINHAS — inofensivo.
@@ -3502,6 +3560,13 @@ async function netVerProfessor(pid){
   const faixa = (a)=> (a.idade_min||a.idade_max)
     ? ` · ${a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos'}` : '';
   const tel = pr.contato ? pr.contato.replace(/[^0-9]/g,'') : null;
+  /* (70) o placar de vagas vem do definer `aula_vagas` — de fora das policies,
+     só números. Falhou a chamada? A turma aparece sem placar, nunca some. */
+  const vg = {};
+  await Promise.all(aulas.map(a =>
+    sb.rpc('aula_vagas', { p_aula: a.id })
+      .then(r=>{ vg[a.id] = (r.data && r.data[0]) || null; }).catch(()=>{})));
+  const hoje = new Date().toISOString().slice(0,10);
   _sheet('net-vprof', `
     <div style="display:flex;justify-content:space-between;align-items:center">
       <b style="font-family:var(--f-disp);font-size:17px">${_admEsc(nome)}</b>
@@ -3513,10 +3578,27 @@ async function netVerProfessor(pid){
     ${pr.atuacao?`<p class="nota" style="margin-top:6px">◎ Atua em: ${_admEsc(pr.atuacao)}</p>`:''}
     ${pr.especialidades?`<p class="nota" style="margin-top:4px">🎯 ${_admEsc(pr.especialidades)}</p>`:''}
     <div class="rot" style="margin-top:14px">Turmas</div>
-    ${aulas.length ? aulas.map(a=>`<div class="card" style="margin-top:6px">
+    ${aulas.length ? aulas.map(a=>{
+      const v = vg[a.id];
+      const cheia = !!(v && v.maximo && v.ocupados >= v.maximo);
+      const placar = v && v.maximo ? ` · ${v.ocupados}/${v.maximo} aluno${v.maximo>1?'s':''}` : '';
+      const filaTx = cheia && v.fila ? ` · ${v.fila} na fila` : '';
+      return `<div class="card" style="margin-top:6px">
         <b style="font-size:14px">${DIAS[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
-        <small style="display:block;color:var(--ink3)">${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+_admEsc(a.local_txt):''}${vagas(a)}${faixa(a)}</small>
-      </div>`).join('') : '<p class="nota">Nenhuma turma aberta agora.</p>'}
+        <small style="display:block;color:var(--ink3)">${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+_admEsc(a.local_txt):''}${placar}${filaTx}${faixa(a)}</small>
+        ${!sou ? `<button class="${cheia?'operf':'oconv'}" style="margin-top:8px;width:100%"
+            onclick="_net.pedirVaga('${pid}','${a.id}')">${cheia?'Entrar na fila de espera':'Pedir vaga nesta turma'}</button>`:''}
+      </div>`; }).join('') : '<p class="nota">Nenhuma turma aberta agora.</p>'}
+    ${!sou ? `<div class="card" style="margin-top:10px">
+      <div class="rot">Aula avulsa · experimental</div>
+      <p class="nota" style="margin:2px 0 8px">Uma aula só, no dia que vocês combinarem — boa pra experimentar.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="av-data" type="date" min="${hoje}" class="onb-input" style="margin:0;flex:1">
+        <input id="av-hora" type="time" class="onb-input" style="margin:0;flex:1">
+      </div>
+      <input id="av-msg" class="onb-input" maxlength="280" placeholder="Mensagem (opcional) — ex.: nunca joguei, quero experimentar">
+      <button class="btn" style="margin-top:8px" onclick="_net.avulsaEnviar('${pid}')">Pedir aula avulsa</button>
+    </div>`:''}
     ${!sou ? `<div style="display:flex;gap:8px;margin-top:14px">
       ${profAceitando && profAceitando(pr) ? `<button class="btn" style="flex:1" onclick="profPedir('${pid}');document.getElementById('net-vprof').remove()">Quero ser aluno</button>`:''}
       ${(tel && tel.length>=8) ? `<a class="btn sec" style="flex:1;text-align:center;text-decoration:none" href="https://wa.me/55${tel}" target="_blank" rel="noopener">Falar</a>`:''}
@@ -3572,9 +3654,11 @@ async function netSalvarProfessor(d){
 /* a turma: quem é meu aluno, quem é meu professor, e o que está pendente */
 async function netTurma(){
   if(!MEU_UID) return {alunos:[], professores:[], pedidos:[]};
-  const [a, pd] = await Promise.all([
+  const [a, pd, av] = await Promise.all([
     sb.from('alunos').select('*').is('encerrado_em', null),
     sb.from('aluno_pedidos').select('*').eq('estado','pendente'),
+    // (70) os pedidos de aula avulsa — o RLS já recorta pro meu lado
+    sb.from('aulas_avulsas').select('*').eq('estado','pedida').order('quando'),
   ]);
   if(a.error) console.error('[net] turma', a.error);
   const linhas = a.data || [];
@@ -3582,10 +3666,14 @@ async function netTurma(){
     alunos:      linhas.filter(x=> x.treinador_id === MEU_UID),
     professores: linhas.filter(x=> x.aluno_id     === MEU_UID),
     pedidos:     (pd.data || []),
+    avulsas:     (av.data || []).filter(x=> x.professor_id === MEU_UID),
   };
 }
-async function netAlunoPedir(outro, esporte){
-  const { data, error } = await sb.rpc('aluno_pedir', { p_outro: outro, p_esporte: esporte || 'tenis' });
+async function netAlunoPedir(outro, esporte, aulaId){
+  /* 27/08 (mig 70): o pedido pode apontar a TURMA. Sem aulaId é o pedido
+     genérico de sempre — o servidor tem o default. */
+  const { data, error } = await sb.rpc('aluno_pedir',
+    { p_outro: outro, p_esporte: esporte || 'tenis', p_aula: aulaId || null });
   return { msg: data, erro: error ? error.message : null };
 }
 async function netAlunoAceitar(outro, esporte){
@@ -6166,6 +6254,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   turmaCriar:netTurmaCriar, alunosDetalhe:netAlunosDetalhe,
   professores:netProfessores, meuProfessor:netMeuProfessor, salvarProfessor:netSalvarProfessor,
   turma:netTurma, alunoPedir:netAlunoPedir, alunoAceitar:netAlunoAceitar,
+  pedirVaga:(pid,aid)=>{ if(window.profPedir) profPedir(pid, aid); },
+  avulsaEnviar:_avulsaEnviarUI, avulsaResponder:_avulsaResponderUI, minhasAulas:netMinhasAulas,
   alunoRecusar:netAlunoRecusar, alunoEncerrar:netAlunoEncerrar,
   salvarLugar:netSalvarLugar, criarTorneioExterno:netCriarTorneioExterno, cidades:netCidades,
   fbResponder:netFeedbackResponder, fbAbrir:_fbAbrir,
