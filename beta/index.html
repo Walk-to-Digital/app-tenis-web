@@ -978,7 +978,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787852430"></script>
+<script src="net.js?v=1787853520"></script>
 
 <script>
 /* =========================================================================
@@ -1900,7 +1900,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787852430"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787853520"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2002,7 +2002,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787852430"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787853520"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2386,11 +2386,11 @@ function homeProfessor(){
   const blocoTurma = `<div class="sec">
       <div class="rot">Sua turma <span>${D?D.length:'…'}</span><a onclick="ir('turma')" style="cursor:pointer">ver tudo ›</a></div>
       ${!D ? '<div class="card"><p class="nota">Carregando…</p></div>'
-        : (D.length ? D.slice(0,5).map(x=>{
+        : (D.length ? D.slice(0,5).map(x=>{ /* (70) toque abre o perfil do aluno */
             const j=x.jogador||{};
             const nv = x.esporte==='beach' ? j.nivelb : j.nivel;
             const cls = (window.divisaoDe && nv!=null) ? divisaoDe(nv) : null;
-            return `<div class="card"><div class="linha-item">
+            return `<div class="card clic" onclick="_net.verJogador&&_net.verJogador('${x.aluno_id}')"><div class="linha-item">
               ${S.jogadores[x.aluno_id]?avatar(x.aluno_id):'<div class="av">👤</div>'}
               <div class="txt"><b>${nomeDe(x.aluno_id)}</b>
                 <small>${j.calibrando?'em calibragem · '+(j.cal||0)+' de 8 partidas':(cls?('Classe '+cls+' · Nível '+nv):'sem partida ainda')}</small></div>
@@ -2598,7 +2598,7 @@ function professoresHTML(){
       <div class="rot" style="margin-top:16px">Turmas abertas <span>${T.length}</span></div>
       ${T.map(a=>{ const pn=(S.jogadores[a.professor_id]||{}).nome||'Professor';
         const fx=(a.idade_min||a.idade_max)? ' · '+(a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos') : '';
-        return `<div class="card oc" onclick="_net.verProfessor&&_net.verProfessor('${a.professor_id}')" style="cursor:pointer">
+        return `<div class="card oc" onclick="_net.verAula&&_net.verAula('${a.id}')" style="cursor:pointer">
           <div class="linha-item"><div class="av">🗓</div><div class="txt">
             <b style="font-size:14px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)} <span style="color:var(--ink3);font-weight:400">· ${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))}</span></b>
             <small>${pn}${a.local_txt?' · '+a.local_txt:''}${a.max_alunos?' · até '+a.max_alunos+' alunos':''}${fx}</small>
@@ -2628,7 +2628,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787852430"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1787853520"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3458,7 +3458,7 @@ aulas(){
     const naAula = (a.aula_alunos||[]).map(x=>x.aluno_id);
     return `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-        <div><b style="font-size:15px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+        <div onclick="_net.verAula&&_net.verAula('${a.id}')" style="cursor:pointer"><b style="font-size:15px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)} <span style="color:var(--ink3);font-weight:400">›</span></b>
           <div class="nota">${a.duracao_min||60} min${a.local_txt?' · 📍 '+a.local_txt:''} · ${a.esporte==='beach'?'Beach':'Tênis'}</div></div>
         <button class="operf" style="flex:0 0 auto;padding:7px 11px" onclick="aulaDesligar('${a.id}')">Desligar</button>
       </div>
@@ -3512,9 +3512,9 @@ aulasAluno(){
     ? `<div class="card"><p class="nota">Você ainda não está em nenhuma turma. Quem procura professor acha em <b>Encontrar › Professores</b> — e as turmas com vaga ficam lá também.</p>
        <button class="btn" style="margin-top:10px" onclick="trocarAba('radar')">Procurar professor</button></div>`
     : `${rec.length?`<div class="rot">Minhas turmas</div>`:''}
-       ${rec.map(a=>`<div class="card" style="margin-bottom:8px">
+       ${rec.map(a=>`<div class="card clic" style="margin-bottom:8px" onclick="_net.verAula('${a.id}')">
          <b style="font-size:15px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
-         <small style="display:block;color:var(--ink3)">${nomeP(a.professor_id)} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+a.local_txt:''}</small>
+         <small style="display:block;color:var(--ink3)"><span onclick="event.stopPropagation();_net.verProfessor('${a.professor_id}')" style="text-decoration:underline">${nomeP(a.professor_id)}</span> · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+a.local_txt:''}</small>
          ${excDe(a.id)}
        </div>`).join('')}
        ${av.length?`<div class="rot" style="margin-top:10px">Aulas avulsas</div>`:''}
@@ -3618,7 +3618,7 @@ turma(){
       <div class="rot">Meus alunos <span>${(T.alunos||[]).length}</span></div>
       ${(T.alunos||[]).length
         ? T.alunos.map(a=>`<div class="card"><div class="linha-item">
-            <div class="txt"><b>${nomeDe(a.aluno_id)}</b><small>${ESP[a.esporte]||a.esporte} · desde ${new Date(a.desde).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})}</small></div>
+            <div class="txt" onclick="_net.verJogador&&_net.verJogador('${a.aluno_id}')" style="cursor:pointer"><b>${nomeDe(a.aluno_id)}</b><small>${ESP[a.esporte]||a.esporte} · desde ${new Date(a.desde).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})}</small></div>
             <button class="operf" style="flex:0 0 auto;padding:8px 12px" onclick="turmaEncerrar('${a.aluno_id}','${a.esporte}')">Encerrar</button>
           </div></div>`).join('')
         : `<div class="card"><p class="nota">Nenhum aluno vinculado ainda. O vínculo nasce quando <b>o aluno</b> confirma — nunca por você sozinho, e é isso que faz a contagem valer alguma coisa.</p></div>`}
@@ -3627,7 +3627,7 @@ turma(){
   const secProf = (T.professores||[]).length ? `<div class="sec">
       <div class="rot">Meu professor</div>
       ${T.professores.map(a=>`<div class="card"><div class="linha-item">
-        <div class="txt"><b>${nomeDe(a.treinador_id)}</b><small>${ESP[a.esporte]||a.esporte}</small></div>
+        <div class="txt" onclick="_net.verProfessor&&_net.verProfessor('${a.treinador_id}')" style="cursor:pointer"><b>${nomeDe(a.treinador_id)}</b><small>${ESP[a.esporte]||a.esporte}</small></div>
         <button class="operf" style="flex:0 0 auto;padding:8px 12px" onclick="turmaEncerrar('${a.treinador_id}','${a.esporte}')">Encerrar</button>
       </div></div>`).join('')}
     </div>` : '';

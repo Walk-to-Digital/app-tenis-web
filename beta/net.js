@@ -3457,6 +3457,59 @@ async function netProfessores(){
 /* ── 27/08 (mig 70) · O LADO DO ALUNO ───────────────────────────────────────
    `__minhasAulas` é o espelho que liga a aba "Aulas" do aluno na barra: quem
    tem matrícula ou avulsa viva ganha a superfície que faltava. */
+/* ── 27/08 · A FOLHA DA AULA — todas as informações num lugar, com o mapa ──
+   O mapa incorporado de verdade (tiles) exige coordenada, e endereço não vira
+   coordenada sem geocodificar — decisão pendente no backlog (#11). O que abre
+   AGORA é o Maps no endereço: com o endereço do clube quando o lugar é
+   cadastrado, ou pela busca "nome + Salvador" quando é texto livre. */
+const _mapsUrl = (q)=> 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+async function netVerAula(aid){
+  const { data: a } = await sb.from('aulas').select('*').eq('id', aid).maybeSingle();
+  if(!a){ if(window.toast) toast('Não achei essa aula — ela pode ter sido desligada.'); return; }
+  const sou = MEU_UID === a.professor_id;
+  const [vg, exc, matri] = await Promise.all([
+    sb.rpc('aula_vagas', { p_aula: aid }).then(r=>(r.data&&r.data[0])||null).catch(()=>null),
+    sb.from('aula_excecoes').select('*').eq('aula_id', aid)
+      .gte('dia', new Date().toISOString().slice(0,10)).then(r=>r.data||[]).catch(()=>[]),
+    sou ? sb.from('aula_alunos').select('aluno_id').eq('aula_id', aid).then(r=>r.data||[]) : Promise.resolve(null),
+  ]);
+  const DIAS = window.DIAS_LONGO || ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const turno = (h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2));
+  const estou = !!(window.__minhasAulas && (window.__minhasAulas.recorrentes||[]).some(x=>x.id===aid));
+  const cheia = !!(vg && vg.maximo && vg.ocupados >= vg.maximo);
+  const lug = a.local_id && (window.__lugares||[]).find(l=>l.id===a.local_id);
+  const lugarNome = (lug && lug.nome) || a.local_txt || null;
+  const mapsQ = (lug && lug.endereco) ? lug.endereco : (lugarNome ? lugarNome + ' Salvador' : null);
+  const faixa = (a.idade_min||a.idade_max)
+    ? (a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos') : null;
+  const linha = (ic,t)=> t?`<div style="display:flex;gap:10px;margin-top:8px;align-items:baseline"><span>${ic}</span><span>${t}</span></div>`:'';
+  _sheet('net-vaula', `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-family:var(--f-disp);font-size:17px">${DIAS[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+      <button onclick="document.getElementById('net-vaula').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="margin-top:2px"><span class="pil ${a.ativa!==false?'up':'gh'}">${a.ativa!==false?'toda semana':'desligada'}</span> <span class="pil gh">${turno}</span></div>
+    ${linha('🧑‍🏫', `<span onclick="document.getElementById('net-vaula').remove();netVerProfessor('${a.professor_id}')" style="text-decoration:underline;cursor:pointer">${_admEsc(_nomeDe(a.professor_id))}</span>`)}
+    ${linha('⏱', (a.duracao_min||60)+' min · '+(a.esporte==='beach'?'Beach Tennis':'Tênis'))}
+    ${linha('👥', vg ? (vg.maximo ? vg.ocupados+' de '+vg.maximo+' vagas'+(cheia&&vg.fila?' · '+vg.fila+' na fila':'') : vg.ocupados+' aluno'+(vg.ocupados===1?'':'s')+' · sem limite') : null)}
+    ${linha('🎂', faixa)}
+    ${lugarNome ? `<div class="card" style="margin-top:12px;cursor:pointer" onclick="window.open('${_mapsUrl(mapsQ)}','_blank','noopener')">
+      <div class="linha-item"><div class="av">🗺</div>
+        <div class="txt"><b>${_admEsc(lugarNome)}</b>
+          <small>${lug&&lug.endereco?_admEsc(lug.endereco):'toque pra abrir no Maps'}</small></div>
+        <div class="seta">›</div></div>
+    </div>` : '<p class="nota" style="margin-top:10px">Sem local definido — combine com o professor.</p>'}
+    ${exc.length ? `<div class="rot" style="margin-top:12px">Sem aula em</div>
+      ${exc.map(e=>`<small style="display:block;color:var(--down)">✕ ${new Date(e.dia+'T12:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})}${e.motivo?' · '+_admEsc(e.motivo):''}</small>`).join('')}` : ''}
+    ${sou && matri ? `<div class="rot" style="margin-top:12px">Quem está na aula <span>${matri.length}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+        ${matri.map(x=>`<button class="chip" onclick="document.getElementById('net-vaula').remove();netVerJogador('${x.aluno_id}')">${_admEsc(_nomeDe(x.aluno_id).split(' ')[0])}</button>`).join('')||'<p class="nota">Ninguém ainda.</p>'}
+      </div>` : ''}
+    ${estou ? `<p class="nota" style="margin-top:12px">✓ Você está nesta turma.</p>` : ''}
+    ${!sou && !estou && a.ativa!==false ? `<button class="${cheia?'operf':'btn'}" style="margin-top:12px;width:100%"
+        onclick="document.getElementById('net-vaula').remove();profPedir('${a.professor_id}','${a.id}')">${cheia?'Entrar na fila de espera':'Pedir vaga nesta turma'}</button>` : ''}
+  `);
+}
 async function netMinhasAulas(){
   if(!MEU_UID){ window.__minhasAulas = null; return null; }
   try{
@@ -6256,6 +6309,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   turma:netTurma, alunoPedir:netAlunoPedir, alunoAceitar:netAlunoAceitar,
   pedirVaga:(pid,aid)=>{ if(window.profPedir) profPedir(pid, aid); },
   avulsaEnviar:_avulsaEnviarUI, avulsaResponder:_avulsaResponderUI, minhasAulas:netMinhasAulas,
+  verAula:netVerAula, verJogadorDireto:netVerJogador,
   alunoRecusar:netAlunoRecusar, alunoEncerrar:netAlunoEncerrar,
   salvarLugar:netSalvarLugar, criarTorneioExterno:netCriarTorneioExterno, cidades:netCidades,
   fbResponder:netFeedbackResponder, fbAbrir:_fbAbrir,
