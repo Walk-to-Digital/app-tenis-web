@@ -2515,6 +2515,9 @@ function profCarregar(){
     if(!l && !window.__profRetry){ window.__profRetry=true; window.__profLoad=false; }
     if(aba==='radar') render();
   }).catch(()=>{ window.__profs = window.__profs || []; });
+  // 27/08: as turmas da vitrine chegam junto (mig 68); sem a 68 vem vazio
+  if(window.netTurmasAbertas) netTurmasAbertas()
+    .then(t=>{ window.__turmasAb=t||[]; if(aba==='radar') render(); }).catch(()=>{});
 }
 function profAceitando(p){
   return !!(p.aceitando_ate && new Date(p.aceitando_ate) > new Date());
@@ -2552,9 +2555,13 @@ function professoresHTML(){
     return `<div class="card oc">
       <div class="linha-item" style="align-items:flex-start">
         ${S.jogadores[p.player_id] ? avatar(p.player_id,'g') : '<div class="av g">🎾</div>'}
-        <div class="txt">
+        <!-- 27/08 (QA do Nuno): tocar é consulta, não compromisso — mesma lição
+             do perfil do jogador (16/08). O toque abre a folha do professor;
+             "Quero ser aluno" e "Falar" continuam diretos no lado direito. -->
+        <div class="txt" onclick="_net.verProfessor&&_net.verProfessor('${p.player_id}')" style="cursor:pointer">
           <b style="font-size:15px">${nome}</b>
           ${p.apresentacao?`<small>${p.apresentacao}</small>`:''}
+          ${p.atuacao?`<small>◎ ${p.atuacao}</small>`:''}
           ${lugar?`<small>📍 ${lugar}</small>`:''}
           <div style="margin-top:7px">${profAceitando(p)
             ? '<span class="pil up">Pegando aluno</span>'
@@ -2567,10 +2574,25 @@ function professoresHTML(){
       </div>
     </div>`;
   }).join('');
+  /* 27/08 (QA do Nuno + mig 68): as turmas com vaga viram vitrine própria.
+     A policy aulas_sel_vitrine decide o que chega (turma ativa de professor
+     ativo); aqui só se desenha o que o banco deixou passar. */
+  const T = (window.__turmasAb||[]).filter(a=> (a.esporte||'tenis')===(S.esporte||'tenis')
+      && Lv.some(p=>p.player_id===a.professor_id));
+  const tHtml = T.length ? `
+      <div class="rot" style="margin-top:16px">Turmas abertas <span>${T.length}</span></div>
+      ${T.map(a=>{ const pn=(S.jogadores[a.professor_id]||{}).nome||'Professor';
+        const fx=(a.idade_min||a.idade_max)? ' · '+(a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos') : '';
+        return `<div class="card oc" onclick="_net.verProfessor&&_net.verProfessor('${a.professor_id}')" style="cursor:pointer">
+          <div class="linha-item"><div class="av">🗓</div><div class="txt">
+            <b style="font-size:14px">${DIAS_LONGO[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+            <small>${pn}${a.local_txt?' · '+a.local_txt:''}${a.max_alunos?' · até '+a.max_alunos+' alunos':''}${fx}</small>
+          </div><div class="seta">›</div></div></div>`; }).join('')}` : '';
   return `<div class="sec">
       <div class="rot">Professores <span>${Lv.length}</span></div>
       <p class="nota" style="margin-bottom:12px">O contato aqui é público pra quem tem conta — declarar-se professor é pendurar a placa.</p>
       ${cards}
+      ${tHtml}
       ${cta}
     </div>`;
 }
@@ -3352,10 +3374,10 @@ souProfessor(){
     window.__profDraft = null;
     _net.meuProfessor().then(r=>{
       window.__profDraft = r ? {contato:r.contato||'', apresentacao:r.apresentacao||'',
-        aceitandoAte:r.aceitando_ate? r.aceitando_ate.slice(0,10):'', ativo:r.ativo!==false}
-        : {contato:'', apresentacao:'', aceitandoAte:'', ativo:true};
+        atuacao:r.atuacao||'', aceitandoAte:r.aceitando_ate? r.aceitando_ate.slice(0,10):'', ativo:r.ativo!==false}
+        : {contato:'', apresentacao:'', atuacao:'', aceitandoAte:'', ativo:true};
       render();
-    }).catch(()=>{ window.__profDraft={contato:'',apresentacao:'',aceitandoAte:'',ativo:true}; render(); });
+    }).catch(()=>{ window.__profDraft={contato:'',apresentacao:'',atuacao:'',aceitandoAte:'',ativo:true}; render(); });
   }
   if(!d) return {titulo:'Professor', html:'<div class="pad"><div class="card"><p class="nota">Carregando…</p></div></div>'};
   const em90 = new Date(Date.now()+90*86400e3).toISOString().slice(0,10);
@@ -3370,6 +3392,10 @@ souProfessor(){
         <div class="rot">Uma linha sobre você</div>
         <input class="onb-input" placeholder="Ex.: 12 anos de quadra, aula individual e em dupla" maxlength="160"
                value="${(d.apresentacao||'').replace(/"/g,'&quot;')}" oninput="profSet('apresentacao',this.value,true)">
+        <div class="rot">Onde você atua</div>
+        <input class="onb-input" placeholder="Pituba e Itaigara · Clube Espanhol · até 10 km" maxlength="140"
+               value="${(d.atuacao||'').replace(/"/g,'&quot;')}" oninput="profSet('atuacao',this.value,true)">
+        <p class="nota">Nas suas palavras: bairros, clubes, raio. Aparece no seu card e no seu perfil.</p>
         <div class="rot">Estou pegando aluno até</div>
         <input class="onb-input" type="date" max="${em90}" value="${d.aceitandoAte||''}" onchange="profSet('aceitandoAte',this.value,true)">
         <p class="nota">Data e não interruptor: quem liga e esquece ficaria "pegando aluno" pra sempre. Passou, você renova em dois toques.</p>
@@ -3461,6 +3487,18 @@ aulaNova(){
                value="${(d.local_txt||'').replace(/"/g,'&quot;')}" oninput="aulaSet('local_txt',this.value,true)">
         <div class="rot" style="margin-top:8px">Modalidade</div>
         <div class="seg2">${['tenis','beach'].map(e=>`<button class="${d.esporte===e?'on':''}" onclick="aulaSet('esporte','${e}')">${e==='beach'?'Beach Tennis':'Tênis'}</button>`).join('')}</div>
+        <div class="rot" style="margin-top:8px">Limites <span style="color:var(--ink3);font-weight:400">· opcional</span></div>
+        <!-- 27/08 (QA do Nuno, mig 68). O piso 18 na faixa não é capricho: o v1
+             é só pra maiores (mig 15) — a faixa segmenta ADULTOS ("turma 50+"),
+             nunca reabre a porta de menor. -->
+        <div style="display:flex;gap:8px">
+          <input class="onb-input" style="margin:0;flex:1" type="number" min="1" max="40" placeholder="Máx. alunos"
+                 value="${d.max_alunos||''}" oninput="aulaSet('max_alunos',parseInt(this.value)||null,true)">
+          <input class="onb-input" style="margin:0;flex:1" type="number" min="18" max="99" placeholder="Idade de"
+                 value="${d.idade_min||''}" oninput="aulaSet('idade_min',parseInt(this.value)||null,true)">
+          <input class="onb-input" style="margin:0;flex:1" type="number" min="18" max="99" placeholder="Idade até"
+                 value="${d.idade_max||''}" oninput="aulaSet('idade_max',parseInt(this.value)||null,true)">
+        </div>
       </div>
       <button class="btn" style="margin-top:14px" onclick="aulaSalvar()">Criar aula</button>
     </div>`};
@@ -5159,6 +5197,7 @@ function renderOnb(){
       <div class="onb-head"><div class="onb-kick">Área de convidados</div><h2>Você precisa de um convite pra fazer parte</h2></div>
       <p class="nota" style="margin-bottom:16px">O Ranket abre por convite — quem já está dentro traz quem joga. Se alguém te passou um código, é agora.</p>
       <input class="onb-input" placeholder="RANKET-XXXXX" value="${(onb.convite||'').replace(/"/g,'&quot;')}" oninput="onbConvite(this.value)" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:.08em;font-weight:700">
+      ${(onb.convite||'').includes('@')?`<p class="nota" style="color:var(--acc)">Isso parece um e-mail — o código do convite tem o formato RANKET-XXXXX. O e-mail entra no passo seguinte.</p>`:''}
       ${onb.conviteMsg?`<p class="nota" style="color:${onb.conviteMsg==='conferindo…'?'var(--ink3)':'var(--dn)'}">${onb.conviteMsg}</p>`:''}
       <div class="onb-nav">
         <button class="onb-prim" onclick="onbConviteOk()">Entrar com o convite</button>

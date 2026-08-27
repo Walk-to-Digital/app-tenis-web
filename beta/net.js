@@ -3316,6 +3316,10 @@ async function netAulaCriar(d){
     duracao_min: d.duracao_min || 60,
     local_id: d.local_id || null, local_txt: (d.local_txt||'').trim() || null,
     esporte: d.esporte || 'tenis',
+    /* 27/08 (mig 68) — limites da turma. Nulos quando o professor não impôs:
+       ausência de limite é ausência, nunca um número inventado. */
+    max_alunos: d.max_alunos || null,
+    idade_min: d.idade_min || null, idade_max: d.idade_max || null,
   }).select('id').maybeSingle();
   return { id: data ? data.id : null, erro: error ? error.message : null };
 }
@@ -3326,6 +3330,36 @@ async function netAulaDesligar(id){
   return { erro: error ? error.message : null };
 }
 async function netAulaAluno(aulaId, alunoId, entra){
+  /* 27/08 (mig 68) — os limites da turma valem na PORTA, não no papel. Guarda
+     de cliente: o professor é o único que matricula (policy da 66), então a
+     tela dele é a porta real. Se a leitura dos limites falhar por rede, a
+     matrícula segue — limite que trava turma por 4G ruim é pior que limite
+     nenhum. A cobrança dura no servidor fica pra quando o guard de aulas
+     ganhar o caso (anotado no IDEIAS-qa-professor.md). */
+  if(entra){
+    try{
+      const { data: a } = await sb.from('aulas')
+        .select('max_alunos, idade_min, idade_max').eq('id', aulaId).maybeSingle();
+      if(a && a.max_alunos){
+        const { count } = await sb.from('aula_alunos')
+          .select('aluno_id', { count:'exact', head:true }).eq('aula_id', aulaId);
+        if(count !== null && count >= a.max_alunos)
+          return { erro: 'a turma está cheia ('+a.max_alunos+' alunos)' };
+      }
+      if(a && (a.idade_min || a.idade_max)){
+        const { data: al } = await sb.from('players')
+          .select('nascimento').eq('id', alunoId).maybeSingle();
+        if(al && al.nascimento){
+          const n = new Date(al.nascimento), hoje = new Date();
+          let idade = hoje.getFullYear() - n.getFullYear();
+          const m = hoje.getMonth() - n.getMonth();
+          if(m < 0 || (m === 0 && hoje.getDate() < n.getDate())) idade--;
+          if(a.idade_min && idade < a.idade_min) return { erro: 'a turma é '+a.idade_min+'+ e o aluno tem '+idade };
+          if(a.idade_max && idade > a.idade_max) return { erro: 'a turma vai até '+a.idade_max+' anos e o aluno tem '+idade };
+        }
+      }
+    }catch(e){ /* rede: segue — ver comentário acima */ }
+  }
   const q = entra
     ? sb.from('aula_alunos').insert({ aula_id: aulaId, aluno_id: alunoId })
     : sb.from('aula_alunos').delete().eq('aula_id', aulaId).eq('aluno_id', alunoId);
@@ -3408,10 +3442,115 @@ window.netAdsRelatorio = netAdsRelatorio;
    policy de escrita, porque quem recebe bonificação não preenche a lista. */
 async function netProfessores(){
   const { data, error } = await sb.from('professores')
-    .select('player_id, contato, apresentacao, aceitando_ate, ativo')
+    .select('player_id, contato, apresentacao, aceitando_ate, ativo, atuacao')
     .eq('ativo', true);
   if(error){ console.error('[net] professores', error); return null; }
   return data || [];
+}
+/* ── 27/08 · O PERFIL DO PROFESSOR (QA do Nuno + estudo Tweener 26/08) ──────
+   Mesma lição do perfil do jogador (16/08): tocar é consulta, não compromisso.
+   O card do Encontrar era vitrine sem porta — "Quero ser aluno" era o único
+   toque, e ninguém pede professor sem olhar quem ele é. A folha junta o que já
+   existia espalhado (apresentação, lugar, aceitando) com o que a mig 68 traz
+   (atuação, turmas com vaga, elogios). */
+async function netTurmasAbertas(){
+  // a policy aulas_sel_vitrine (68 D) decide o que aparece: turma ativa de
+  // professor ativo. Antes da 68 rodar, isto devolve só as MINHAS — inofensivo.
+  try{
+    const { data } = await sb.from('aulas').select('*').eq('ativa', true)
+      .order('dia_semana').order('hora');
+    return data || [];
+  }catch(e){ return []; }
+}
+async function netElogiosDe(pid){
+  try{
+    const { data, error } = await sb.from('professor_elogios').select('*')
+      .eq('professor_id', pid).order('criado_em', {ascending:false});
+    if(error) return null;             // tabela ainda sem a 68: seção some
+    return data || [];
+  }catch(e){ return null; }
+}
+async function netElogiar(pid, estrelas, texto){
+  if(!MEU_UID) return { erro:'sem conta' };
+  const { error } = await sb.from('professor_elogios').upsert({
+    professor_id: pid, autor_id: MEU_UID,
+    estrelas: estrelas, texto: (texto||'').trim() || null });
+  return { erro: error ? error.message : null };
+}
+let _vpEstrelas = 0;
+async function netVerProfessor(pid){
+  const [pr, aulas, elogios] = await Promise.all([
+    sb.from('professores').select('*').eq('player_id', pid).maybeSingle().then(r=>r.data),
+    sb.from('aulas').select('*').eq('professor_id', pid).eq('ativa', true)
+      .order('dia_semana').then(r=>r.data||[]).catch(()=>[]),
+    netElogiosDe(pid),
+  ]);
+  if(!pr){ toast && toast('Não achei esse professor.'); return; }
+  const nome = _nomeDe(pid);
+  const sou = MEU_UID === pid;
+  const DIAS = window.DIAS_LONGO || ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const media = (elogios && elogios.length)
+    ? (elogios.reduce((t,e)=>t+e.estrelas,0)/elogios.length) : null;
+  const meuElogio = (elogios||[]) .find(e=>e.autor_id===MEU_UID);
+  _vpEstrelas = meuElogio ? meuElogio.estrelas : 0;
+  const estr = (n)=> '★'.repeat(Math.round(n)) + '☆'.repeat(5-Math.round(n));
+  const vagas = (a)=>{
+    if(!a.max_alunos) return '';
+    const n = (a.aula_alunos||[]).length;   // pode não vir no select simples
+    return ` · até ${a.max_alunos} aluno${a.max_alunos>1?'s':''}`;
+  };
+  const faixa = (a)=> (a.idade_min||a.idade_max)
+    ? ` · ${a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos'}` : '';
+  const tel = pr.contato ? pr.contato.replace(/[^0-9]/g,'') : null;
+  _sheet('net-vprof', `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-family:var(--f-disp);font-size:17px">${_admEsc(nome)}</b>
+      <button onclick="document.getElementById('net-vprof').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    ${media!==null ? `<div style="margin-top:2px;color:var(--acc);font-size:15px">${estr(media)} <span style="color:var(--ink3);font-size:12px">${media.toFixed(1)} · ${elogios.length} elogio${elogios.length>1?'s':''}</span></div>`:''}
+    <div style="margin-top:8px">${profAceitando && profAceitando(pr) ? '<span class="pil up">Pegando aluno</span>' : '<span class="pil gh">Turma fechada agora</span>'}</div>
+    ${pr.apresentacao?`<p style="margin-top:10px">${_admEsc(pr.apresentacao)}</p>`:''}
+    ${pr.atuacao?`<p class="nota" style="margin-top:6px">◎ Atua em: ${_admEsc(pr.atuacao)}</p>`:''}
+    <div class="rot" style="margin-top:14px">Turmas</div>
+    ${aulas.length ? aulas.map(a=>`<div class="card" style="margin-top:6px">
+        <b style="font-size:14px">${DIAS[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+        <small style="display:block;color:var(--ink3)">${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+_admEsc(a.local_txt):''}${vagas(a)}${faixa(a)}</small>
+      </div>`).join('') : '<p class="nota">Nenhuma turma aberta agora.</p>'}
+    ${!sou ? `<div style="display:flex;gap:8px;margin-top:14px">
+      ${profAceitando && profAceitando(pr) ? `<button class="btn" style="flex:1" onclick="profPedir('${pid}');document.getElementById('net-vprof').remove()">Quero ser aluno</button>`:''}
+      ${(tel && tel.length>=8) ? `<a class="btn sec" style="flex:1;text-align:center;text-decoration:none" href="https://wa.me/55${tel}" target="_blank" rel="noopener">Falar</a>`:''}
+    </div>`:''}
+    ${elogios===null ? '' : `
+    <div class="rot" style="margin-top:16px">Elogios</div>
+    ${(elogios||[]).slice(0,5).map(e=>`<div class="card" style="margin-top:6px">
+        <span style="color:var(--acc)">${estr(e.estrelas)}</span>
+        ${e.texto?`<p style="margin:4px 0 0">${_admEsc(e.texto)}</p>`:''}
+        <small style="color:var(--ink3)">${_admEsc(_nomeDe(e.autor_id))}</small>
+      </div>`).join('') || '<p class="nota">Ninguém elogiou ainda.</p>'}
+    ${!sou ? `<div class="card" style="margin-top:10px">
+      <div class="rot">${meuElogio?'Seu elogio':'Elogiar'}</div>
+      <div id="vp-estrelas" style="font-size:24px;letter-spacing:4px;cursor:pointer;margin:4px 0">
+        ${[1,2,3,4,5].map(n=>`<span onclick="_net.vpEstrela(${n},'${pid}')" style="color:${n<=_vpEstrelas?'var(--acc)':'var(--ink3)'}">★</span>`).join('')}
+      </div>
+      <textarea id="vp-texto" class="onb-input" maxlength="280" rows="2"
+        placeholder="Conta como é treinar com ${_admEsc(nome.split(' ')[0])} (opcional)">${meuElogio&&meuElogio.texto?_admEsc(meuElogio.texto):''}</textarea>
+      <button class="btn" style="margin-top:8px" onclick="_net.enviarElogio('${pid}')">${meuElogio?'Atualizar elogio':'Enviar elogio'}</button>
+    </div>`:''}`}
+  `);
+}
+function _vpEstrela(n, pid){
+  _vpEstrelas = n;
+  const el = document.getElementById('vp-estrelas');
+  if(el) el.querySelectorAll('span').forEach((s,i)=>{ s.style.color = (i+1)<=n ? 'var(--acc)' : 'var(--ink3)'; });
+}
+async function _vpEnviar(pid){
+  if(!_vpEstrelas){ alert('Toque nas estrelas pra dar a nota.'); return; }
+  const t = document.getElementById('vp-texto');
+  const r = await netElogiar(pid, _vpEstrelas, t ? t.value : '');
+  if(r.erro){ alert('Não deu: '+r.erro); return; }
+  toast('Elogio registrado.');
+  const el=document.getElementById('net-vprof'); if(el) el.remove();
+  netVerProfessor(pid);
 }
 async function netMeuProfessor(){
   if(!MEU_UID) return null;
@@ -3423,6 +3562,7 @@ async function netSalvarProfessor(d){
   const linha = { player_id: MEU_UID, ativo: d.ativo !== false,
     contato: (d.contato||'').trim() || null,
     apresentacao: (d.apresentacao||'').trim() || null,
+    atuacao: (d.atuacao||'').trim() || null,          // 27/08 (mig 68)
     aceitando_ate: d.aceitandoAte || null };
   const { error } = await sb.from('professores').upsert(linha);
   return { erro: error ? error.message : null };
@@ -6039,6 +6179,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
   cancelarDesafio:netCancelarDesafio,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
+  verProfessor:netVerProfessor, vpEstrela:_vpEstrela, enviarElogio:_vpEnviar, turmasAbertas:netTurmasAbertas,
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,
   admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
