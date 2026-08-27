@@ -188,7 +188,27 @@ async function netBoot(eu){
     // CONTA: busca meu jogador no banco. Se já existe (conta real), HIDRATA o
     // app a partir dele e pula o cadastro — em qualquer aparelho. Só sobe o
     // local quando é a primeira vez (não sobrescreve conta real com o default).
-    const { data: meuRow } = await sb.from('players').select('*').eq('id',uid).maybeSingle();
+    const { data: meuRow, error: meuErr } = await sb.from('players').select('*').eq('id',uid).maybeSingle();
+    /* 27/08 — SESSÃO ÓRFÃ. O JWT continua válido no aparelho depois que a conta
+       morre no banco (wipe de teste hoje; LGPD ou banimento com purge amanhã).
+       Sem esta guarda, `contaReal` sai false, mas o gate do cadastro lê o
+       `S.cadastroFeito` do LOCALSTORAGE — e o app segue rodando sobre a persona
+       local do aparelho, com nome e número velhos, parecendo logado. Foi
+       exatamente o "Breno Nuno · 2259" fantasma do QA de 27/08.
+       A exceção do `onb` é a mesma da linha do cadastro acima: durante o
+       onboarding existe a janela entre o signUp (sessão já criada) e o primeiro
+       sync (linha ainda não criada) — derrubar a sessão ali mataria o cadastro
+       no meio. */
+    /* `!meuErr` é obrigatório: falha de REDE também devolve data nulo, e
+       deslogar + limpar o aparelho por causa de 4G ruim seria pior que o bug.
+       Ausência só é ausência quando a consulta respondeu. */
+    if(!meuRow && !meuErr && !(typeof onb!=='undefined' && onb)){
+      netBadge('off', 'conta encerrada');
+      try{ await sb.auth.signOut(); }catch(e){}
+      try{ localStorage.removeItem('appTenis'); }catch(e){}
+      location.reload();
+      return null;
+    }
     /* 18/08 (mig 41): CONTA BANIDA PARA AQUI. Antes de hidratar, antes de
        carregar elenco, antes de ligar o tempo-real. A coluna existe pra isso;
        sem esta linha, banir seria escrever num campo que ninguém lê — o
