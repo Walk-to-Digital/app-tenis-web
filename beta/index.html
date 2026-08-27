@@ -2016,8 +2016,17 @@ function render(){
   const naInicio = atual.rota==='inicio';
   const naVest = atual.rota==='vestiario';
   $('#topo').style.display = (naInicio||naVest) ? 'none' : 'flex';
-  // ambiente noturno (quadra por baixo) vale nas telas internas; home e vestiário têm cena própria
-  $('#fone').classList.toggle('noturno', !naInicio && !naVest);
+  /* ambiente noturno (a quadra correndo por baixo) vale nas telas internas.
+     26/08: a rota `inicio` era sinônimo de "esta tela pinta o próprio fundo", e
+     DEIXOU DE SER no dia em que a home do professor entrou — ela é a MESMA rota
+     e não desenha cena nenhuma. O professor ficava sem as duas: sem a
+     `.ini .cena` (que a `homeProfessor` não renderiza) e com o `#amb` desligado
+     por este `naInicio`. Sobrava o fundo chapado.
+     A pergunta certa não é QUE ROTA É — é SE A TELA PINTA O PRÓPRIO FUNDO. E o
+     predicado é o mesmo que escolhe qual home renderizar (`ehProfessor`), então
+     os dois não têm como discordar. */
+  const cenaPropria = (naInicio && !ehProfessor()) || naVest;
+  $('#fone').classList.toggle('noturno', !cenaPropria);
   // o cenário escolhido no vestiário vira o fundo da home e o ambiente das telas internas
   const _c = S.jogadores[EU].cena||{quadra:'saibro',momento:'noite'};
   $('#fone').style.setProperty('--cena-url', `url('../quadras/${_c.quadra}-${_c.momento}.jpg')`);
