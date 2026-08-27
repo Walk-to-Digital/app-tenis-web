@@ -2457,14 +2457,26 @@ function aulasCarregar(){
             .catch(()=>{ window.__aulas=[]; render(); });
 }
 function aulaSet(k,v,quieto){ window.__aulaDraft=window.__aulaDraft||{}; window.__aulaDraft[k]=v; if(!quieto) render(); }
+function aulaDia(i){ const d=window.__aulaDraft=window.__aulaDraft||{}; d.dias=d.dias||[];
+  d.dias=d.dias.includes(i)? d.dias.filter(x=>x!==i) : [...d.dias,i].sort((a,b)=>a-b); render(); }
 async function aulaSalvar(){
   const d=window.__aulaDraft||{};
-  if(d.dia_semana===undefined || d.dia_semana===null){ alert('Escolha o dia da semana.'); return; }
+  const dias=(d.dias&&d.dias.length)? d.dias : (d.dia_semana!==undefined&&d.dia_semana!==null? [d.dia_semana] : []);
+  if(!dias.length){ alert('Escolha pelo menos um dia da semana.'); return; }
   if(!d.hora){ alert('Escolha a hora.'); return; }
-  const r=await _net.aulaCriar(d);
-  if(r.erro){ alert('Não deu pra criar: '+r.erro); return; }
+  /* uma criação POR DIA, e o resultado nunca é silencioso pela metade: se a
+     terça entrou e a quinta falhou, a mensagem diz exatamente isso — meia
+     verdade calada aqui viraria aula fantasma na grade. */
+  const ok=[], falhou=[];
+  for(const dia of dias){
+    const r=await _net.aulaCriar({...d, dia_semana: dia});
+    if(r.erro) falhou.push(DIAS_LONGO[dia]+' ('+r.erro+')'); else ok.push(DIAS_LONGO[dia]);
+  }
   window.__aulaDraft={}; window.__aulasLoad=false; window.__aulas=undefined;
-  toast('Aula criada. Ela se repete toda semana até você desligar.');
+  if(falhou.length && ok.length){ alert('Criou '+ok.join(', ')+' — mas falhou: '+falhou.join('; ')); }
+  else if(falhou.length){ alert('Não deu pra criar: '+falhou.join('; ')); return; }
+  else toast(ok.length>1 ? 'Aulas de '+ok.join(' e ')+' criadas. Repetem toda semana até você desligar.'
+                         : 'Aula criada. Ela se repete toda semana até você desligar.');
   voltar();
 }
 async function aulaDesligar(id){
@@ -2715,8 +2727,12 @@ function lugaresHTML(){
     return `
     <div class="card oc">
       <div class="linha-item" style="align-items:flex-start">
-        <div class="av">📍</div>
-        <div class="txt">
+        <!-- 27/08 (QA do Nuno): o card era vitrine sem porta — o perfil do lugar
+             (netVerLocal) existia desde a mig 19 e nada aqui levava até ele. O
+             clique fica no avatar e no texto; zap/ligar seguem diretos no lado
+             direito, sem passar pelo perfil. -->
+        <div class="av" onclick="_net.verLocal('${l.id}')" style="cursor:pointer">📍</div>
+        <div class="txt" onclick="_net.verLocal('${l.id}')" style="cursor:pointer">
           <b style="font-size:15px">${l.nome}</b>
           <small>▤ ${TIPO[l.tipo]||'Espaço'} · ${l.quadras} quadra${l.quadras>1?'s':''}</small>
           ${l.cidade?`<small>◎ ${l.cidade}</small>`:''}
@@ -3428,8 +3444,13 @@ aulaNova(){
       <div class="card" style="padding:16px">
         <b style="font-family:var(--f-disp);font-size:17px">Criar aula</b>
         <p class="nota" style="margin:4px 0 14px">Ela se repete toda semana, no mesmo dia e hora, até você desligar.</p>
-        <div class="rot">Dia da semana</div>
-        <div class="grade" style="margin-bottom:14px">${DIAS_LONGO.map((n,i)=>chip('dia_semana',i,n.slice(0,3))).join('')}</div>
+        <div class="rot">Dias da semana <span style="color:var(--ink3);font-weight:400">· pode mais de um</span></div>
+        <!-- 27/08 (QA do Nuno): "toda terça E quinta às 17h" é uma aula só na
+             cabeça do professor — aqui viram N linhas na tabela de aulas: o
+             modelo do banco é 1 linha por dia POR DESENHO (cancelar o feriado
+             de terça não pode cancelar a quinta). Multi-seleção na tela, uma
+             criação por dia no salvar. -->
+        <div class="grade" style="margin-bottom:14px">${DIAS_LONGO.map((n,i)=>`<button class="chip ${(d.dias||[]).includes(i)?'on':''}" onclick="aulaDia(${i})">${n.slice(0,3)}</button>`).join('')}</div>
         <div class="rot">Hora e duração</div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <input class="onb-input" style="margin:0;flex:1" type="time" value="${d.hora||''}" onchange="aulaSet('hora',this.value,true)">
@@ -4889,6 +4910,7 @@ function onbSet(k,v){ onb[k]=v; renderOnb() }
 function onbNome(v){ onb.nome=v }                 // sem re-render pra não perder o foco do input
 function onbEmail(v){ onb.email=v }
 function onbSenha(v){ onb.senha=v }
+function onbSenha2(v){ onb.senha2=v }
 function onbNasc(v){ onb.nasc=v }
 function onbTempo(v){ onb.tempo=v }
 function onbSet2(k,v){ onb[k]=v }          // sem re-render: não perde o foco do input
@@ -4969,6 +4991,7 @@ function onbContaOk(){
     return;
   }
   if(!onb.senha || onb.senha.length<6){ alert('A senha precisa de pelo menos 6 caracteres.'); return; }
+  if(onb.senha !== (onb.senha2||'')){ alert('As duas senhas não estão iguais. Confere e tenta de novo.'); return; }
   onbNext();
 }
 // traduz os erros comuns do Supabase pra português de gente
@@ -5199,6 +5222,10 @@ function renderOnb(){
         <input id="onb-senha" class="onb-input" type="${onb.verSenha?'text':'password'}" placeholder="Criar senha" value="${(onb.senha||'').replace(/"/g,'&quot;')}" oninput="onbSenha(this.value)" autocomplete="new-password" style="padding-right:52px">
         <button onclick="onbVerSenha()" aria-label="mostrar senha" style="position:absolute;right:8px;top:8px;width:38px;height:38px;border:0;background:none;color:var(--ink3);font-size:17px;cursor:pointer">${onb.verSenha?'◉':'◎'}</button>
       </div>
+      <!-- 27/08 (QA do Nuno): repetir a senha. O olho é UM só e revela as duas
+           — dois olhos independentes deixariam uma visível e a outra não, e a
+           comparação a olho voltaria a ser adivinhação. -->
+      <input id="onb-senha2" class="onb-input" type="${onb.verSenha?'text':'password'}" placeholder="Repetir a senha" value="${(onb.senha2||'').replace(/"/g,'&quot;')}" oninput="onbSenha2(this.value)" autocomplete="new-password">
       <p class="nota">A senha informada deve ter no mínimo 6 caracteres.</p>
       <div class="onb-nav"><button class="onb-prim" onclick="onbContaOk()">Avançar</button></div>`;
   } else if(onb.step===2){
