@@ -405,11 +405,9 @@ button,input,select{font:inherit;color:inherit}
 .ini .linha1{display:flex;align-items:center;gap:10px}
 /* 25/08 (telas novas): o topo da home é logo + sino + avatar */
 .ini .logo{height:30px;width:auto;display:block;margin-right:auto;filter:drop-shadow(0 1px 6px rgba(0,0,0,.6))}
-/* `.av-topo.solo` cobre o avatar da home do professor, que vive fora da `.ini`
-   — mesmo remendo do `.ic.sino` (28/08). */
-.ini .av-topo,.av-topo.solo{width:40px;height:40px;flex:0 0 40px;border-radius:50%;overflow:hidden;cursor:pointer;
+.ini .av-topo{width:40px;height:40px;flex:0 0 40px;border-radius:50%;overflow:hidden;cursor:pointer;
   border:2px solid var(--acc);background:var(--sup2);position:relative}
-.ini .av-topo .ro,.av-topo.solo .ro{position:absolute;inset:0;background-repeat:no-repeat}
+.ini .av-topo .ro{position:absolute;inset:0;background-repeat:no-repeat}
 .ini .temp{flex:1;background:rgba(30,23,20,.72);border:1px solid var(--linha);border-radius:99px;
   padding:7px 14px;font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px)}
 .ini .temp b{color:var(--ink);font-weight:700}
@@ -425,13 +423,12 @@ button,input,select{font:inherit;color:inherit}
   background:radial-gradient(circle at 50% 45%, rgba(21,16,13,.15), rgba(21,16,13,.72));}
 .ini .ic.vitrine i{position:relative;z-index:1;font-style:normal;font-size:15px;
   color:var(--acc);text-shadow:0 1px 3px rgba(0,0,0,.85)}
-.ini .ic .badge,.ic.sino .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;line-height:17px;
+.ini .ic .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;line-height:17px;
   border-radius:99px;background:var(--up);color:#0A1100;font-size:10px;font-weight:800;text-align:center;padding:0 4px}
 /* (51) o ponto de recado: PONTO e não número, porque S.novidades conta AÇÃO e
    recado não é ação. Mora embaixo pra não brigar com o badge de cima. O valor
-   vem sempre do carimbo no banco (net.js netAvisos) — nunca de um zero local.
-   `.ic.sino` cobre o sino da home do professor, que vive fora da `.ini`. */
-.ini .ic .ponto,.ic.sino .ponto{position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;
+   vem sempre do carimbo no banco (net.js netAvisos) — nunca de um zero local. */
+.ini .ic .ponto{position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;
   background:var(--up);border:2px solid rgba(30,23,20,.9)}
 #nav .ponto{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--up);
   vertical-align:top;margin-top:2px}
@@ -450,6 +447,18 @@ button,input,select{font:inherit;color:inherit}
 .ini .degrau .bar{height:6px;border-radius:99px;background:var(--sup2);margin-top:8px;overflow:hidden}
 .ini .degrau .bar i{display:block;height:100%;background:var(--up);border-radius:99px}
 .ini .degrau .fim{font-size:10px;color:var(--ink3);margin-top:6px}
+/* 28/08: o painel do PROFESSOR ocupa o lugar do degrau — mesmo material
+   (vidro escuro sobre a cena), conteúdo outro: ele não sobe de classe, ele
+   tem turma. Três números e nada mais: alunos, aulas na semana e quem espera
+   resposta. `.q` acende em lime quando há alguém esperando — número que pede
+   ação não pode ter a mesma cor de número que só informa. */
+.ini .painel{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;
+  padding:11px 6px;backdrop-filter:blur(6px);display:grid;grid-template-columns:repeat(3,1fr)}
+.ini .painel .q{text-align:center;position:relative}
+.ini .painel .q+.q::before{content:'';position:absolute;left:0;top:12%;height:76%;width:1px;background:var(--linha)}
+.ini .painel .q b{display:block;font-family:var(--f-disp);font-size:20px;font-weight:700;line-height:1.1}
+.ini .painel .q small{display:block;font-size:9.5px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+.ini .painel .q.acende b{color:var(--up)}
 .ini .palco{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:220px;z-index:1;padding:0 18px}
 .ini .sombra{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:170px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(11px);z-index:0}
 .ini .glow{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:230px;height:66px;border-radius:50%;
@@ -981,7 +990,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787933455"></script>
+<script src="net.js?v=1787934574"></script>
 
 <script>
 /* =========================================================================
@@ -1914,7 +1923,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787933455"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787934574"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2016,7 +2025,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787933455"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787934574"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2038,15 +2047,12 @@ function render(){
   const naVest = atual.rota==='vestiario';
   $('#topo').style.display = (naInicio||naVest) ? 'none' : 'flex';
   /* ambiente noturno (a quadra correndo por baixo) vale nas telas internas.
-     26/08: a rota `inicio` era sinônimo de "esta tela pinta o próprio fundo", e
-     DEIXOU DE SER no dia em que a home do professor entrou — ela é a MESMA rota
-     e não desenha cena nenhuma. O professor ficava sem as duas: sem a
-     `.ini .cena` (que a `homeProfessor` não renderiza) e com o `#amb` desligado
-     por este `naInicio`. Sobrava o fundo chapado.
-     A pergunta certa não é QUE ROTA É — é SE A TELA PINTA O PRÓPRIO FUNDO. E o
-     predicado é o mesmo que escolhe qual home renderizar (`veProfessor`, que
-     desde 28/08 inclui a lente), então os dois não têm como discordar. */
-  const cenaPropria = (naInicio && !veProfessor()) || naVest;
+     26/08 abriu uma exceção aqui: a home do professor era a MESMA rota `inicio`
+     e não desenhava cena nenhuma, então `naInicio` desligava o `#amb` e sobrava
+     fundo chapado. 28/08 a exceção MORREU na origem — a home do professor
+     passou a renderizar `.ini` com a própria `.cena`, igual à do jogador. A
+     regra voltou a ser a simples: a rota `inicio` pinta o próprio fundo. */
+  const cenaPropria = naInicio || naVest;
   $('#fone').classList.toggle('noturno', !cenaPropria);
   // o cenário escolhido no vestiário vira o fundo da home e o ambiente das telas internas
   const _c = S.jogadores[EU].cena||{quadra:'saibro',momento:'noite'};
@@ -2363,36 +2369,74 @@ async function tExtSalvar(){
   voltar();
 }
 
-/* ------- 25/08 (mig 66): A HOME DO PROFESSOR -------
+/* ------- 25/08 (mig 66) · redesenhada 28/08: A HOME DO PROFESSOR -------
    Ele entrou por outra porta e o app dele é sobre outra coisa: a turma de
-   hoje, quem está evoluindo, e quem está esperando resposta. Se ele TAMBÉM
-   joga, ganha o próprio degrau no fim — a home é a soma, não uma escolha. */
+   hoje, quem está evoluindo, e quem está esperando resposta.
+
+   28/08 (decisão do Nuno): a home dele passa a falar a MESMA LÍNGUA VISUAL da
+   home do jogador — cena, HUD, um painel no lugar do degrau, palco com o
+   boneco e UMA ação grande. Antes era uma pilha de cards sem hierarquia: sem
+   ação, sem números, e com meia tela de quadra crua sobrando embaixo.
+
+   A ação grande é CONTEXTUAL, na mesma cascata do `bt` do jogador: responder
+   quem espera › a aula de hoje › criar a primeira › voltar pra vitrine. As
+   três coisas úteis existem sempre; o que muda é qual delas ganha o botão
+   grande e quais caem nas secundárias. */
 function homeProfessor(){
   aulasCarregar(); turmaCarregar(); alunosDetalheCarregar();
   const eu=S.jogadores[EU];
   const A=window.__aulas, T=window.__turma, D=window.__alunosDet;
   const hoje = A ? aulasHoje(A) : [];
   const nomeDe=(id)=> (S.jogadores[id]||{}).nome || 'Aluno';
-  const pedidos = ((T&&T.pedidos)||[]).filter(x=> x.quem_pediu !== (window._net&&_net.uid?_net.uid():null));
+  const meuUid = (window._net&&_net.uid?_net.uid():null);
+  const pedidos = ((T&&T.pedidos)||[]).filter(x=> x.quem_pediu !== meuUid);
+  /* ⚠️ `avulsas` com guarda própria: o catch do `turmaCarregar` devolve um
+     objeto SEM essa chave, então `T.avulsas.length` estoura justamente quando
+     a rede falhou — o estado em que a tela mais precisa continuar de pé. */
+  const avulsas = (T&&T.avulsas) || [];
+  /* quem espera resposta são os DOIS: pedido de vaga e aula avulsa. A avulsa
+     nunca apareceu na home — vivia só na aba Turma, e o professor só a
+     descobria entrando lá. */
+  const esperando = pedidos.length + avulsas.length;
 
-  const blocoHoje = hoje.length
-    ? `<div class="sec"><div class="rot">Sua aula de hoje <span>${hoje.length}</span></div>
-        ${hoje.map(a=>`<div class="card" style="border-color:var(--up)">
-          <b style="font-size:16px">${(a.hora||'').slice(0,5)}${a.local_txt?' · '+a.local_txt:''}</b>
-          <div class="nota">${(a.aula_alunos||[]).length} aluno(s) · ${a.duracao_min||60} min</div>
-        </div>`).join('')}</div>`
-    : `<div class="sec"><div class="rot">Hoje</div>
-        <div class="card"><p class="nota">${A===undefined?'Carregando…':(A&&A.length?'Nenhuma aula hoje.':'Você ainda não cadastrou aula. A primeira leva dois toques.')}</p>
-        ${A&&!A.length?`<button class="btn" style="margin-top:10px" onclick="ir('aulaNova')">Criar minha primeira aula</button>`:''}</div></div>`;
+  /* estou aparecendo pra quem procura aula? `aceitando_ate` é DATA com
+     decadência (mig 62): vence sozinho, e o professor sumia da vitrine sem
+     jamais saber. Agora a home diz. */
+  const P = window.__profDados;
+  const naVitrine = !!(P && P.ativo!==false && P.aceitando_ate && new Date(P.aceitando_ate) > new Date());
 
-  const blocoPed = pedidos.length ? `<div class="sec">
-      <div class="rot">Esperando você <span>${pedidos.length}</span></div>
-      ${pedidos.map(x=>{
-        const outro = x.treinador_id===(window._net&&_net.uid?_net.uid():null) ? x.aluno_id : x.treinador_id;
-        return `<div class="card clic" onclick="ir('turma')"><div class="linha-item">
-          <div class="txt"><b>${nomeDe(outro)}</b><small>quer ser seu aluno</small></div>
-          <div class="seta">›</div></div></div>`;
-      }).join('')}</div>` : '';
+  const hhmm=(h)=>String(h||'').slice(0,5);
+  /* a ação grande, por urgência — o que só ELE pode resolver vem primeiro */
+  let bt;
+  if(esperando)          bt={cls:'up', t:esperando+(esperando>1?' pessoas esperando':' pessoa esperando'),
+                             s:(pedidos.length?pedidos.length+' pedido'+(pedidos.length>1?'s':'')+' de vaga':'')
+                               +(pedidos.length&&avulsas.length?' · ':'')
+                               +(avulsas.length?avulsas.length+' aula avulsa'+(avulsas.length>1?'s':''):''), go:"ir('turma')"};
+  else if(hoje.length)   bt={cls:'', t:'Aula hoje · '+hhmm(hoje[0].hora),
+                             s:((hoje[0].aula_alunos||[]).length)+' aluno(s)'+(hoje[0].local_txt?' · '+hoje[0].local_txt:'')
+                               +(hoje.length>1?' · +'+(hoje.length-1)+' hoje':''), go:"trocarAba('aulas')"};
+  else if(A&&!A.length)  bt={cls:'', t:'Criar minha primeira aula', s:'Dois toques: o dia e a hora', go:"ir('aulaNova')"};
+  else if(!naVitrine)    bt={cls:'', t:'Você não aparece pra quem procura', s:'Ligue o "pegando aluno" pra voltar à busca', go:"ir('souProfessor')"};
+  else                   bt={cls:'', t:'Divulgar minhas aulas', s:'Seu perfil em Encontrar › Professores', go:"ir('souProfessor')"};
+
+  /* secundárias: só o que o botão grande NÃO cobriu (mesma técnica da home
+     do jogador) — nunca duas portas pra mesma coisa na mesma tela */
+  const sec2 = `<div class="acoes-sec">
+      ${!esperando ? `<button onclick="ir('turma')">👥 Minha turma</button>` : ''}
+      ${!hoje.length && !(A&&!A.length) ? `<button onclick="trocarAba('aulas')">🗓 Minhas aulas</button>` : ''}
+      ${bt.go.indexOf('souProfessor')<0 ? `<button onclick="ir('souProfessor')">◈ Meu perfil</button>` : ''}
+    </div>`;
+
+  /* a aula de hoje só vira LISTA quando há mais de uma — com uma só, o botão
+     grande já disse tudo e repetir logo abaixo é o ruído que a gente quer
+     evitar. Agora os cards abrem a folha da aula, que era um toque morto. */
+  const blocoHoje = hoje.length>1
+    ? `<div class="sec"><div class="rot">Suas aulas de hoje <span>${hoje.length}</span></div>
+        ${hoje.map(a=>`<div class="card clic" style="border-color:var(--up)" onclick="_net.verAula&&_net.verAula('${a.id}')"><div class="linha-item">
+          <div class="txt"><b>${hhmm(a.hora)}${a.local_txt?' · '+a.local_txt:''}</b>
+            <small>${(a.aula_alunos||[]).length} aluno(s) · ${a.duracao_min||60} min</small></div>
+          <div class="seta">›</div></div></div>`).join('')}</div>`
+    : '';
 
   /* A EVOLUÇÃO — é o que ele mostra pro pai do aluno, e o que faz a turma
      valer mais que uma lista de nomes. Aluno em calibragem aparece como tal:
@@ -2410,36 +2454,61 @@ function homeProfessor(){
                 <small>${j.calibrando?'em calibragem · '+(j.cal||0)+' de 8 partidas':(cls?('Classe '+cls+' · Nível '+nv):'sem partida ainda')}</small></div>
             </div></div>`;
           }).join('')
-        : `<div class="card"><p class="nota">Nenhum aluno ainda. Quem procura professor te acha em <b>Encontrar › Professores</b> — e o vínculo nasce quando o aluno confirma.</p>
-           ${(T&&!T.grupo)?'':''}</div>`)}
+        : `<div class="card"><p class="nota">Nenhum aluno ainda. Quem procura professor te acha em <b>Encontrar › Professores</b> — e o vínculo nasce quando o aluno confirma.</p></div>`)}
     </div>`;
 
-  /* se ele também joga, o degrau dele fecha a home — sem competir com a turma */
-  const meuJogo = euJogo() ? `<div class="sec">
-      <div class="rot">Você também joga</div>
-      <!-- 28/08: o card troca a LENTE, não a aba — o Encontrar saiu da nav do
-           professor e mora inteiro na lente de jogador (navAbas) -->
-      <div class="card clic" onclick="modoTrocar('jogo')"><div class="linha-item">
-        <div class="av">🎾</div>
-        <div class="txt"><b>Entrar como jogador</b><small>Classe ${classeDe(eu)} · Nível ${nivelDe(eu)} — radar, comunidade e vestiário</small></div>
-        <div class="seta">›</div></div></div>
-    </div>` : '';
+  const cena = eu.cena||{quadra:'saibro',momento:'noite'};
+  const nAulas = A ? A.length : null;
 
   return {titulo:'Início', dir:'', html:`
-    <div class="sec" style="padding-bottom:0">
-      <div style="display:flex;align-items:center;gap:12px">
-        <img src="../marcas/ranket-horizontal.png" alt="Ranket" style="height:26px;margin-right:auto">
-        <div class="ic sino" onclick="netAbrirInbox()" style="width:38px;height:38px;border-radius:50%;background:var(--sup);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative">🔔${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
-        <!-- 28/08: o caminho do professor até a própria ficha (switch "eu
-             compito", histórico, sair da conta). Sem ele, o professor que
-             joga não tinha COMO chegar lá: a aba Ficha só existe na nav de
-             quem NÃO joga (navAbas). -->
-        <div class="av-topo solo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
+    <div class="ini" style="--camisa:${eu.cor}">
+      <div class="cena" style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"></div>
+      <div class="scrim"></div>
+
+      <div class="hud">
+        <div class="linha1">
+          <img class="logo" src="../marcas/ranket-horizontal.png" alt="Ranket">
+          <div class="ic" onclick="netAbrirInbox()">🔔${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
+          <!-- 28/08: o caminho do professor até a própria ficha (switch "eu
+               compito", histórico, sair da conta) -->
+          <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
+        </div>
+        ${euJogo()?`
+        <!-- 28/08: a ida pra lente de jogador, no MESMO lugar e com o mesmo
+             peso do "👥 Sou professor" que volta de lá — a simetria é o que
+             faz as duas lentes se lerem como um par, e não como dois acasos -->
+        <button onclick="modoTrocar('jogo')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px system-ui;cursor:pointer;backdrop-filter:blur(6px)">🎾 Jogar</button>`:''}
+        <div class="painel">
+          <div class="q"><b>${D?D.length:'—'}</b><small>Alunos</small></div>
+          <div class="q"><b>${nAulas===null?'—':nAulas}</b><small>Aulas/sem</small></div>
+          <div class="q ${esperando?'acende':''}"><b>${esperando||'—'}</b><small>Esperando</small></div>
+        </div>
       </div>
-      <p class="nota" style="margin-top:12px">Olá, ${(eu.nome||'').split(' ')[0]}. ${hoje.length?'Você tem aula hoje.':'Sem aula hoje.'}</p>
-    </div>
-    ${blocoHoje}${blocoPed}${blocoTurma}${meuJogo}
-    ${typeof agendaHomeHTML==='function'?agendaHomeHTML():''}`};
+
+      <div class="palco">
+        <div class="sombra"></div>
+        <div class="glow"></div>
+        <div class="boneco" onclick="trocarAba('ficha')">${bonecoImg(eu, true)}</div>
+        <div class="placa">
+          <div class="nm">${eu.nome}</div>
+          <div class="meta">Professor${D&&D.length?` · <b>${D.length}</b> aluno${D.length>1?'s':''}`:''}
+            <span class="pil2" style="${naVitrine?'':'background:var(--sup2);color:var(--ink3)'}">${naVitrine?'na busca':'fora da busca'}</span></div>
+        </div>
+      </div>
+
+      <div class="acao">
+        <button class="big ${bt.cls}" onclick="${bt.go}">${bt.t}<small>${bt.s}</small></button>
+        ${sec2}
+      </div>
+
+      <!-- as listas moram DENTRO do container da cena, como as do jogador: o
+           palco cresce e empurra a ação pro fim da primeira tela, e o que vem
+           depois rola sobre a mesma cena, coberto pelo mesmo scrim. Fora dele
+           elas cairiam sobre o fundo base, que nesta rota está desligado
+           justamente porque a tela pinta o próprio fundo. -->
+      ${blocoHoje}${blocoTurma}
+      ${typeof agendaHomeHTML==='function'?agendaHomeHTML():''}
+    </div>`};
 }
 function alunosDetalheCarregar(){
   if(window.__alunosDetLoad) return;
@@ -2656,7 +2725,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787933455"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1787934574"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
