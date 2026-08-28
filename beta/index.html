@@ -981,7 +981,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787931990"></script>
+<script src="net.js?v=1787933291"></script>
 
 <script>
 /* =========================================================================
@@ -993,6 +993,10 @@ function estadoInicial(){ return {
   dia: 0,
   cadastroFeito: false,
   semana: 0,
+  /* 28/08: a LENTE do professor que também joga — 'prof' vê turma e aulas,
+     'jogo' vê o app como qualquer jogador (radar, comunidade, vestiário).
+     É apresentação do aparelho, nunca dado: `perfil` e `joga` vivem no banco. */
+  modoProf: 'prof',
   // 06/08: beach é esporte irmão — Nível, pontos e divisão próprios. Nunca se misturam.
   esporte: 'tenis',
   // bon = boneco do elenco · cor = camisa (vira o aro do avatar, o identificador a 34px)
@@ -1691,19 +1695,27 @@ let aba='inicio', pilha=[];
 
 function ir(rota, params){ pilha.push({rota,params}); render() }
 function voltar(){ pilha.pop(); render() }
-/* ===== 25/08 (mig 66): AS ABAS, POR PAPEL =====
-   Professor vê a turma e as aulas no lugar do Encontrar e do Vestiário. Se ele
-   TAMBÉM joga, ganha as duas de volta — a nav de quem faz as duas coisas é a
-   soma, não uma escolha. Máximo de 5 na barra: acima disso o alvo do dedo fica
-   menor que o dedo. */
+/* ===== 25/08 (mig 66) · revisto 28/08: AS ABAS, POR PAPEL E POR LENTE =====
+   Professor vê a turma e as aulas no lugar do Encontrar e do Vestiário.
+   28/08 (decisão do Nuno): o professor que TAMBÉM joga não ganha mais uma nav
+   híbrida — ele troca de LENTE. "Sou professor" mostra o app do professor;
+   "Jogar" mostra o app inteiro do jogador (radar, comunidade, vestiário).
+   A soma de 26/08 estourava o teto de 5 e deixava quem faz as duas coisas sem
+   Comunidade e sem Vestiário. Máximo de 5 na barra: acima disso o alvo do
+   dedo fica menor que o dedo. */
 function ehProfessor(){ const p=window.__perfil; return !!(p && p.perfil==='professor'); }
 function euJogo(){ const p=window.__perfil; return !p || p.joga !== false; }
+/* a lente atual — e o predicado ÚNICO que nav, home e cena compartilham
+   (ver o comentário da cena: os dois não têm como discordar) */
+function modoJogador(){ return ehProfessor() && euJogo() && S.modoProf==='jogo'; }
+function veProfessor(){ return ehProfessor() && !modoJogador(); }
+function modoTrocar(m){ S.modoProf=m; aba='inicio'; pilha=[]; salvar(); render(); }
+window.modoTrocar = modoTrocar;
 function navAbas(){
   const chat = {t:'chat', i:'💬', r:'Chat'};
-  /* 27/08 (mig 70, decisão do Nuno): quem é aluno ganha a aba Aulas NA BARRA —
-     a superfície que faltava. Seis itens só pra quem tem aula; os outros
-     seguem com cinco. O espelho `__souAluno` é preenchido no boot. */
-  if(!ehProfessor()) return window.__souAluno ? [
+  const jogador = window.__souAluno ? [
+    /* 27/08 (mig 70, decisão do Nuno): quem é aluno ganha a aba Aulas NA
+       BARRA — a superfície que faltava. Seis itens só pra quem tem aula. */
     {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Encontrar'},
     {t:'aulasAluno', i:'🗓', r:'Aulas'},
     {t:'comunidade', i:'▣', r:'Comunidade'}, chat, {t:'vestiario', i:'❖', r:'Vestiário'},
@@ -1711,14 +1723,13 @@ function navAbas(){
     {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Encontrar'},
     {t:'comunidade', i:'▣', r:'Comunidade'}, chat, {t:'vestiario', i:'❖', r:'Vestiário'},
   ];
-  const base = [
+  if(!ehProfessor() || modoJogador()) return jogador;
+  /* a nav do professor leva a Ficha SEMPRE (é onde vive o switch "eu compito"
+     da mig 72) — o Encontrar mora na lente de jogador, não aqui */
+  return [
     {t:'inicio', i:'◈', r:'Home'}, {t:'turma', i:'👥', r:'Turma'},
-    {t:'aulas', i:'🗓', r:'Aulas'},
+    {t:'aulas', i:'🗓', r:'Aulas'}, chat, {t:'ficha', i:'◇', r:'Ficha'},
   ];
-  /* professor que também joga troca o Chat pelo Encontrar na quinta posição —
-     o Chat continua alcançável pela Turma, e marcar jogo é o que ele perderia. */
-  return euJogo() ? [...base, {t:'radar', i:'◎', r:'Encontrar'}, chat]
-                  : [...base, chat, {t:'ficha', i:'◇', r:'Ficha'}];
 }
 function pintarNav(){
   const el = document.getElementById('nav');
@@ -1748,7 +1759,7 @@ function trocarAba(t){ aba=t; pilha=[]; if(t==='comunidade') S.novidades=0;
   if(t==='turma'||t==='aulas'){ window.__turmaLoad=false; window.__turma=undefined;
                                 window.__aulasLoad=false; window.__aulas=undefined;
                                 window.__alunosDetLoad=false; window.__alunosDet=undefined; }   // (66)
-  if(t==='inicio' && ehProfessor()){ window.__aulasLoad=false; window.__alunosDetLoad=false; }   // (66) a home dele vive disso
+  if(t==='inicio' && veProfessor()){ window.__aulasLoad=false; window.__alunosDetLoad=false; }   // (66) a home dele vive disso — na lente de jogador não há o que recarregar
   if(t==='ficha') { window.__convLoad=false; window.__convites=undefined;
                     window.__turmaLoad=false; window.__turma=undefined; window.__profDraft=undefined;
                     window.__midia=undefined; }   // 25/08: convites, turma, professor e midia
@@ -1903,7 +1914,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787931990"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787933291"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2005,7 +2016,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787931990"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1787933291"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2033,9 +2044,9 @@ function render(){
      `.ini .cena` (que a `homeProfessor` não renderiza) e com o `#amb` desligado
      por este `naInicio`. Sobrava o fundo chapado.
      A pergunta certa não é QUE ROTA É — é SE A TELA PINTA O PRÓPRIO FUNDO. E o
-     predicado é o mesmo que escolhe qual home renderizar (`ehProfessor`), então
-     os dois não têm como discordar. */
-  const cenaPropria = (naInicio && !ehProfessor()) || naVest;
+     predicado é o mesmo que escolhe qual home renderizar (`veProfessor`, que
+     desde 28/08 inclui a lente), então os dois não têm como discordar. */
+  const cenaPropria = (naInicio && !veProfessor()) || naVest;
   $('#fone').classList.toggle('noturno', !cenaPropria);
   // o cenário escolhido no vestiário vira o fundo da home e o ambiente das telas internas
   const _c = S.jogadores[EU].cena||{quadra:'saibro',momento:'noite'};
@@ -2406,9 +2417,11 @@ function homeProfessor(){
   /* se ele também joga, o degrau dele fecha a home — sem competir com a turma */
   const meuJogo = euJogo() ? `<div class="sec">
       <div class="rot">Você também joga</div>
-      <div class="card clic" onclick="trocarAba('radar')"><div class="linha-item">
+      <!-- 28/08: o card troca a LENTE, não a aba — o Encontrar saiu da nav do
+           professor e mora inteiro na lente de jogador (navAbas) -->
+      <div class="card clic" onclick="modoTrocar('jogo')"><div class="linha-item">
         <div class="av">🎾</div>
-        <div class="txt"><b>Classe ${classeDe(eu)} · Nível ${nivelDe(eu)}</b><small>marcar jogo pelo Encontrar</small></div>
+        <div class="txt"><b>Entrar como jogador</b><small>Classe ${classeDe(eu)} · Nível ${nivelDe(eu)} — radar, comunidade e vestiário</small></div>
         <div class="seta">›</div></div></div>
     </div>` : '';
 
@@ -2643,7 +2656,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787931990"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1787933291"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -2814,8 +2827,9 @@ const VISTAS = {
 
 /* ---------------- INÍCIO (home vitrine) ---------------- */
 inicio(){
-  /* (66) o professor entrou por outra porta e a home dele é sobre outra coisa */
-  if(ehProfessor()) return homeProfessor();
+  /* (66) o professor entrou por outra porta e a home dele é sobre outra coisa
+     — salvo quando a lente é a de jogador (28/08): aí a home é esta */
+  if(veProfessor()) return homeProfessor();
   const eu=S.jogadores[EU], pos=posicoes();
   const cena=eu.cena||{quadra:'saibro',momento:'noite'};
 
@@ -2893,6 +2907,9 @@ inicio(){
                style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"><i>◈</i></div>
           <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
         </div>
+        ${modoJogador()?`
+        <!-- 28/08: a volta da lente — só o professor vendo o app como jogador -->
+        <button onclick="modoTrocar('prof')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px system-ui;cursor:pointer;backdrop-filter:blur(6px)">👥 Sou professor</button>`:''}
         <div class="esp-sw">
           <button class="${S.esporte==='tenis'?'on':''}" onclick="trocarEsporte('tenis')">Tênis</button>
           <button class="${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach</button>
