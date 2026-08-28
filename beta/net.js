@@ -5729,6 +5729,35 @@ async function netCheckPerfil(){
 }
 window.netCheckPerfil = netCheckPerfil;
 
+/* 28/08 (mig 72): o switch "eu compito" da ficha do professor.
+   DESLIGAR é update direto — `joga` não é coluna que o guard da 31 protege, e
+   desligar muda DESCOBERTA (radar/quadro, mig 67), nunca compromisso: desafio
+   marcado e turma seguem como estão.
+   LIGAR passa pela porta `joga_ligar` do banco, que decide SOZINHO se a pessoa
+   já jogou (só vira o boolean, o Elo é história real) ou se está nascendo
+   esportivamente (cobra a classe e liga a calibragem). O app nunca afirma
+   "nunca joguei" — parâmetro que chega pronto é parâmetro forjável. */
+async function netJogaDesligar(){
+  if(!MEU_UID) return { erro:'sem conta' };
+  const { error } = await sb.from('players').update({ joga:false }).eq('id', MEU_UID);
+  if(error){ console.error('[net] joga', error); return { erro:error.message }; }
+  if(_perfil){ _perfil.joga = false; window.__perfil = _perfil; }
+  return { ok:true };
+}
+async function netJogaLigar(classe){
+  if(!MEU_UID) return { erro:'sem conta' };
+  const args = classe
+    ? { p_classe: classe,
+        p_esporte: (typeof S!=='undefined' && S.esporte==='beach') ? 'beach' : 'tenis' }
+    : {};
+  const { data, error } = await sb.rpc('joga_ligar', args);
+  if(error){ console.error('[net] joga', error); return { erro:error.message }; }
+  const r = data || {};
+  if(r.ok && _perfil){ _perfil.joga = true; window.__perfil = _perfil; }
+  return r;
+}
+window.netJogaLigar = netJogaLigar; window.netJogaDesligar = netJogaDesligar;
+
 async function netCheckAdm(){
   if(_admEh !== null) return _admEh;
   try{
