@@ -466,6 +466,23 @@ button,input,select{font:inherit;color:inherit}
 .rtabs{flex:1;display:flex;gap:4px;background:var(--sup);border:1px solid var(--linha2);border-radius:var(--rp);padding:3px}
 .rtab{flex:1;border:0;border-radius:var(--rp);background:transparent;color:var(--ink2);font:600 12px var(--f-ui);padding:8px 4px;cursor:pointer;white-space:nowrap}
 .rtab.on{background:var(--acc);color:var(--acc-ink);font-weight:800}
+/* 29/08 (board, node 120:390) — "Sua disponibilidade de jogo hoje".
+   Três colunas de pílulas separadas por fio. No board há um boneco numa quarta
+   coluna à esquerda; em 390pt de aparelho, quatro colunas dariam menos de 100pt
+   cada e a pílula "Rápida" não caberia. O boneco saiu — ele já está na home,
+   grande, e aqui era decoração. */
+.dhoje{display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+  background:rgba(11,11,11,.82);border:1px solid var(--linha);border-radius:20px;padding:14px 4px}
+.dhoje .col{padding:0 10px;min-width:0}
+.dhoje .col + .col{border-left:1px solid var(--linha)}
+.dhoje .cab{display:flex;align-items:center;gap:5px;margin-bottom:10px}
+.dhoje .cab i{font-style:normal;font-size:12px;color:var(--acc)}
+.dhoje .cab b{font:700 11px var(--f-ui);color:var(--ink);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.dhoje button{display:block;width:100%;margin-bottom:7px;padding:8px 4px;
+  border-radius:99px;border:1px solid var(--ink3);background:transparent;
+  color:var(--ink3);font:400 11.5px var(--f-ui);cursor:pointer}
+.dhoje button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 .rfiltro{border:1px solid var(--linha2);border-radius:var(--rp);background:var(--sup);color:var(--ink2);font:600 12px var(--f-ui);padding:9px 13px;cursor:pointer;white-space:nowrap}
 .oc .txt small{display:block;font-size:11px;color:var(--ink3);margin-top:3px}
 .odir{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:0 0 122px}
@@ -1146,7 +1163,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788040998"></script>
+<script src="net.js?v=1788041699"></script>
 
 <script>
 /* =========================================================================
@@ -2137,7 +2154,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788040998"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788041699"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2239,7 +2256,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788040998"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788041699"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2532,6 +2549,36 @@ async function dispSalvar(){
   window.__dispLoad=false;                          // força recarregar a régua
   toast('Disponibilidade marcada — você aparece no radar da sua faixa.');
   voltar();
+}
+/* 29/08 (board, node 120:390) — o atalho de UM TOQUE do radar: hoje, no
+   período escolhido. Não reaproveita dispSalvar() por duas razões: aquele
+   exige data e hora exatas (aqui são períodos) e termina em voltar(), que no
+   radar não tem pra onde voltar — é aba, a pilha está vazia.
+   As horas de cada período são âncoras, não promessa: quem quer 07h30 usa o
+   formulário completo, que continua ali e é linkado logo abaixo do bloco. */
+const DISP_PERIODO = { manha:['08:00','manhã'], tarde:['14:00','tarde'], noite:['19:00','noite'] };
+async function dispHoje(){
+  const d = window.__dispDraft || {};
+  if(!d.periodo){ alert('Escolha um período: manhã, tarde ou noite.'); return; }
+  const [hora, rotulo] = DISP_PERIODO[d.periodo];
+  const hoje = new Date();
+  const quando = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(),
+                          +hora.slice(0,2), +hora.slice(3,5), 0, 0);
+  /* o servidor recusa disponibilidade no passado, e com razão. Melhor dizer
+     isso aqui, com o motivo, do que deixar o erro genérico subir de lá. */
+  if(!(quando > new Date())){
+    alert('A ' + rotulo + ' de hoje já passou.\n\nEscolha outro período, ou abra o formulário completo pra marcar outro dia.');
+    return;
+  }
+  const r = window._net && _net.dispCriar ? await _net.dispCriar({
+    quando: quando.toISOString(),
+    uf:(d.uf||'').trim()||null, cidade:(d.cidade||'').trim()||null, bairro:(d.bairro||'').trim()||null,
+    tipo:d.tipo||'simples', esporte:d.esporte||S.esporte||'tenis', quadra:d.quadra||null,
+  }) : {erro:'sem rede'};
+  if(r.erro){ alert('Não deu pra marcar: '+r.erro); return; }
+  window.__dispLoad=false;                          // força recarregar a régua
+  toast('Você aparece no radar da sua faixa hoje à ' + rotulo + '.');
+  render();
 }
 async function dispRemover(id){
   if(window._net && _net.dispApagar) await _net.dispApagar(id);
@@ -3011,7 +3058,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788040998"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788041699"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3687,8 +3734,35 @@ radar(){
         ${euLivre?'🎾 Você está com bola na mão hoje — tocar desliga':'🎾 Tô livre hoje (sem hora marcada)'}</button>
     </div>
 
+    <!-- 29/08 (board): a disponibilidade deixou de ser SÓ uma tela à parte e
+         ganhou este atalho no topo do radar. A tela cheia (dispForm) continua,
+         com data, hora e localidade — aqui é o caminho de um toque: hoje, no
+         período escolhido. O board não desenha botão de confirmar; sem ele não
+         haveria como marcar, então ele existe e diz o que faz. -->
     <div class="sec">
-      <div class="rot">Oponentes disponíveis no seu radar <span>classes ${permitidas.join(' · ')}</span></div>
+      <div class="rot">Sua disponibilidade de jogo hoje</div>
+      ${(()=>{ const d=window.__dispDraft = window.__dispDraft||{tipo:'simples', esporte:S.esporte||'tenis', quadra:'saibro', uf:'BA'};
+        const pill=(k,v,n)=>`<button class="${d[k]===v?'on':''}" onclick="dispSet('${k}','${v}')">${n}</button>`;
+        return `<div class="dhoje">
+          <div class="col">
+            <div class="cab"><i>◔</i><b>Horário</b></div>
+            ${pill('periodo','manha','Manhã')}${pill('periodo','tarde','Tarde')}${pill('periodo','noite','Noite')}
+          </div>
+          <div class="col">
+            <div class="cab"><i>▤</i><b>Quadra</b></div>
+            ${pill('quadra','saibro','Saibro')}${pill('quadra','dura','Dura')}${pill('quadra','rapida','Rápida')}
+          </div>
+          <div class="col">
+            <div class="cab"><i>◎</i><b>Jogo</b></div>
+            ${pill('tipo','simples','Simples')}${pill('tipo','duplas','Duplas')}
+          </div>
+        </div>
+        <button class="btn" style="margin-top:12px" onclick="dispHoje()">Marcar disponibilidade de hoje</button>
+        <p class="nota" style="margin-top:8px">Quer marcar outro dia, com horário e bairro? <a onclick="ir('dispForm')" style="color:var(--acc);cursor:pointer">Abrir o formulário completo</a></p>`; })()}
+    </div>
+
+    <div class="sec">
+      <div class="rot">Disponíveis no seu radar <span>classes ${permitidas.join(' · ')}</span></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
         <div class="rtabs">${abaBt('agora','Agora')}${abaBt('hoje','Hoje')}${abaBt('semana','Esta semana')}</div>
         <button class="rfiltro" onclick="ir('radarFiltros')">Filtrar${nFiltros?` · ${nFiltros}`:''} ⌄</button>
