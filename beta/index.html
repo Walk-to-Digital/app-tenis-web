@@ -534,6 +534,35 @@ button,input,select{font:inherit;color:inherit}
    barra atravessando o card. A régua é a mesma (categoria, não classe) — o
    que muda é a forma, e a forma horizontal cabe mais informação: os pontos, o
    próximo degrau e o quanto falta, tudo na mesma linha de leitura. */
+/* 29/08 (board, node 58:1619) — PERFIL DO OPONENTE.
+   Cabeçalho com avatar grande de aro lime, nome + classe, bio, três
+   contadores e o CTA laranja. Depois as abas. */
+.pcab{display:flex;gap:14px;align-items:flex-start;padding:16px 18px 0}
+.pcab .av.gg{flex:0 0 76px}
+.pcab .info{flex:1;min-width:0}
+.pcab .nm{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pcab .nm b{font:700 19px var(--f-disp);color:var(--ink)}
+.pcab .nm .cl{font:700 17px var(--f-ui);color:var(--acc)}
+.pcab .bio{font:400 12px/1.5 var(--f-ui);color:var(--ink3);margin-top:7px}
+.pnums{display:flex;align-items:center;gap:18px;padding:14px 18px 0}
+.pnums .n{text-align:left}
+.pnums .n b{display:block;font:700 19px var(--f-disp);color:var(--ink)}
+.pnums .n small{font:400 11.5px var(--f-ui);color:var(--ink3)}
+.pnums .seguir{margin-left:auto;flex:0 0 auto;padding:10px 20px;border-radius:10px;
+  border:1px solid var(--linha2);background:transparent;color:var(--ink2);
+  font:400 12.5px var(--f-ui);cursor:pointer}
+.pcta{padding:14px 18px 4px}
+.pcta button{width:100%;border:0;border-radius:var(--rp);padding:15px;
+  background:var(--marca);color:var(--marca-ink);font:700 14px var(--f-ui);cursor:pointer}
+/* os três números de estatística, no formato do board */
+.pstats{display:flex;align-items:center;background:rgba(11,11,11,.6);
+  border:1px solid var(--linha);border-radius:16px;padding:16px 6px;margin-bottom:14px}
+.pstats > div{flex:1;text-align:center;min-width:0}
+.pstats > div + div{border-left:1px solid var(--linha)}
+.pstats .v{font:700 21px var(--f-disp);color:var(--ink)}
+.pstats .k{font:400 11px var(--f-ui);color:var(--ink3);margin-top:2px}
+.pstats .ic{font-style:normal;color:var(--acc);font-size:13px;margin-right:4px}
+
 .hcard{margin-top:11px;background:rgba(11,11,11,.82);border:1px solid var(--linha);
   border-radius:20px;padding:14px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .hcard .l1{display:flex;align-items:baseline;gap:8px}
@@ -1163,7 +1192,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788042562"></script>
+<script src="net.js?v=1788043581"></script>
 
 <script>
 /* =========================================================================
@@ -2154,7 +2183,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788042562"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788043581"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2256,7 +2285,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788042562"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788043581"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3058,7 +3087,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788042562"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788043581"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -4847,31 +4876,67 @@ ficha(){
    do ranking por container agora é a própria comunidade (`netVerGrupo`). */
 
 /* ---------------- JOGADOR ---------------- */
+/* 29/08 (board, node 58:1619) — o PERFIL DO OPONENTE.
+   Esta rota absorveu a folha `netVerJogador` do net.js, que era a segunda
+   ficha de jogador do app e agora delega pra cá. Era o único caso da leva em
+   que migrar REMOVE código em vez de mover: as duas desenhavam a mesma coisa,
+   e a folha nem consulta rede — lê `S.jogadores`, que o boot já hidratou. */
 jogador(p){
   const j=S.jogadores[p.id];
   if(p.id===EU) return VISTAS.ficha();
   const h=S.historico.filter(x=>x.adv===p.id);
-  return {titulo:j.nome, html:`
-    <div class="hero">
-      <div class="cab-hero">
-        ${avatar(p.id,'gg')}
-        <div class="txt">
-          <div class="nm">${j.nome}</div>
-          <div class="sub">Classe ${divDe(j)}</div>
-        </div>
+  const eu=S.jogadores[EU];
+  const cat=categoriaDe(nivelDe(j), divDe(j));
+  const advN=(S.esporte==='beach') ? (j.nivelB ?? 1200) : (j.nivel ?? 1200);
+  /* o que está em jogo — é o que a folha do net.js mostrava, e some se ela
+     sumir sem trazer isto junto */
+  const gV=calcular(nivelDe(eu), advN, true,  'amistoso','md3',false, eu.calibrando, eu.cal);
+  const gD=calcular(nivelDe(eu), advN, false, 'amistoso','md3',false, eu.calibrando, eu.cal);
+  const venci=h.filter(x=>x.venceu).length;
+  const aba=abaDe('perfil','stats');
+
+  const corpo = aba==='feed' ? cascaNota('O feed do jogador chega com a tabela de posts — a mesma que o feed da comunidade espera. Até lá não há o que mostrar aqui, e post de exemplo seria invenção.')
+    : aba==='conq' ? cascaNota('As conquistas de OUTRA pessoa não são carregadas hoje: o app só busca os troféus de quem está logado. Precisa de uma consulta nova, não de tela.')
+    : `
+      <div class="pstats">
+        <div><div class="v">${venci}</div><div class="k"><i class="ic">♦</i>Vitórias suas</div></div>
+        <div><div class="v">${h.length}</div><div class="k"><i class="ic">◎</i>Confrontos</div></div>
+        <div><div class="v">${h.length?Math.round(venci/h.length*100):0}%</div><div class="k"><i class="ic">▲</i>Aproveitamento</div></div>
       </div>
-      <div class="linha-nivel"><div class="n">${nivelDe(j)}</div><div class="lb">Nível</div></div>
-    </div>
-    <div class="sec">
+
+      <div class="rot">O que está em jogo</div>
+      <div class="card" style="margin-bottom:14px"><div class="linha-item">
+        <div class="txt"><b style="color:var(--up)">${gV.dNivel>0?'+':''}${gV.dNivel} de Nível se você vencer</b>
+        <small>${gD.dNivel} se perder · Classe ${divDe(j)}${CAT_SUFIXO[cat]||''} · Nível ${advN}</small></div>
+      </div></div>
+
       <div class="rot">Confronto direto</div>
       ${h.length? h.map(x=>`<div class="card"><div class="linha-item">
         <div class="txt"><b>${x.venceu?'Você venceu':'Você perdeu'}</b><small>${x.placar} · ${x.quando}</small></div></div></div>`).join('')
         : '<div class="card"><p class="nota">Vocês ainda não se enfrentaram no app.</p></div>'}
+
+      <div class="rot" style="margin-top:16px">Estilos de jogo</div>
+      ${cascaNota('O board mostra três estilos (fundo de quadra, consistente, defensivo). O app não pergunta nem deduz estilo de ninguém — não há de onde tirar, e três rótulos plausíveis seriam invenção sobre uma pessoa real.')}
+
+      <div class="rot">Disponibilidade da semana</div>
+      ${cascaNota('O board mostra a grade de sete dias por três períodos. O app guarda disponibilidade como horários avulsos que expiram, não como agenda semanal — a grade precisa de um modelo de dado que ainda não existe.')}`;
+
+  return {titulo:j.nome, html:`
+    <div class="pcab">
+      ${avatar(p.id,'gg')}
+      <div class="info">
+        <div class="nm"><b>${j.nome}</b><span class="cl">${divDe(j)}${CAT_SUFIXO[cat]||''}</span></div>
+        ${j.bio?`<div class="bio">${(j.bio+'').replace(/</g,'&lt;')}</div>`:''}
+      </div>
     </div>
-    <div class="sec">
-      <div class="rot">Atributos</div>
-      <div class="card"><p class="nota">Só atributo positivo e objetivo aparece na ficha de outro jogador. Nunca nota de opinião — o app não deixa ninguém avaliar ninguém.</p></div>
-    </div>`};
+    <div class="pnums">
+      <div class="n"><b>${h.length}</b><small>Partidas com você</small></div>
+      <button class="seguir" disabled title="Seguir ainda não existe no app">Seguir</button>
+    </div>
+    ${casca('<p class="nota">O board tem <b>Seguidores</b> e <b>Seguindo</b> ao lado das partidas, e um botão Seguir. O app não tem sistema de seguir ninguém: é tabela, policies e contadores novos. O botão fica desligado até existir.</p>')}
+    <div class="pcta"><button onclick="netDesafiar('${p.id}')">Convidar para jogar</button></div>
+    ${abasHtml('perfil', [['stats','Estatísticas'],['feed','Feed'],['conq','Conquistas']], 'linha')}
+    <div class="pad">${corpo}</div>`};
 },
 };
 
@@ -6357,6 +6422,11 @@ function aplicarJogadoresReais(lista){
       // existiam no banco e não chegavam em tela nenhuma além da própria.
       escudo: a.escudo || null,
       patroc: a.patroc || null,
+      /* 29/08 (mig 78): a bio viaja pro elenco. O board a exibe no perfil que
+         OUTRA pessoa abre — é justamente esse o uso dela. Sem esta linha o
+         dado existiria no banco e não chegaria a tela nenhuma além da própria,
+         que é o mesmo defeito que o escudo e o patrocinador tiveram até 18/08. */
+      bio: a.bio || '',
     };
   });
   /* (66) QUEM NÃO JOGA NÃO ENTRA NO ELENCO COMPETITIVO. Este é o ponto único

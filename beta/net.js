@@ -166,7 +166,7 @@ async function netAdversarios(){
      patrocinador seria falso. São escolhas de exibição, públicas por natureza
      (estão na camisa), e `players_select` é `using(true)`. */
   const { data, error } = await sb.from('players')
-    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc, perfil, joga')
+    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc, perfil, joga, bio')
     .neq('id', MEU_UID)
     .order('nome');
   if(error){ console.error('[net] lista falhou', error); return []; }
@@ -847,66 +847,24 @@ async function _abrirOQueMexeu(ultima, posAntes){
 
    Pré-requisito do perfil público com URL própria, que é outra pendência. */
 function netVerJogador(id){
+  /* 29/08 — ERA a segunda ficha de jogador do app. O board (node 58:1619)
+     desenha uma só, com abas, e ela virou a rota `jogador` do index.html.
+     Esta função continua existindo porque 20 lugares chamam por ela; o que
+     mudou é que ela não desenha mais nada, só leva pra lá.
+     A folha não fazia consulta nenhuma — lia `S.jogadores`, que o boot já
+     hidrata — então a migração não perdeu dado, e o "o que está em jogo"
+     (o `calcular` de vencer/perder) foi junto pra rota. */
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
-  const j = S.jogadores && S.jogadores[id];
-  if(!j){ alert('Jogador não encontrado.'); return; }
-
-  const eu    = S.jogadores[EU];
-  const amigo = (eu.amigos||[]).includes(id);
-  const advN  = (S.esporte==='beach') ? (j.nivelB ?? 1200) : (j.nivel ?? 1200);
-  const v = calcular(nivelDe(eu), advN, true,  'amistoso','md3',false, eu.calibrando, eu.cal);
-  const d = calcular(nivelDe(eu), advN, false, 'amistoso','md3',false, eu.calibrando, eu.cal);
-
-  /* NÃO tem "onde ele joga" nesta ficha, e a ausência é deliberada. O dado
-     existe em `player_locais`, mas o cliente não carrega o de terceiros — só o
-     meu (`__meusLocais`). Botar a linha aqui exigiria uma consulta nova, e
-     inventar um valor de fallback seria preencher com estatística um campo que
-     existe pra ser fato. Fica de fora até ter fonte. */
-  const primeiro = (j.nome||'').split(' ')[0] || 'ele';
-  _sheet('net-perfil', `
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Jogador</div>
-      <button onclick="_net.fecharPerfil()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
-      ${_disco(j, 52)}
-      <div style="min-width:0">
-        <b style="font-size:17px">${j.nome||'Jogador'}</b>
-        <div style="font-size:12px;color:var(--ink2)">Classe ${divDe(j)} · Nível ${advN}${amigo?' · <span style="color:var(--up)">amigo</span>':''}</div>
-      </div>
-    </div>
-
-    <div style="border:1px solid var(--linha);border-radius:12px;padding:12px;margin-top:14px">
-      <div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">O que está em jogo</div>
-      <div style="display:flex;gap:16px">
-        <div><span style="font:700 17px system-ui;color:var(--up)">${v.dNivel>0?'+':''}${v.dNivel}</span>
-          <span style="font-size:11px;color:var(--ink2)"> se vencer</span></div>
-        <div><span style="font:700 17px system-ui;color:var(--dn)">${d.dNivel}</span>
-          <span style="font-size:11px;color:var(--ink2)"> se perder</span></div>
-      </div>
-      ${v.zebra?'<div style="font-size:11px;color:var(--up);margin-top:6px">Zebra — ele está acima da sua faixa, a vitória multiplica os pontos.</div>':''}
-    </div>
-
-    <button onclick="_net.fecharPerfil();netDesafiar('${id}')"
-      style="width:100%;margin-top:14px;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 15px system-ui;cursor:pointer">Desafiar ${primeiro}</button>
-
-    ${_confrontoDireto(id)}
-
-    <!-- troféus e patches chegam do banco; o miolo é trocado quando a consulta
-         volta. Enquanto isso a seção diz que está buscando, em vez de afirmar
-         "nenhum troféu" — que é o que um vazio otimista faria, e seria mentira
-         pra quem tem. -->
-    <div id="net-perfil-conq" style="margin-top:16px">
-      <div style="font-size:11.5px;color:var(--ink3)">Buscando troféus e patches…</div>
-    </div>
-
-    ${amigo
-      ? `<p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px;line-height:1.5">Vocês já são amigos — dá pra desafiar em qualquer classe, sem a janela de ±1.</p>`
-      : `<button onclick="_net.pedirAmizade('${id}','${(j.nome||'').replace(/'/g,"\\'")}')"
-          style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:none;color:#fff;font:700 14px system-ui;cursor:pointer">Pedir pra ser amigo</button>
-         <p style="font-size:11px;color:var(--ink3);text-align:center;margin-top:10px;line-height:1.5">Amizade é mútua: ele recebe o pedido e decide. Sendo amigos, vocês se desafiam em qualquer classe.</p>`}
-  `);
-  _carregarConquistas(id);
+  if(!(S.jogadores && S.jogadores[id])){ alert('Jogador não encontrado.'); return; }
+  _fecharFolhas();
+  ir('jogador', {id});
+}
+/* fecha qualquer folha aberta antes de navegar: elas são position:fixed com
+   z-index alto, e sem isto a rota nova pintaria ATRÁS da folha ainda aberta. */
+function _fecharFolhas(){
+  document.querySelectorAll('.net-sheet, [id^="net-"]').forEach(el=>{
+    if(el.parentNode && /^net-/.test(el.id)) el.remove();
+  });
 }
 
 /* ---- as três seções que a ficha ganhou em 18/08 ------------------------
