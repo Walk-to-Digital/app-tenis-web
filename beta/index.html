@@ -528,7 +528,7 @@ button,input,select{font:inherit;color:inherit}
   background:var(--up);border:2px solid rgba(30,23,20,.9)}
 #nav .ponto{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--up);
   vertical-align:top;margin-top:2px}
-.ini /* 29/08 (board, node 35:756) — O CARD DE PROGRESSO DA HOME.
+/* 29/08 (board, node 35:756) — O CARD DE PROGRESSO DA HOME.
    Substitui o anel do .degrau. O anel media a categoria num círculo de 58px;
    o board mede na horizontal, com a classe em corpo grande à esquerda e a
    barra atravessando o card. A régua é a mesma (categoria, não classe) — o
@@ -537,6 +537,42 @@ button,input,select{font:inherit;color:inherit}
 /* 29/08 (board, node 58:1619) — PERFIL DO OPONENTE.
    Cabeçalho com avatar grande de aro lime, nome + classe, bio, três
    contadores e o CTA laranja. Depois as abas. */
+/* 29/08 (board, nodes 159:2468 e 169:728) — HISTÓRICO.
+   Card de partida com contorno que diz o resultado sem precisar ler: lime pra
+   vitória, laranja pra derrota. É a mesma semântica de cor que o resto do app
+   já usa (--up e --dn), então não precisou de token novo. */
+.hpart{display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:9px;
+  border:1px solid var(--linha);border-radius:16px;background:rgba(11,11,11,.6)}
+.hpart.v{border-color:var(--up)}
+.hpart.d{border-color:var(--dn)}
+.hpart .pl{flex:0 0 auto;font:700 19px var(--f-disp);min-width:52px;text-align:center}
+.hpart.v .pl{color:var(--up)}
+.hpart.d .pl{color:var(--dn)}
+.hpart .meio{flex:1;min-width:0}
+.hpart .meio div{font:400 11.5px var(--f-ui);color:var(--ink3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hpart .meio i{font-style:normal;color:var(--ink3);margin-right:5px}
+.hpart .dir{flex:0 0 auto;text-align:right}
+.hpart .dir .dt{font:400 10.5px var(--f-ui);color:var(--ink3)}
+.hpart .dir .pts{font:700 17px var(--f-disp);margin-top:3px}
+.hpart.v .dir .pts{color:var(--up)}
+.hpart.d .dir .pts{color:var(--dn)}
+/* o gráfico anual: 12 colunas, a do mês escolhido acesa */
+.hano{background:rgba(11,11,11,.6);border:1px solid var(--linha);border-radius:16px;padding:16px 12px}
+.hbarras{display:flex;align-items:flex-end;gap:4px;height:150px;margin-bottom:8px}
+.hbarras .m{flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:center;gap:2px;height:100%;cursor:pointer;min-width:0}
+.hbarras .m .bs{display:flex;align-items:flex-end;gap:2px;height:100%;width:100%;justify-content:center}
+.hbarras .m .bs i{display:block;width:4px;border-radius:2px;background:var(--linha2);min-height:2px}
+.hbarras .m.on .bs i.v{background:var(--up)}
+.hbarras .m.on .bs i.d{background:var(--dn)}
+.hbarras .m .rot{font:700 8.5px var(--f-ui);color:var(--ink3);letter-spacing:.04em}
+.hbarras .m.on .rot{color:var(--ink)}
+.hmes{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:14px}
+.hmes .cx{border:1px solid var(--linha);border-radius:14px;padding:13px}
+.hmes .cx b{font:700 19px var(--f-disp);color:var(--ink);margin-right:6px}
+.hmes .cx small{font:400 11.5px var(--f-ui);color:var(--ink3)}
+
 .pcab{display:flex;gap:14px;align-items:flex-start;padding:16px 18px 0}
 .pcab .av.gg{flex:0 0 76px}
 .pcab .info{flex:1;min-width:0}
@@ -589,7 +625,7 @@ button,input,select{font:inherit;color:inherit}
   background:var(--acc);color:var(--acc-ink);font:700 11.5px var(--f-ui);
   letter-spacing:.09em;text-transform:uppercase;cursor:pointer}
 
-.degrau{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);
+.ini .degrau{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);
   display:flex;align-items:center;gap:13px}
 /* 25/08: o anel de progressão das telas novas — progresso da CATEGORIA (a
    mesma conta da barra antiga), com a etiqueta C4 no centro */
@@ -1192,7 +1228,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788043581"></script>
+<script src="net.js?v=1788045606"></script>
 
 <script>
 /* =========================================================================
@@ -2183,7 +2219,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788043581"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788045606"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2285,7 +2321,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788043581"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788045606"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2526,6 +2562,8 @@ function dispClasse(slots, j){
   return {agora,hoje,semana,prox};
 }
 function radarSub(v){ S.radarSub=v; salvar(); render(); }
+// 29/08: o mês escolhido no gráfico anual do histórico
+function histMes(k){ S.histMes=k; salvar(); render(); }
 /* ===== 25/08 (Encontrar): a categoria da busca ===== */
 function encCat(v){ S.encCat=v; salvar(); render(); }
 function lugCarregar(){
@@ -3087,7 +3125,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788043581"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788045606"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -4881,6 +4919,105 @@ ficha(){
    ficha de jogador do app e agora delega pra cá. Era o único caso da leva em
    que migrar REMOVE código em vez de mover: as duas desenhavam a mesma coisa,
    e a folha nem consulta rede — lê `S.jogadores`, que o boot já hidratou. */
+/* 29/08 (board) — HISTÓRICO COMPLETO, duas abas numa rota.
+   A fonte é `window.__minhasPartidas` (o select('*') que o inbox já faz), e
+   NÃO o `S.historico`. A razão está escrita na casa desde 26/08: o histórico
+   local é do APARELHO — em celular novo nasce vazio e diria que quem tem 40
+   jogos nunca registrou nenhum — e o `quando` dele é a string 'agora', que não
+   dá pra agrupar por mês. `confirmed_at` e os deltas só existem na linha do
+   banco.
+   ⚠️ Não há EMPATE aqui, e o board mostra um (5-5, +15pts). O app não tem:
+   `venceu_criador` é booleano. Entrar com empate é mexer no motor de
+   pontuação, não numa tela — ficou pendente com o Nuno. */
+historico(){
+  const uid = (window._net && _net.uid && _net.uid()) || null;
+  const todas = ((window.__minhasPartidas)||[]).filter(m=>m.status==='confirmada' && m.confirmed_at);
+  const ladoCri  = (m)=> m.criador_id===uid || m.parceiro_criador_id===uid;
+  const meuDelta = (m)=> m.criador_id===uid             ? m.delta_criador
+                       : m.adversario_id===uid          ? m.delta_adversario
+                       : m.parceiro_criador_id===uid    ? m.delta_parceiro_criador
+                       : m.parceiro_adversario_id===uid ? m.delta_parceiro_adversario
+                       : null;
+  const venci = (m)=> ladoCri(m) ? !!m.venceu_criador : !m.venceu_criador;
+  const pts   = (m)=> { const d=meuDelta(m); return d ? (+(d.dPts||0)) : 0 };
+  const advId = (m)=> ladoCri(m) ? m.adversario_id : m.criador_id;
+
+  const aba = abaDe('historico','mes');
+  const agora = new Date();
+  const ano = (S.histAno = S.histAno || agora.getFullYear());
+  const mesSel = (S.histMes === undefined ? agora.getMonth() : S.histMes);
+
+  /* 29/08 — GUARDA DE IDENTIDADE, achada testando.
+     Todo o cálculo desta tela depende de saber QUAL LADO da partida sou eu:
+     `ladoCri`, `venci` e `meuDelta` comparam contra o uid. Com uid nulo (boot
+     ainda correndo, ou sessão caída) nada disso lança erro — `ladoCri` devolve
+     false pra tudo, `venci` inverte, `meuDelta` cai em null e o delta vira 0.
+     O resultado é uma tela cheia, plausível e ERRADA: toda partida como
+     derrota, todo placar valendo 0 pts. É o pior modo de falha que existe, e
+     custava esta linha. */
+  if(!uid) return {titulo:'Histórico', html:`<div class="pad">
+    ${abasHtml('historico',[['mes','Partidas do mês'],['ano','Análise anual']],'linha')}
+    <div class="card" style="margin-top:14px"><div class="vazio"><i class="ic">◔</i>
+    Ainda conectando à sua conta. O histórico precisa saber qual lado da partida é você
+    pra dizer quem venceu — sem isso ele mostraria o contrário.</div></div></div>`};
+
+  if(!todas.length) return {titulo:'Histórico', html:`<div class="pad">
+    ${abasHtml('historico',[['mes','Partidas do mês'],['ano','Análise anual']],'linha')}
+    <div class="card" style="margin-top:14px"><div class="vazio"><i class="ic">◔</i>
+    Nenhuma partida confirmada ainda. O histórico enche sozinho conforme você joga e lança placar.</div></div></div>`};
+
+  const doMes = todas.filter(m=>{ const d=new Date(m.confirmed_at);
+    return d.getFullYear()===ano && d.getMonth()===mesSel; });
+
+  const corpo = aba==='ano' ? (()=>{
+    const porMes = Array.from({length:12},()=>({v:0,d:0,pts:0}));
+    todas.forEach(m=>{ const d=new Date(m.confirmed_at); if(d.getFullYear()!==ano) return;
+      const b=porMes[d.getMonth()]; venci(m) ? b.v++ : b.d++; b.pts += pts(m); });
+    const teto = Math.max(1, ...porMes.map(b=>b.v+b.d));
+    const MES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+    const b = porMes[mesSel];
+    return `<div class="hano">
+      <div class="hbarras">${porMes.map((x,k)=>`
+        <div class="m ${k===mesSel?'on':''}" onclick="histMes(${k})">
+          <div class="bs">
+            <i class="d" style="height:${Math.round(x.d/teto*100)}%"></i>
+            <i class="v" style="height:${Math.round(x.v/teto*100)}%"></i>
+          </div>
+          <div class="rot">${MES[k]}</div>
+        </div>`).join('')}</div>
+      <div class="rot" style="margin-top:6px">Dados de ${MES[mesSel].toLowerCase()} de ${ano}</div>
+      <div class="hmes">
+        <div class="cx"><b>${b.v}</b><small>Vitórias</small></div>
+        <div class="cx"><b>${b.d}</b><small>Derrotas</small></div>
+        <div class="cx"><b>${b.v+b.d}</b><small>Partidas</small></div>
+        <div class="cx"><b>${b.v+b.d?Math.round(b.v/(b.v+b.d)*100):0}%</b><small>Aproveitamento</small></div>
+        <div class="cx" style="grid-column:1/-1"><b style="color:${b.pts>=0?'var(--up)':'var(--dn)'}">${b.pts>0?'+':''}${b.pts} pts</b><small>no mês</small></div>
+      </div>
+    </div>`;
+  })() : (doMes.length ? doMes.map(m=>{
+      const ok = venci(m), dp = pts(m), a = advId(m);
+      const jj = S.jogadores[a];
+      const cat = jj ? categoriaDe(nivelDe(jj), divDe(jj)) : null;
+      const d = new Date(m.confirmed_at);
+      return `<div class="hpart ${ok?'v':'d'}" onclick="${a?`ir('jogador',{id:'${a}'})`:''}">
+        <div class="pl">${m.placar||'—'}</div>
+        <div class="meio">
+          <div><i>◎</i>${m.esporte==='beach'?'Beach Tennis':'Tênis'}</div>
+          <div><i>◈</i>${jj?jj.nome:'Jogador'}</div>
+          ${jj?`<div><i>▦</i>Classe ${divDe(jj)}${CAT_SUFIXO[cat]||''}</div>`:''}
+        </div>
+        <div class="dir">
+          <div class="dt">${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</div>
+          <div class="pts">${dp>0?'+':''}${dp}pts</div>
+        </div>
+      </div>`; }).join('')
+    : `<div class="card"><div class="vazio"><i class="ic">◔</i>Nenhuma partida confirmada neste mês.</div></div>`);
+
+  return {titulo:'Histórico', html:`
+    ${abasHtml('historico',[['mes','Partidas do mês'],['ano','Análise anual']],'linha')}
+    <div class="pad">${corpo}</div>`};
+},
+
 jogador(p){
   const j=S.jogadores[p.id];
   if(p.id===EU) return VISTAS.ficha();
@@ -4914,6 +5051,12 @@ jogador(p){
       ${h.length? h.map(x=>`<div class="card"><div class="linha-item">
         <div class="txt"><b>${x.venceu?'Você venceu':'Você perdeu'}</b><small>${x.placar} · ${x.quando}</small></div></div></div>`).join('')
         : '<div class="card"><p class="nota">Vocês ainda não se enfrentaram no app.</p></div>'}
+
+      <div class="card clic" style="margin-top:14px" onclick="ir('historico')">
+        <div class="linha-item"><div class="av">◔</div>
+        <div class="txt"><b>Ver histórico completo</b><small>Partidas do mês e a análise do ano</small></div>
+        <div class="seta">›</div></div>
+      </div>
 
       <div class="rot" style="margin-top:16px">Estilos de jogo</div>
       ${cascaNota('O board mostra três estilos (fundo de quadra, consistente, defensivo). O app não pergunta nem deduz estilo de ninguém — não há de onde tirar, e três rótulos plausíveis seriam invenção sobre uma pessoa real.')}
