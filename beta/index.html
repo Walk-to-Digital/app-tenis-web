@@ -317,6 +317,12 @@ button,input,select{font:inherit;color:inherit}
 #mais .mais-item + .mais-item{border-top:1px solid var(--linha)}
 #mais .mais-item i{font-style:normal;font-size:19px;width:24px;text-align:center;color:var(--acc)}
 #mais .mais-item small{display:block;font:400 11.5px var(--f-ui);color:var(--ink3);margin-top:2px}
+/* o item que o board pede e o app ainda não tem. Não some da lista — some da
+   lista seria esconder o que falta; fica visível, apagado e sem clique, e o
+   subtítulo diz por quê. Laranja tracejado é a mesma marca da classe .casca. */
+#mais .mais-item.casca{opacity:.5;cursor:default}
+#mais .mais-item.casca i{color:var(--marca)}
+#mais .mais-item.casca small{color:var(--marca)}
 .nav button .badge{
   display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:99px;
   background:var(--up);color:#0A1100;font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
@@ -505,7 +511,39 @@ button,input,select{font:inherit;color:inherit}
   background:var(--up);border:2px solid rgba(30,23,20,.9)}
 #nav .ponto{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--up);
   vertical-align:top;margin-top:2px}
-.ini .degrau{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);
+.ini /* 29/08 (board, node 35:756) — O CARD DE PROGRESSO DA HOME.
+   Substitui o anel do .degrau. O anel media a categoria num círculo de 58px;
+   o board mede na horizontal, com a classe em corpo grande à esquerda e a
+   barra atravessando o card. A régua é a mesma (categoria, não classe) — o
+   que muda é a forma, e a forma horizontal cabe mais informação: os pontos, o
+   próximo degrau e o quanto falta, tudo na mesma linha de leitura. */
+.hcard{margin-top:11px;background:rgba(11,11,11,.82);border:1px solid var(--linha);
+  border-radius:20px;padding:14px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hcard .l1{display:flex;align-items:baseline;gap:8px}
+.hcard .cls{font:700 34px/1 var(--f-disp);color:var(--ink);letter-spacing:-.02em}
+.hcard .suf{font:600 14px var(--f-ui);color:var(--acc);margin-left:-4px}
+.hcard .pts{flex:1;text-align:right;font:700 17px var(--f-ui);color:var(--ink);white-space:nowrap}
+.hcard .prox{font:700 17px var(--f-ui);color:var(--ink3)}
+.hcard .faltam{text-align:right;font:600 11px var(--f-ui);color:var(--acc);margin-top:3px}
+.hcard .barra{height:6px;border-radius:99px;background:var(--acc-ink);margin:9px 0 8px;overflow:hidden}
+.hcard .barra i{display:block;height:100%;border-radius:99px;background:var(--acc)}
+.hcard .fim{font:400 12px/1.5 var(--f-ui);color:var(--ink3)}
+.hcard .fim b{color:var(--ink2)}
+
+/* O card "Let's Ranket" — o convite pra entrar no radar. É o único bloco da
+   home do board com botão LIME, e não é exceção à regra de :20-34: ele não
+   compete com o laranja de "Ver oponentes", está um degrau abaixo dele na
+   hierarquia. Some quando a pessoa já tem disponibilidade marcada, senão
+   viraria moldura pedindo o que já foi feito. */
+.hlets{margin-top:11px;background:rgba(11,11,11,.86);border:1px solid var(--linha);
+  border-radius:20px;padding:20px 18px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hlets h3{font:700 30px/1.06 var(--f-disp);color:var(--ink);letter-spacing:-.02em}
+.hlets p{font:300 12.5px/1.5 var(--f-ui);color:var(--ink3);margin:10px 0 16px;max-width:30ch}
+.hlets button{width:100%;border:0;border-radius:var(--rp);padding:14px;
+  background:var(--acc);color:var(--acc-ink);font:700 11.5px var(--f-ui);
+  letter-spacing:.09em;text-transform:uppercase;cursor:pointer}
+
+.degrau{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);
   display:flex;align-items:center;gap:13px}
 /* 25/08: o anel de progressão das telas novas — progresso da CATEGORIA (a
    mesma conta da barra antiga), com a etiqueta C4 no centro */
@@ -540,8 +578,15 @@ button,input,select{font:inherit;color:inherit}
 .ini .boneco img{height:100%;width:auto;display:block}
 /* 06/08: o boneco virou corpo inteiro e ficou mais alto — a placa no topo
    passou a cortar a cabeça. Desceu pro pé do palco, sobre a sombra. */
-.ini .placa{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);text-align:center;z-index:2;width:100%;padding:0 12px}
-.ini .placa .nm{font-family:var(--f-disp);font-size:21px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.ini .placa{position:absolute;bottom:2px;left:0;right:0;z-index:2;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:0 14px;padding:12px 18px;border-radius:var(--rp);
+  border:1px solid var(--acc);background:rgba(11,11,11,.55);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.placa .pos{flex:0 0 auto;font:700 9.5px var(--f-ui);color:var(--ink);
+  letter-spacing:.11em;text-transform:uppercase}
+.ini .placa .nm{font:700 15px var(--f-ui);color:var(--ink);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.7)}
 .ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
 .ini .placa .meta b{font-family:var(--f-disp);font-size:14px;color:var(--ink)}
 .ini .placa .meta .pil2{background:var(--up);color:#0A1100;font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
@@ -1101,7 +1146,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788040455"></script>
+<script src="net.js?v=1788040998"></script>
 
 <script>
 /* =========================================================================
@@ -1849,26 +1894,38 @@ window.modoTrocar = modoTrocar;
      volta pra cá e quem sai é outro.
    · O teto de 5 (linha ~1712: "acima disso o alvo do dedo fica menor que o
      dedo") volta a valer pra TODO MUNDO, inclusive o aluno. */
-/* A folha do +. Os itens são as portas que JÁ EXISTEM: `radar` é a aba de
-   marcar jogo e `netAbrirMao` é o lançar placar que o net.js já exporta. Nada
-   aqui é porta nova — o + é atalho, não recurso. */
+/* A folha do +. 29/08: os itens NÃO são escolha minha — estão desenhados no
+   board, sobrepostos na HOME (node 120:329), coisa que a seção
+   "+ DA BARRA INFERIOR" não mostrava porque saiu com o corpo vazio. São
+   quatro, nesta ordem, e dois deles ainda não existem no app:
+
+     · Registrar placar ....... netAbrirMao, existe
+     · Organizar nova partida . a aba radar, existe
+     · Registrar atividade .... NÃO EXISTE — nem tela, nem dado, nem regra.
+                                O board não diz o que é uma "atividade" que
+                                não é partida (treino? aula? só marcar que
+                                jogou?). Nasce em casca até alguém decidir.
+     · Novo post no feed ...... NÃO EXISTE — depende da tabela `posts`, que é
+                                a migração da Fase 2. Casca até lá.
+
+   O que não existe fica VISÍVEL como não existente, e não escondido: item que
+   parece funcionar e não faz nada é pior que item ausente. */
 function maisItens(){
   const eu = [];
-  if(veProfessor()){
-    eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()"]);
-  } else {
-    eu.push(['◎','Marcar jogo','Ver quem está livre no seu radar', "trocarAba('radar')"]);
-  }
-  eu.push(['✎','Lançar placar','Registrar uma partida já jogada', "_net.abrirMao()"]);
-  /* 29/08: a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse.
-     Ela reaparece aqui — mesma superfície, um toque, outro lugar. */
-  if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')"]);
+  if(veProfessor()) eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()", false]);
+  eu.push(['1-1','Registrar placar','Uma partida que já aconteceu', "_net.abrirMao()", false]);
+  eu.push(['◎','Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
+  eu.push(['✚','Registrar atividade','Ainda não existe no app', "", true]);
+  eu.push(['✎','Novo post no feed','Chega com o feed da comunidade', "", true]);
+  /* a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse; ela
+     reaparece aqui — mesma superfície, um toque, outro lugar. */
+  if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')", false]);
   return eu;
 }
 function abrirMais(){
   const f = document.getElementById('mais-folha');
-  f.innerHTML = '<div class="puxador"></div>' + maisItens().map(([ic,tit,sub,acao])=>
-    `<button class="mais-item" onclick="fecharMais(); ${acao}"><i>${ic}</i><span>${tit}<small>${sub}</small></span></button>`
+  f.innerHTML = '<div class="puxador"></div>' + maisItens().map(([ic,tit,sub,acao,vazio])=>
+    `<button class="mais-item${vazio?' casca':''}"${vazio?' disabled':` onclick="fecharMais(); ${acao}"`}><i>${ic}</i><span>${tit}<small>${sub}</small></span></button>`
   ).join('');
   document.getElementById('mais').hidden = false;
 }
@@ -2080,7 +2137,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788040455"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788040998"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2182,7 +2239,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788040455"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788040998"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2954,7 +3011,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788040455"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788040998"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3165,7 +3222,12 @@ inicio(){
   // conta só o que REALMENTE espera placar — proposta ainda não foi aceita
   else if(pendEsperando().length){ const _n=pendEsperando().length;
                             bt={cls:'up',      t:'Lançar placar',    s:'Você tem '+_n+' partida'+(_n>1?'s':'')+' esperando o placar', go:"trocarAba('registrar')"}; }
-  else                      bt={cls:'',        t:'Buscar oponentes', s:'Abre o radar de quem está livre na sua faixa', go:"trocarAba('radar')"};
+  /* 29/08: o texto vem do board ("Ver oponentes no seu radar"). O botão em si
+     continua ADAPTATIVO, e isso é decisão do app que o board não contradiz —
+     ele desenha um estado, não os três. Quando há placar esperando, o botão
+     é o placar: o registro é o elo frágil do ciclo e não pode ficar atrás de
+     um convite pra marcar mais jogo. */
+  else                      bt={cls:'',        t:'Ver oponentes no seu radar', s:'Quem está livre na sua faixa, agora', go:"trocarAba('radar')"};
 
   /* Ações secundárias: marcar jogo e buscar oponente existiam só dentro de
      abas. Ficam abaixo do botão grande, discretas — o registro continua sendo
@@ -3210,25 +3272,29 @@ inicio(){
         <button onclick="modoTrocar('prof')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px system-ui;cursor:pointer;backdrop-filter:blur(6px)">👥 Sou professor</button>`:''}
         <div class="esp-sw">
           <button class="${S.esporte==='tenis'?'on':''}" onclick="trocarEsporte('tenis')">Tênis</button>
-          <button class="${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach</button>
+          <button class="${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach Tennis</button>
         </div>
-        <div class="degrau">
-          <div class="anel">
-            <svg viewBox="0 0 58 58">
-              <circle cx="29" cy="29" r="24" fill="none" stroke="var(--sup2)" stroke-width="5"/>
-              <circle cx="29" cy="29" r="24" fill="none" stroke="var(--up)" stroke-width="5"
-                stroke-linecap="round" stroke-dasharray="${(progCat/100*150.8).toFixed(1)} 150.8"/>
-            </svg>
-            <div class="tri">${divDe(eu)}<small>${cat}</small></div>
+        <div class="hcard">
+          <div class="l1">
+            <span class="cls">${divDe(eu)}</span><span class="suf">${CAT_SUFIXO[cat]||''}</span>
+            <span class="pts">${nivelDe(eu)} pts${proxDegrau?` <span class="prox">› ${proxDegrau}</span>`:''}</span>
           </div>
-          <div class="dtx">
-            <div class="top"><span><b>${nivelDe(eu)} pts</b>${proxDegrau?` › <b>${proxDegrau}</b>`:''}</span><span style="color:var(--up);font-weight:700">${proxDegrau?'Faltam '+faltamCat+' pts':'topo da escada'}</span></div>
-            <div class="fim">${cat>1
+          <div class="barra"><i style="width:${progCat}%"></i></div>
+          <div class="faltam">${proxDegrau?'Faltam '+faltamCat+' pts':'topo da escada'}</div>
+          <div class="fim">${cat>1
               ? `Sobe pra <b>${proxDegrau}</b> com mais ${faltamCat} de Nível. Você joga contra a classe <b>${divDe(eu)}</b> inteira — categoria é progressão, não pareamento.`
               : (teto ? `Você está no topo da <b>${divDe(eu)}</b>. Rumo à classe <b>${acima}</b>!`
                       : 'Você está na Classe A1 — o topo da escada.')}</div>
-          </div>
         </div>
+        <!-- 29/08 (board): o convite pra entrar no radar. Só aparece pra quem
+             ainda não marcou disponibilidade: pedir o que já foi feito é
+             moldura, não convite. -->
+        ${(window.__disp||[]).some(d=>d.player_id===MEU_UID) ? '' : `
+        <div class="hlets">
+          <h3>Let's<br>Ranket</h3>
+          <p>Adicione sua disponibilidade para que os outros jogadores no radar vejam você.</p>
+          <button onclick="trocarAba('radar'); ir('dispForm')">Adicionar disponibilidade</button>
+        </div>`}
       </div>
 
       <div class="palco">
@@ -3236,9 +3302,16 @@ inicio(){
         <div class="glow"></div>
         <!-- a home é a vitrine: escudo e patrocinador aparecem aqui também -->
         <div class="boneco" onclick="trocarAba('vestiario')">${bonecoImg(eu, true)}<span class="edit-hint">❖ Vestiário</span></div>
+        <!-- 29/08 (board, node 35:794): a placa virou FAIXA de contorno lime,
+             com o nome à esquerda e a posição à direita. Antes era um bloco
+             centralizado com Nível e Classe embaixo do nome — mas os dois já
+             estão no card de progresso logo acima, e repetir o mesmo número a
+             200px de distância não informa, enche. -->
         <div class="placa">
           <div class="nm">${eu.nome}</div>
-          <div class="meta"><b>${nivelDe(eu)}</b> Nível · Classe ${classeDe(eu)}${S.comunidade.membros.length>1?` <span class="pil2">${pos.comunidade}º na comunidade</span>`:''}</div>
+          <div class="pos">${S.comunidade.membros.length>1
+            ? `${pos.comunidade}º lugar na comunidade`
+            : `Classe ${classeDe(eu)}`}</div>
         </div>
       </div>
 
