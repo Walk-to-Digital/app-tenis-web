@@ -95,17 +95,33 @@ async function netSyncJogador(eu){
     // não manda undefined nem quebra contra banco sem a migração.
     ...(eu.mao ? { mao: eu.mao } : {}),
     ...(eu.tempoPratica ? { tempo_pratica: eu.tempoPratica } : {}),
-    // 25/08 (mig 62): o canal de contato preferido
-    ...(eu.contatoCanal ? { contato_canal: eu.contatoCanal } : {}),
-    ...(eu.contatoValor ? { contato_valor: eu.contatoValor } : {}),
-    // 25/08 (mig 66): a porta pela qual entrou e se compete. Mesmo padrão
-    // condicional: conta antiga não manda undefined nem quebra contra banco
-    // sem a migração.
+    // 25/08 (mig 66): a porta pela qual entrou. `joga` NÃO viaja aqui — ver
+    // abaixo.
     ...(eu.perfil ? { perfil: eu.perfil } : {}),
-    ...(eu.joga !== undefined ? { joga: !!eu.joga } : {}),
+    /* 28/08 (mig 74) — `joga` SAIU DO SYNC.
+       O banco passou a recusar ligar o "eu compito" fora da `joga_ligar`, e o
+       sync mandava a coluna em TODO upsert. Enquanto os dois lados concordam
+       nada acontece (o trigger só olha quando o valor muda), mas basta um
+       aparelho com estado local velho — alguém que desligou no outro celular —
+       pra o upsert tomar a recusa, e o `throw` daqui derruba o boot inteiro.
+       Regra nova em cima de escrita velha é o defeito de sempre.
+       Quem liga é `joga_ligar` (a porta, que pergunta a classe); quem desliga
+       é `netJogaDesligar`. As duas escrevem a coluna sozinhas. */
   };
   const { error } = await sb.from('players').upsert(row);
   if(error){ console.error('[net] sync falhou', error); throw error; }
+
+  /* 28/08 (mig 74) — o contato mora fora de `players` desde a 74: a policy
+     `players_select` é `using(true)` por desenho (lista de adversário e Elo),
+     e o WhatsApp que a 62 pôs lá dentro ficava legível por toda conta logada.
+     Tabela própria, policy "só eu e o ADM". Upsert à parte, e falha aqui NÃO
+     derruba o cadastro — contato é acessório, identidade não. */
+  if(eu.contatoValor){
+    const { error: ec } = await sb.from('player_contato').upsert({
+      player_id: MEU_UID, canal: eu.contatoCanal || null, valor: eu.contatoValor,
+    });
+    if(ec) console.error('[net] contato nao gravou', ec);
+  }
 }
 
 /* 3. Adversários reais: todo mundo no banco menos eu. Vira a lista do
@@ -226,7 +242,17 @@ async function netBoot(eu){
     // pergunta é feita AGORA, uma vez, no login: é o registro que faltaria se
     // alguém cobrasse.
     if(contaReal && !meuRow.nascimento){ try{ netPedirIdade(); }catch(e){} }
-    else if(S.cadastroFeito && S.jogadores[EU].nome!=='Você'){ await netSyncJogador(S.jogadores[EU]); }
+    /* 28/08: com try/catch. Era a ÚNICA chamada desta sequência sem guarda —
+       todas as vizinhas têm — e `netSyncJogador` faz `throw`. Qualquer falha
+       dele (banco à frente do app, coluna que sumiu, rede) caía no catch lá
+       de baixo, que só pinta o pontinho e sai: nunca rodavam elenco, amigos,
+       locais, realtime, inbox, nav do professor, quadros nem destaques. O app
+       ficava com cara de offline, sem erro nenhum na tela. Espelhar o próprio
+       jogador é acessório; o boot não é. */
+    else if(S.cadastroFeito && S.jogadores[EU].nome!=='Você'){
+      try{ await netSyncJogador(S.jogadores[EU]); }
+      catch(e){ console.error('[net] sync no boot falhou (segue o boot)', e); }
+    }
     // se não há conta real em lugar nenhum e o cadastro não foi feito, abre o cadastro
     if(!contaReal && !S.cadastroFeito && window.abrirCadastro){ abrirCadastro(); }
     // carrega os jogadores REAIS do banco e injeta no app (sem elenco fake).

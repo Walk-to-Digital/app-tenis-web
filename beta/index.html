@@ -990,7 +990,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1787934574"></script>
+<script src="net.js?v=1788023946"></script>
 
 <script>
 /* =========================================================================
@@ -1923,7 +1923,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787934574"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788023946"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2025,7 +2025,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1787934574"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788023946"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2725,7 +2725,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1787934574"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788023946"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -5447,6 +5447,15 @@ function completarCadastro(){
   fecharCadastro(); aba='inicio'; pilha=[]; salvar(); render();
   (async()=>{
     if(window.netSyncJogador){ try{ await netSyncJogador(eu); }catch(e){} }
+    /* 28/08 (mig 74): `joga` saiu do upsert do sync, e este é o INSERT que
+       CRIA a linha — sem a coluna no payload vale o default do banco, que é
+       `true`. Quem escolheu "Não, só dou aula" nasceria competindo: entraria
+       no ranking da vitrine e no radar dos outros como adversário, contra o
+       que esta mesma tela promete por escrito. Desligar é o caminho que a 74
+       deixou livre de propósito — `true → false` não fabrica assento nenhum. */
+    if(eu.joga === false && window.netJogaDesligar){
+      try{ await netJogaDesligar(); }catch(e){ console.error('[cadastro] nao consegui desligar o joga', e); }
+    }
     /* 25/08: SEGUNDA TENTATIVA do convite. A primeira roda no signUp (passo 2)
        e é a que vale; esta existe porque falha silenciosa ali deixava o código
        livre pra sempre — medido em teste real, com a FK apontando pro lugar
