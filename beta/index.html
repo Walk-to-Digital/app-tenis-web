@@ -541,6 +541,25 @@ button,input,select{font:inherit;color:inherit}
    Card de partida com contorno que diz o resultado sem precisar ler: lime pra
    vitória, laranja pra derrota. É a mesma semântica de cor que o resto do app
    já usa (--up e --dn), então não precisou de token novo. */
+/* 29/08 (board, node 159:1470) — CONQUISTAS EM GRADE.
+   O board mostra os selos numa grade plana. A sala 3D (abrirTrofeus) NÃO sai:
+   ela continua sendo o "abrir" de um troféu, e a grade é a vista de conjunto
+   que faltava. auto-fill em vez das 5 colunas fixas do board — em 390pt de
+   aparelho, 5 colunas dariam 70px e o nome do selo não caberia embaixo. */
+.tgrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.tsel{background:rgba(11,11,11,.6);border:1px solid var(--linha);border-radius:14px;
+  padding:10px 6px;text-align:center;cursor:pointer}
+.tsel img{width:100%;max-width:56px;height:auto;display:block;margin:0 auto 6px}
+.tsel b{display:block;font:700 9.5px var(--f-ui);color:var(--ink);
+  letter-spacing:.03em;line-height:1.3}
+.tsel small{display:block;font:400 8.5px var(--f-ui);color:var(--ink3);margin-top:3px;line-height:1.3}
+.tsel.tem{border-color:var(--acc)}
+.tsel.nao{opacity:.42}
+.tsel.nao img{filter:grayscale(1)}
+/* o menu de 3 pontos do topo (board 159:1604) */
+.tpmenu{background:none;border:0;color:var(--ink2);font-size:19px;cursor:pointer;
+  padding:0 2px;line-height:1}
+
 .hpart{display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:9px;
   border:1px solid var(--linha);border-radius:16px;background:rgba(11,11,11,.6)}
 .hpart.v{border-color:var(--up)}
@@ -1228,7 +1247,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788045606"></script>
+<script src="net.js?v=1788046638"></script>
 
 <script>
 /* =========================================================================
@@ -2219,7 +2238,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788045606"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788046638"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2321,7 +2340,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788045606"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788046638"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2564,6 +2583,33 @@ function dispClasse(slots, j){
 function radarSub(v){ S.radarSub=v; salvar(); render(); }
 // 29/08: o mês escolhido no gráfico anual do histórico
 function histMes(k){ S.histMes=k; salvar(); render(); }
+
+/* 29/08 (board, node 159:1604) — o menu do ⋮ no perfil do oponente:
+   COMPARTILHAR e BLOQUEAR. */
+function perfilMenu(id){
+  const j = S.jogadores[id]; if(!j) return;
+  const f = document.getElementById('mais-folha');
+  f.innerHTML = '<div class="puxador"></div>' +
+    `<button class="mais-item" onclick="fecharMais(); perfilCompartilhar('${id}')">
+       <i>⇪</i><span>Compartilhar perfil<small>Manda o nome e a classe de ${(j.nome||'').split(' ')[0]}</small></span></button>` +
+    `<button class="mais-item casca" disabled>
+       <i>⊘</i><span>Bloquear perfil<small>Precisa da tabela de bloqueio — ainda não existe</small></span></button>`;
+  document.getElementById('mais').hidden = false;
+}
+/* Compartilhar é a única das duas que dá pra fazer hoje, e não precisa de
+   banco nenhum. `navigator.share` é o caminho do celular (é lá que a tela
+   vive); onde ele não existe, cai na área de transferência — e onde nem isso
+   existe, diz o que aconteceu em vez de falhar calado. */
+async function perfilCompartilhar(id){
+  const j = S.jogadores[id]; if(!j) return;
+  const cat = categoriaDe(nivelDe(j), divDe(j));
+  const texto = `${j.nome} — Classe ${divDe(j)}${CAT_SUFIXO[cat]||''} no Ranket.`;
+  try{
+    if(navigator.share){ await navigator.share({title:'Ranket', text:texto}); return; }
+    if(navigator.clipboard){ await navigator.clipboard.writeText(texto); toast('Copiado — é só colar.'); return; }
+    toast('Este navegador não deixa compartilhar daqui.');
+  }catch(e){ /* o usuário fechou a folha de compartilhar: não é erro */ }
+}
 /* ===== 25/08 (Encontrar): a categoria da busca ===== */
 function encCat(v){ S.encCat=v; salvar(); render(); }
 function lugCarregar(){
@@ -3125,7 +3171,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788045606"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788046638"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -4812,8 +4858,18 @@ ficha(){
       </div>
     </div>
 
+    <!-- 29/08 (board, node 159:1470): a grade de selos. A sala 3D continua
+         logo abaixo, como o "abrir" de um troféu — a grade é a vista de
+         conjunto que faltava, não a substituta dela. -->
     <div class="sec">
       <div class="rot">Conquistas</div>
+      ${(()=>{ const tem = trofeusConquistados();
+        return `<div class="tgrade" style="margin-bottom:12px">${TR_PECAS.map(t=>{
+          const ok = tem.has(t.id);
+          return `<div class="tsel ${ok?'tem':'nao'}" onclick="abrirTrofeus()" title="${ok?t.n:t.c}">
+            <img src="../trofeus-v1/${t.arq}.png" alt="${t.n}" loading="lazy">
+            <b>${t.n}</b>${ok?'':`<small>${t.c}</small>`}
+          </div>`; }).join('')}</div>`; })()}
       <div class="card clic" onclick="abrirTrofeus()">
         <div class="linha-item">
           <div class="av">🏆</div>
@@ -5064,7 +5120,9 @@ jogador(p){
       <div class="rot">Disponibilidade da semana</div>
       ${cascaNota('O board mostra a grade de sete dias por três períodos. O app guarda disponibilidade como horários avulsos que expiram, não como agenda semanal — a grade precisa de um modelo de dado que ainda não existe.')}`;
 
-  return {titulo:j.nome, html:`
+  return {titulo:j.nome,
+    dir:`<button class="tpmenu" onclick="perfilMenu('${p.id}')" aria-label="Mais">⋮</button>`,
+    html:`
     <div class="pcab">
       ${avatar(p.id,'gg')}
       <div class="info">
