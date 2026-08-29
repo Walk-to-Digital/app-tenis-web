@@ -1163,7 +1163,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788041699"></script>
+<script src="net.js?v=1788042562"></script>
 
 <script>
 /* =========================================================================
@@ -2154,7 +2154,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788041699"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788042562"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2256,7 +2256,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788041699"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788042562"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3058,7 +3058,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788041699"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788042562"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3855,6 +3855,27 @@ radarFiltros(){
   const tenhoLocal=!!meu.principal;
   return {titulo:'Filtros', dir:`<a style="color:var(--marca);cursor:pointer" onclick="radarLimpar()">limpar</a>`, html:`
     <div class="pad">
+      <!-- 29/08 (board, node 58:1232): MODALIDADE e BUSCAR entram no filtro.
+           As duas já existiam no app, mas fora daqui — o esporte era um switch
+           global na home e o "jogadores ou professores" era o seletor no topo
+           do radar. O board junta as duas com o resto, que é onde a pessoa
+           procura por elas. Continuam sendo o mesmo estado: mexer aqui mexe lá. -->
+      <div class="rot">Modalidade</div>
+      <div class="grade" style="margin-bottom:16px">
+        <button class="chip ${S.esporte==='tenis'?'on':''}" onclick="trocarEsporte('tenis')">Tênis</button>
+        <button class="chip ${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach Tennis</button>
+      </div>
+      <div class="rot">Buscar</div>
+      <div class="grade" style="margin-bottom:16px">
+        <button class="chip ${S.encCat==='jogadores'?'on':''}" onclick="encCat('jogadores')">Jogadores</button>
+        <button class="chip ${S.encCat==='professores'?'on':''}" onclick="encCat('professores')">Professores</button>
+      </div>
+
+      <!-- O board desenha a classe como SLIDER de faixa, de 2.0 a 4.5. Aqui
+           são chips, e é de propósito: o radar já só mostra ±1 classe por
+           regra de produto, então uma faixa livre prometeria alcance que não
+           existe. O texto ao lado diz isso. (A escala decimal do board é NTRP;
+           o Nuno decidiu em 29/08 que o sistema que manda é Classe D/C/B/A.) -->
       <div class="rot">Classe <span>o pareamento continua ±1 — aqui só afunila</span></div>
       <div class="grade" style="margin-bottom:16px">${chip('classe',null,'Todas')}${permitidas.map(c=>chip('classe',c,'Classe '+c)).join('')}</div>
       <div class="rot">Tipo de jogo</div>
@@ -3867,6 +3888,14 @@ radarFiltros(){
       <div class="grade" style="margin-bottom:16px">${chip('per',null,'Todos')}${chip('per','m','Manhã')}${chip('per','t','Tarde')}${chip('per','n','Noite')}</div>
       ${tenhoLocal?`<div class="rot">Localidade</div>
       <div class="grade" style="margin-bottom:16px">${chip('lugar',null,'Todas')}${chip('lugar','clube','Meu clube')}${meu.regiaoId?chip('lugar','regiao',meu.regiao||'Minha região'):''}${chip('lugar','cidade',meu.cidade?meu.cidade.split('/')[0]:'Minha cidade')}</div>`:''}
+      <!-- 29/08 (board): RAIO DE BUSCA. O board desenha um slider de km, e o
+           app não tem como cumprir: a localidade aqui é TEXTO (UF, cidade,
+           bairro), não coordenada, e sem latitude/longitude não existe raio.
+           Fica em casca — visível como o que falta, e não como um controle que
+           parece funcionar e não filtra nada. -->
+      ${casca(`<div class="rot" style="margin:0 0 6px">Raio de busca</div>
+        <p class="nota">O desenho pede um raio em km. O app guarda cidade e bairro como texto, não como coordenada — sem isso não dá pra medir distância. Precisa de geolocalização pra existir.</p>`)}
+
       <div class="card clic" onclick="radarF('livresAgora',${F.livresAgora?'null':'true'})" style="margin-bottom:16px">
         <div class="linha-item"><div class="txt"><b>Mostrar apenas jogadores livres agora</b></div>
         <span class="pil ${F.livresAgora?'up':'gh'}">${F.livresAgora?'ligado':'desligado'}</span></div>
