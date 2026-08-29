@@ -122,6 +122,33 @@ async function netSyncJogador(eu){
     });
     if(ec) console.error('[net] contato nao gravou', ec);
   }
+
+  /* 29/08 (mig 78) — a BIO. Ela mora em `players` (é de vitrine: o perfil que
+     outra pessoa abre a exibe), mas NÃO viaja no upsert de identidade lá em
+     cima, e a razão é a mesma que já vale pro contato: aquele upsert dá
+     `throw` e derruba o BOOT INTEIRO se falhar.
+     Bio é campo de perfil, opcional, que ninguém precisa pra entrar no app.
+     Acoplá-la ao boot significa que um cliente novo contra um banco sem a
+     coluna — o intervalo entre publicar e rodar a migração, ou um aparelho que
+     atualizou antes — abre em tela branca. É o defeito que este arquivo já
+     documenta duas vezes: regra nova em cima de escrita velha.
+     Aqui, se a coluna não existir ainda, a bio só não grava. */
+  if(eu.bio){
+    const { error: eb } = await sb.from('players').update({ bio: eu.bio }).eq('id', MEU_UID);
+    if(eb) console.error('[net] bio nao gravou', eb);
+  }
+
+  /* 29/08 (mig 78) — o GÊNERO, mesma forma e mesma razão do contato acima.
+     O board coleta o dado e não o exibe em tela nenhuma: nem no perfil
+     próprio, nem no do oponente, nem no radar. Dado que ninguém precisa ler é
+     dado que ninguém deve poder ler — `player_privado` é "só eu e o ADM".
+     Falha aqui também NÃO derruba o cadastro, pela mesma razão do contato. */
+  if(eu.genero){
+    const { error: eg } = await sb.from('player_privado').upsert({
+      player_id: MEU_UID, genero: eu.genero,
+    });
+    if(eg) console.error('[net] genero nao gravou', eg);
+  }
 }
 
 /* 3. Adversários reais: todo mundo no banco menos eu. Vira a lista do

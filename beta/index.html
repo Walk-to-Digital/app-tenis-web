@@ -34,20 +34,42 @@
    quem age é o laranja (--marca), quem confirma escolha é o lime (--acc). */
 :root{
   --bg:#060B08; --sup:#0C1013; --sup2:#131920; --linha:#1B2320; --linha2:#2A3430;
-  --ink:#FFFEFD; --ink2:#BFC6B6; --ink3:#A6A6A7;
+  --ink:#FFFEFD; --ink2:#BFC6B6; --ink3:#BCBCBC;   /* 29/08: --ink3 era #A6A6A7; o board mede #BCBCBC — mais claro, contrasta melhor no preto */
   --acc:#83E000; --acc-ink:#0A1100;          /* lime = seleção/ativo */
   --up:#83E000; --up-bg:#16240A;             /* o lime da bola premia */
   --dn:#E8433C; --dn-bg:#2B0F0C;             /* vermelho, não laranja */
   --marca:#FF6A00; --marca-ink:#FFFEFD;      /* laranja = ação */
   --gold:#E0C48A; --gold-bg:#26220F;
   --r:14px; --rp:999px;
-  /* 11/08: era Bodoni/Didot. A serifada clássica brigava com o lettering
-     geométrico da RANKET — pareciam duas marcas na mesma tela. Avenir Next é
-     a mais próxima do logo entre as que já existem no aparelho: geométrica,
-     sem serifa, com o mesmo desenho aberto de 'a' e 'e'. Sem webfont: o app
-     não carrega fonte externa e não vai começar agora. */
-  --f-disp:"Avenir Next","Avenir",Futura,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
-  --f-ui:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  /* 29/08: o BRILHO do board. Toda tela do Figma tem um gradiente radial lime
+     vindo do alto, que é o que tira o fundo do preto morto. O original é um
+     radialGradient com matriz de transformação que o CSS não reproduz igual;
+     isto é a leitura do efeito, não a cópia da matriz — mesma cor, mesma
+     origem, mesma queda. Medido contra o screenshot de 29:256. */
+  --brilho:radial-gradient(ellipse 120% 60% at 88% -6%,
+    rgba(131,224,0,.10) 0%, rgba(70,121,0,.07) 38%, rgba(40,69,0,.04) 62%, transparent 82%);
+  /* 11/08: era Bodoni/Didot, e a regra virou "sem webfont, e não vai começar
+     agora" — Avenir Next era a mais próxima do logo entre as já instaladas.
+     29/08: o board do Figma inteiro é desenhado em INTER, e o Nuno decidiu
+     adotá-la. A regra antiga cai, mas a razão dela não: por isso a fonte é
+     SERVIDA PELO PRÓPRIO APP (app/fontes/), não puxada do Google. O app é PWA
+     e abre no 4G da quadra; texto que só aparece depois de um terceiro
+     responder é regressão, e o Google veria o IP de cada jogador.
+     Um arquivo só, 47 KB: é variable (400..800), então todo peso do board sai
+     dele. Subset latin, que cobre ã ç õ é — o resto do português inclusive.
+     `swap` é deliberado: melhor ler em San Francisco por 200ms do que encarar
+     um retângulo em branco. A pilha de fallback é a de antes, na ordem. */
+  --f-disp:Inter,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+  --f-ui:Inter,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+@font-face{
+  font-family:'Inter';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url('fontes/inter-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
+    U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
@@ -163,6 +185,21 @@ button,input,select{font:inherit;color:inherit}
 .nota{font-size:11px;color:var(--ink3);line-height:1.55;margin-top:2px}
 .nota b{color:var(--ink2)}
 
+/* 29/08: CASCA — a marca de "esta tela está de pé, mas o dado por trás não
+   existe ainda". Nasce com a leva das 24 telas do board: várias chegam antes
+   da migração que as alimenta, e tela bonita com número plausível é demo
+   enganosa. O precedente é a linha do estadoInicial: "não há mais elenco fake".
+   LARANJA de propósito. Lime aqui leria como "confirmado" pela regra da casa
+   (quem age é o laranja, quem confirma escolha é o lime), e confirmado é o
+   sentido exatamente errado pra um bloco que não tem dado.
+   A regra de uso está no helper `casca()`, lá embaixo: nome nenhum inventado,
+   número nenhum inventado, foto nenhuma inventada. */
+.casca{position:relative;border:1px dashed var(--marca);border-radius:var(--r);
+  padding:26px 18px 18px;margin:10px 0;opacity:.78}
+.casca::before{content:'SEM DADO REAL';position:absolute;top:8px;left:14px;
+  font:700 8.5px var(--f-ui);letter-spacing:.14em;color:var(--marca)}
+.casca .nota{color:var(--ink2)}
+
 /* grade de seleção (propor horário) */
 .grade{display:flex;flex-wrap:wrap;gap:8px}
 .chip{background:var(--sup);border:1px solid var(--linha2);color:var(--ink2);
@@ -244,6 +281,42 @@ button,input,select{font:inherit;color:inherit}
 .nav button i{display:block;font-style:normal;font-size:17px;margin-bottom:3px;opacity:.5}
 .nav button.on{color:var(--acc)}
 .nav button.on i{opacity:1}
+/* 29/08 (board): o + central. É item do array da nav como qualquer outro —
+   o grid e a delegação do clique não sabem que ele é diferente, só o CSS sabe.
+   ⚠️ O lime aqui é EXCEÇÃO DECLARADA à regra de :20-34 (quem age é o laranja).
+   O board desenhou assim e o Nuno confirmou em 29/08. A regra continua valendo
+   pro resto: este é o único lime que age. */
+.nav button.cta{display:flex;align-items:center;justify-content:center;
+  width:52px;height:52px;margin:-18px auto 0;border-radius:50%;
+  background:var(--acc);color:var(--acc-ink);font-size:26px;font-weight:400;
+  line-height:1;box-shadow:0 6px 18px rgba(131,224,0,.28)}
+.nav button.cta i{margin:0;opacity:1;font-size:26px}
+.nav button.cta.on{color:var(--acc-ink)}
+.topo-acoes{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.ic-topo{position:relative;width:30px;height:30px;flex:0 0 30px;border-radius:50%;
+  border:1px solid var(--linha2);background:none;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;padding:0}
+.ic-topo svg{width:16px;height:16px;display:block}
+.ic-topo .pt{position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;
+  background:var(--marca);border:1.5px solid var(--bg)}
+.av-topo{overflow:hidden;border-color:var(--acc)}
+.av-topo .av{width:100%;height:100%}
+/* a folha do + */
+#mais[hidden]{display:none}
+/* absolute, não fixed: a folha pertence ao aparelho (#fone é relative), e
+   fixed a fazia cobrir a janela inteira no desktop, escapando da moldura.
+   É o mesmo posicionamento do #cenas, que é a mesma peça — folha que sobe. */
+#mais{position:absolute;inset:0;z-index:35;display:flex;align-items:flex-end}
+#mais .mais-fundo{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+#mais .mais-folha{position:relative;width:100%;background:var(--sup);
+  border-top-left-radius:20px;border-top-right-radius:20px;border-top:1px solid var(--linha2);
+  padding:10px 18px max(18px,env(safe-area-inset-bottom))}
+#mais .puxador{width:38px;height:4px;border-radius:99px;background:var(--linha2);margin:0 auto 14px}
+#mais .mais-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+  background:none;border:0;padding:15px 4px;color:var(--ink);font:600 15px var(--f-ui);cursor:pointer}
+#mais .mais-item + .mais-item{border-top:1px solid var(--linha)}
+#mais .mais-item i{font-style:normal;font-size:19px;width:24px;text-align:center;color:var(--acc)}
+#mais .mais-item small{display:block;font:400 11.5px var(--f-ui);color:var(--ink3);margin-top:2px}
 .nav button .badge{
   display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:99px;
   background:var(--up);color:#0A1100;font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
@@ -757,6 +830,33 @@ button,input,select{font:inherit;color:inherit}
 .pcor{width:38px;height:38px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
 .pcor.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--bg),0 0 0 4px rgba(198,255,61,.3)}
 .seg2{display:flex;gap:8px}
+/* 29/08 (board, node 29:256): o seletor de TRÊS. O .seg2 é a peça de duas
+   escolhas; gênero tem três e no desenho elas são pílulas separadas, com
+   contorno lime em todas e preenchimento lime só na ativa. */
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.seg3 button{border:1px solid var(--acc);background:transparent;color:var(--ink3);
+  border-radius:10px;padding:11px 4px;font:700 12px var(--f-ui);cursor:pointer}
+.seg3 button.on{background:var(--acc);color:var(--acc-ink)}
+/* rótulo em negrito ACIMA do campo, como o board faz em "Data de nascimento"
+   e "Bio" — diferente do .rot, que é caixa-alta e menor */
+.onb-rot{font:700 14px var(--f-ui);color:var(--ink);margin:16px 0 8px}
+.onb-area{width:100%;min-height:86px;padding:15px;border-radius:16px;resize:vertical;
+  background:rgba(30,23,20,.72);border:1px solid rgba(255,254,253,.55);color:var(--ink);
+  font:400 15px var(--f-ui);margin-bottom:4px}
+.onb-area:focus{outline:none;border-color:var(--acc)}
+/* o aceite: botão, não <input type=checkbox> — o app inteiro pinta estado por
+   classe .on e re-render, e um checkbox nativo guardaria estado no DOM, que o
+   render() destrói. A caixinha é o ::before. */
+.onb-check{display:flex;align-items:flex-start;gap:10px;background:none;border:0;
+  padding:12px 0;cursor:pointer;text-align:left;color:var(--ink);font:400 13px var(--f-ui)}
+.onb-check::before{content:'';flex:0 0 18px;width:18px;height:18px;border-radius:3px;
+  border:2px solid var(--acc);margin-top:1px}
+.onb-check.on::before{background:var(--acc);
+  box-shadow:inset 0 0 0 2px var(--bg),inset 0 0 0 9px var(--acc)}
+/* o texto inteiro num <span>: sendo filhos diretos do flex, "Termos de Uso"
+   e o ponto final viravam dois itens e o gap de 10px caía entre eles. */
+.onb-check span{flex:1;line-height:1.45}
+.onb-check u{text-underline-offset:2px}
 .seg2 button{flex:1;padding:12px 10px;border-radius:8px;background:rgba(30,23,20,.7);border:1px solid var(--linha2);
   color:var(--ink2);font-size:13px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .seg2 button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
@@ -945,6 +1045,13 @@ button,input,select{font:inherit;color:inherit}
     <div class="marca" id="marca"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
     <h1 id="titulo">Quadro</h1>
     <div class="dir" id="dir"></div>
+    <!-- 29/08 (board): sino e avatar sobem pro topo. É o que libera a barra de
+         baixo pra caber em cinco com o + no meio: Notificações deixa de ser
+         aba e vira o sino, o perfil deixa de ser aba e vira o avatar. -->
+    <div class="topo-acoes">
+      <button class="ic-topo" id="btSino" aria-label="Notificações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="pt" id="sinoPt" hidden></span></button>
+      <button class="ic-topo av-topo" id="btEu" aria-label="Seu perfil"></button>
+    </div>
   </div>
 
   <div id="tela"></div>
@@ -966,6 +1073,10 @@ button,input,select{font:inherit;color:inherit}
        funcionando. -->
   <div class="nav" id="nav"></div>
 
+  <!-- 29/08: a folha do + da barra. O board desenhou onde o botão fica e
+       deixou o corpo em branco, então o conteúdo é decisão do Nuno: marcar
+       jogo e lançar placar, as duas portas que já existem. -->
+  <div id="mais" hidden><div class="mais-fundo"></div><div class="mais-folha" id="mais-folha"></div></div>
   <div id="toast"></div>
 
   <!-- 18/08: a splash é markup, não JS — tem que estar pintada antes de o
@@ -990,7 +1101,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788023946"></script>
+<script src="net.js?v=1788040455"></script>
 
 <script>
 /* =========================================================================
@@ -1006,6 +1117,12 @@ function estadoInicial(){ return {
      'jogo' vê o app como qualquer jogador (radar, comunidade, vestiário).
      É apresentação do aparelho, nunca dado: `perfil` e `joga` vivem no banco. */
   modoProf: 'prof',
+  /* 29/08: a aba escolhida DENTRO de cada tela (Comunidade, Ficha, Grupo...).
+     Mora aqui, e não no DOM nem na pilha, por duas razões que já morderam:
+     render() troca o innerHTML inteiro (o DOM não guarda nada) e trocarAba()
+     zera a pilha. Em S ela ainda sobrevive ao localStorage, que é o que uma
+     barra de abas serve pra fazer: te devolver onde você estava. */
+  abas: {},
   // 06/08: beach é esporte irmão — Nível, pontos e divisão próprios. Nunca se misturam.
   esporte: 'tenis',
   // bon = boneco do elenco · cor = camisa (vira o aro do avatar, o identificador a 34px)
@@ -1720,24 +1837,57 @@ function modoJogador(){ return ehProfessor() && euJogo() && S.modoProf==='jogo';
 function veProfessor(){ return ehProfessor() && !modoJogador(); }
 function modoTrocar(m){ S.modoProf=m; aba='inicio'; pilha=[]; salvar(); render(); }
 window.modoTrocar = modoTrocar;
+/* 29/08 (board): CINCO itens, iguais pros três papéis, com o + no meio.
+   O que mudou e por quê:
+   · Vestiário e Ficha SAÍRAM da barra — o board põe o perfil no avatar do topo,
+     e o vestiário passa a ser alcançado de dentro dele. As duas rotas continuam
+     existindo, agora por `ir()` e não por aba.
+   · Notificações não é aba: virou o sino do topo.
+   · A aba AULAS do aluno (mig 70, 27/08) sai da barra e vai pro menu do +.
+     Isso mexe numa decisão do Nuno daquele dia — a superfície continua a um
+     toque, mas de outro lugar. Se a aula for o centro da vida do aluno, ela
+     volta pra cá e quem sai é outro.
+   · O teto de 5 (linha ~1712: "acima disso o alvo do dedo fica menor que o
+     dedo") volta a valer pra TODO MUNDO, inclusive o aluno. */
+/* A folha do +. Os itens são as portas que JÁ EXISTEM: `radar` é a aba de
+   marcar jogo e `netAbrirMao` é o lançar placar que o net.js já exporta. Nada
+   aqui é porta nova — o + é atalho, não recurso. */
+function maisItens(){
+  const eu = [];
+  if(veProfessor()){
+    eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()"]);
+  } else {
+    eu.push(['◎','Marcar jogo','Ver quem está livre no seu radar', "trocarAba('radar')"]);
+  }
+  eu.push(['✎','Lançar placar','Registrar uma partida já jogada', "_net.abrirMao()"]);
+  /* 29/08: a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse.
+     Ela reaparece aqui — mesma superfície, um toque, outro lugar. */
+  if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')"]);
+  return eu;
+}
+function abrirMais(){
+  const f = document.getElementById('mais-folha');
+  f.innerHTML = '<div class="puxador"></div>' + maisItens().map(([ic,tit,sub,acao])=>
+    `<button class="mais-item" onclick="fecharMais(); ${acao}"><i>${ic}</i><span>${tit}<small>${sub}</small></span></button>`
+  ).join('');
+  document.getElementById('mais').hidden = false;
+}
+function fecharMais(){ document.getElementById('mais').hidden = true; }
+
 function navAbas(){
+  const mais = {t:'__mais', i:'+', r:'', cta:true};
   const chat = {t:'chat', i:'💬', r:'Chat'};
-  const jogador = window.__souAluno ? [
-    /* 27/08 (mig 70, decisão do Nuno): quem é aluno ganha a aba Aulas NA
-       BARRA — a superfície que faltava. Seis itens só pra quem tem aula. */
-    {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Encontrar'},
-    {t:'aulasAluno', i:'🗓', r:'Aulas'},
-    {t:'comunidade', i:'▣', r:'Comunidade'}, chat, {t:'vestiario', i:'❖', r:'Vestiário'},
-  ] : [
-    {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Encontrar'},
-    {t:'comunidade', i:'▣', r:'Comunidade'}, chat, {t:'vestiario', i:'❖', r:'Vestiário'},
+  if(!ehProfessor() || modoJogador()) return [
+    {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Radar'},
+    mais,
+    {t:'comunidade', i:'▣', r:'Comunidade'}, chat,
   ];
-  if(!ehProfessor() || modoJogador()) return jogador;
-  /* a nav do professor leva a Ficha SEMPRE (é onde vive o switch "eu compito"
-     da mig 72) — o Encontrar mora na lente de jogador, não aqui */
+  /* o professor mantém Turma e Aulas, que são a vida dele. A Ficha — onde vive
+     o switch "eu compito" da mig 72 — sobe pro avatar do topo, como todo mundo. */
   return [
     {t:'inicio', i:'◈', r:'Home'}, {t:'turma', i:'👥', r:'Turma'},
-    {t:'aulas', i:'🗓', r:'Aulas'}, chat, {t:'ficha', i:'◇', r:'Ficha'},
+    mais,
+    {t:'aulas', i:'🗓', r:'Aulas'}, chat,
   ];
 }
 function pintarNav(){
@@ -1752,7 +1902,8 @@ function pintarNav(){
     } else if(a.t==='chat'){
       extra = (window.netTemRecado&&netTemRecado())? ' <span class="ponto"></span>':'';
     }
-    return `<button data-t="${a.t}" class="${a.t===aba?'on':''}"><i>${a.i}</i>${a.r}${extra}</button>`;
+    const cls = [a.cta?'cta':'', a.t===aba?'on':''].filter(Boolean).join(' ');
+    return `<button data-t="${a.t}" class="${cls}"><i>${a.i}</i>${a.r}${extra}</button>`;
   }).join('');
   el.style.gridTemplateColumns = `repeat(${abas.length},1fr)`;
   /* a aba ativa pode ter sumido com a troca de papel (ex.: professor que
@@ -1761,7 +1912,11 @@ function pintarNav(){
   if(!abas.some(a=>a.t===aba)){ aba = abas[0].t; }
 }
 
-function trocarAba(t){ aba=t; pilha=[]; if(t==='comunidade') S.novidades=0;
+function trocarAba(t){
+  /* 29/08: o + não é destino — não existe VISTAS['__mais'], e sem esta linha
+     o render() logo abaixo estouraria. Ele abre uma folha e a aba não muda. */
+  if(t==='__mais') return abrirMais();
+  aba=t; pilha=[]; if(t==='comunidade') S.novidades=0;
   if(t==='chat') window.__chatHub=undefined;   // 25/08: recarrega as conversas a cada visita
   if(t==='radar'){ window.__dispLoad=false; window.__lugLoad=false; window.__lugRetry=false;
                    window.__profLoad=false; window.__profRetry=false; window.__eqLoad=false; }   // 25/08: disponibilidades, lugares, professores e equipamentos
@@ -1772,8 +1927,10 @@ function trocarAba(t){ aba=t; pilha=[]; if(t==='comunidade') S.novidades=0;
   if(t==='ficha') { window.__convLoad=false; window.__convites=undefined;
                     window.__turmaLoad=false; window.__turma=undefined; window.__profDraft=undefined;
                     window.__midia=undefined; }   // 25/08: convites, turma, professor e midia
-  // sair do provador fecha a categoria E descarta o que estava sendo provado:
-  // sair sem vestir é a forma de desistir, então o rascunho não pode sobreviver.
+  /* 29/08: a limpeza do rascunho do provador MUDOU DE CASA — foi pro render(),
+     que decide por ROTA e não por nome de aba. Esta linha fica como rede: com
+     o vestiário fora da barra ela quase nunca dispara, mas se um dia ele
+     voltar a ser aba, o descarte continua acontecendo pelos dois caminhos. */
   if(t!=='vestiario'){ vestAba=null; vestDraft=null }
   salvar(); render() }
 // o quadro virou aba interna da Comunidade (05/08: "a comunidade é aba, não o app inteiro")
@@ -1923,7 +2080,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788023946"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788040455"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2025,7 +2182,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788023946"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788040455"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2045,13 +2202,24 @@ function render(){
   // a home abre imersiva: sem barra de topo (a HUD dela já faz esse papel)
   const naInicio = atual.rota==='inicio';
   const naVest = atual.rota==='vestiario';
-  $('#topo').style.display = (naInicio||naVest) ? 'none' : 'flex';
+  /* 29/08: o vestiário saiu da barra e agora é alcançado por `ir()` a partir do
+     avatar do topo. Escondendo o topo nos dois casos ele ficaria SEM SAÍDA —
+     não há mais aba pra clicar. Some só quando ele é a raiz (o cadastro, via
+     cadVest); vindo por cima, o topo fica e o ‹ é a porta de volta. */
+  const vestImersivo = naVest && !pilha.length;
+  $('#topo').style.display = (naInicio||vestImersivo) ? 'none' : 'flex';
   /* ambiente noturno (a quadra correndo por baixo) vale nas telas internas.
      26/08 abriu uma exceção aqui: a home do professor era a MESMA rota `inicio`
      e não desenhava cena nenhuma, então `naInicio` desligava o `#amb` e sobrava
      fundo chapado. 28/08 a exceção MORREU na origem — a home do professor
      passou a renderizar `.ini` com a própria `.cena`, igual à do jogador. A
      regra voltou a ser a simples: a rota `inicio` pinta o próprio fundo. */
+  /* 29/08: a limpeza do rascunho do provador migrou pra cá, do trocarAba().
+     Lá ela dependia do NOME DA ABA ('sair sem vestir é desistir'), e o
+     vestiário deixou de ser aba — a regra teria morrido em silêncio, deixando
+     o rascunho sobreviver à saída. Aqui ela depende da ROTA, que é o que a
+     regra sempre quis dizer. */
+  if(!naVest){ vestAba=null; vestDraft=null }
   const cenaPropria = naInicio || naVest;
   $('#fone').classList.toggle('noturno', !cenaPropria);
   // o cenário escolhido no vestiário vira o fundo da home e o ambiente das telas internas
@@ -2059,6 +2227,9 @@ function render(){
   $('#fone').style.setProperty('--cena-url', `url('../quadras/${_c.quadra}-${_c.momento}.jpg')`);
   $('#topo').classList.toggle('temvoltar', pilha.length>0);
   $('#marca').style.display = pilha.length? 'none':'flex';
+  // o avatar do topo é a porta do perfil (board): repintado a cada render
+  // porque a camisa e o boneco mudam no vestiário
+  const _bt = $('#btEu'); if(_bt) _bt.innerHTML = avatar(EU,'');
   $('#tela').innerHTML = v.html;
   $('#tela').scrollTop = 0;
   // 25/08 (bug do Nuno): durante o vestiário DO CADASTRO a nav some — com ela
@@ -2134,6 +2305,64 @@ function corAro(cor){
   }
   _aroCache.set(cor,out);
   return out;
+}
+
+/* ===== ABAS DENTRO DE TELA (29/08) =====================================
+   Antes desta leva havia três convenções pro mesmo gesto: `.abas` (sublinhado),
+   `.rtabs/.rtab` (pílula, no radar) e o `_adm.aba` do net.js. O board pede aba
+   em mais três telas (Comunidade, Ficha e Grupo), e sem um componente isso
+   viraria seis convenções. Aqui é uma.
+
+   O clique NÃO é pendurado no botão: a delegação mora no boot, lá embaixo,
+   pela mesma razão da barra inferior — estes botões nascem dentro de um
+   innerHTML que é reescrito a cada render(), e handler pendurado no botão
+   velho morre junto com ele, em silêncio. */
+function abaDe(grupo, padrao){
+  // defensivo de propósito: localStorage de antes de 29/08 não tem S.abas
+  return (S.abas && S.abas[grupo]) || padrao;
+}
+function abaIr(grupo, v, fn){
+  S.abas = S.abas || {};
+  S.abas[grupo] = v;
+  salvar();
+  /* Folha do net.js não é repintada por render(): ela vive fora do #tela. Quem
+     usa abas dentro de folha passa o nome da própria função de repintura, e ela
+     manda aqui. Sem isso a aba mudaria em S e não mudaria na tela — troca que
+     não pinta é defeito silencioso. */
+  if(fn && typeof window[fn]==='function') window[fn]();
+  else render();
+}
+/* itens: [[chave, rótulo], ...] — a PRIMEIRA é o padrão.
+   estilo: 'linha' (sublinhado, o das telas do board) ou 'pilula' (o do radar).
+   aoTrocar: nome de função global, só quando isto for pintado dentro de folha. */
+function abasHtml(grupo, itens, estilo, aoTrocar){
+  const atual = abaDe(grupo, itens[0][0]);
+  const casca = estilo==='pilula' ? 'rtabs' : 'abas';
+  const bt    = estilo==='pilula' ? 'rtab'  : '';
+  const fn    = aoTrocar ? ` data-aba-fn="${aoTrocar}"` : '';
+  return `<div class="${casca}">${itens.map(([k,r])=>{
+    const cls = [bt, atual===k?'on':''].filter(Boolean).join(' ');
+    return `<button class="${cls}" data-aba-grupo="${grupo}" data-aba="${k}"${fn}>${r}</button>`;
+  }).join('')}</div>`;
+}
+
+/* ===== CASCA (29/08) ====================================================
+   Tela de pé sem o dado que a alimenta. Regra de uso, e ela não é decorativa:
+   NOME nenhum inventado, NÚMERO nenhum inventado, FOTO nenhuma inventada.
+   Um feed de casca diz que não tem dado; não mostra três posts plausíveis de
+   um "Marcos Silva" que não existe. `.vazio` continua sendo o estado vazio
+   honesto de quem TEM a fonte e ela veio vazia — `.casca` é pra quando nem a
+   fonte existe ainda.
+   A flag existe pra ser greppável e virar de um lugar só; o publicar.sh recusa
+   publicar com ela ligada, e o publicar-beta.sh não — o beta é justamente onde
+   a casca pode estar acesa. */
+const CASCA = true;
+function casca(dentro){
+  if(!CASCA) return '';
+  return `<div class="casca">${dentro}</div>`;
+}
+function cascaNota(texto){
+  return casca(`<p class="nota">${texto}</p>`);
 }
 
 // avatar: boneco recortado + aro na cor da camisa. classe extra: '', 'g' (52) ou 'gg' (76)
@@ -2725,7 +2954,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788023946"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788040455"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -4324,6 +4553,22 @@ ficha(){
       </div>
     </div>
 
+    <!-- 29/08 (board): o Vestiário saiu da barra de baixo, então a porta dele
+         passa a ser aqui, no perfil. Usa ir() e não trocarAba(): ele deixou de
+         ter item na nav, e trocarAba deixaria a aba apontando pra uma rota que
+         o pintarNav não conhece. (Sem crase: este comentário vive dentro de um
+         template literal, e crase aqui fecha a string. Foi o defeito de 11/08.) -->
+    <div class="sec">
+      <div class="rot">Personagem</div>
+      <div class="card clic" onclick="ir('vestiario')">
+        <div class="linha-item">
+          <div class="av">❖</div>
+          <div class="txt"><b>Vestiário</b><small>Trocar roupa, cor, escudo e o cenário da quadra</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+    </div>
+
     <div class="sec">
       <div class="rot">Conquistas</div>
       <div class="card clic" onclick="abrirTrofeus()">
@@ -5232,6 +5477,8 @@ function onbEsporteToggle(v){
 function fecharCadastro(){ onb=null; document.getElementById('onb').classList.remove('on') }
 function onbSet(k,v){ onb[k]=v; renderOnb() }
 function onbNome(v){ onb.nome=v }                 // sem re-render pra não perder o foco do input
+function onbSobrenome(v){ onb.sobrenome=v }       // 29/08 (board): sobrenome virou campo próprio
+function onbBio(v){ onb.bio=v }                   // texto livre: mesma razão, sem re-render
 function onbEmail(v){ onb.email=v }
 function onbSenha(v){ onb.senha=v }
 function onbSenha2(v){ onb.senha2=v }
@@ -5340,7 +5587,13 @@ function onbTemConvite(){
 // PASSO 2 — nome + nascimento; a trava de idade roda e SÓ ENTÃO o signUp
 async function onbDadosOk(){
   if(!onbTemConvite()) return;
-  if(!onb.nome || !onb.nome.trim()){ alert('Digite seu nome e sobrenome.'); return; }
+  if(!onb.nome || !onb.nome.trim()){ alert('Digite seu nome.'); return; }
+  if(!onb.sobrenome || !onb.sobrenome.trim()){ alert('Digite seu sobrenome.'); return; }
+  /* 29/08 (board, node 29:256): o aceite virou caixa de marcar, e por isso
+     virou GATE aqui em vez de letra miúda no rodapé. Ele mora junto da trava
+     de 18 anos de propósito: as duas são a mesma pergunta — esta conta pode
+     existir? — e separar deixaria uma delas passar sozinha. */
+  if(!onb.termos){ alert('Para criar a conta é preciso aceitar os Termos de Uso.'); return; }
   const idade = idadeEm(onb.nasc, new Date());
   if(idade === null){ alert('Preencha sua data de nascimento.'); return; }
   if(idade < 18){
@@ -5419,7 +5672,13 @@ function completarCadastro(){
   S.esporte = esc[0];
   eu.cena = S.esporte==='beach' ? {quadra:'areia',momento:'noite'} : {quadra:'saibro',momento:'noite'};
   eu.cenas = { [S.esporte]: eu.cena };
-  if(onb.nome.trim()){ eu.nome=onb.nome.trim(); eu.ap=onb.nome.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase() }
+  /* 29/08: nome e sobrenome são campos separados na tela (board) e um só no
+     estado — `eu.nome` é o que toda a lista de adversários, o quadro e o card
+     exportado leem. Juntar aqui evita espalhar a mudança por 40 leitores. */
+  const nomeCheio = [onb.nome, onb.sobrenome].map(x=>(x||'').trim()).filter(Boolean).join(' ');
+  if(nomeCheio){ eu.nome=nomeCheio; eu.ap=nomeCheio.split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase() }
+  eu.bio    = (onb.bio||'').trim();
+  eu.genero = onb.genero || '';
   // personagem (bon/cor/roupa/clube/etc) já vem do vestiário aberto no passo 4 — não sobrescreve.
   if(onb.div){
     if(esc.includes('tenis')){ eu.div =onb.div; eu.nivel =NIVEL_PTS[onb.div] } else { eu.div ='C'; eu.nivel =NIVEL_PTS.C }
@@ -5565,9 +5824,20 @@ function renderOnb(){
   } else if(onb.step===2){
     body=`
       <div class="onb-head"><div class="onb-kick">Passo 2 de 4</div><h2>Dados Pessoais</h2></div>
-      <input id="onb-nome" class="onb-input" placeholder="Nome e sobrenome" value="${(onb.nome||'').replace(/"/g,'&quot;')}" oninput="onbNome(this.value)" maxlength="40" autocomplete="name">
+      <input id="onb-nome" class="onb-input" placeholder="Nome" value="${(onb.nome||'').replace(/"/g,'&quot;')}" oninput="onbNome(this.value)" maxlength="30" autocomplete="given-name">
+      <input id="onb-sobre" class="onb-input" placeholder="Sobrenome" value="${(onb.sobrenome||'').replace(/"/g,'&quot;')}" oninput="onbSobrenome(this.value)" maxlength="30" autocomplete="family-name">
+      <div class="onb-rot">Data de nascimento</div>
       <input id="onb-nasc" class="onb-input" type="date" value="${onb.nasc||''}" oninput="onbNasc(this.value)" max="${new Date().toISOString().slice(0,10)}">
       <p class="nota">Sua data de nascimento não aparece para os outros usuários. O Ranket é só para maiores de 18.</p>
+      <div class="onb-rot">Bio</div>
+      <textarea id="onb-bio" class="onb-area" placeholder="Uma linha sobre o seu jogo. Aparece no seu perfil." oninput="onbBio(this.value)" maxlength="160">${(onb.bio||'').replace(/</g,'&lt;')}</textarea>
+      <p class="nota">Opcional, até 160 caracteres.</p>
+      <div class="onb-rot">Gênero</div>
+      <div class="seg3">
+        <button class="${onb.genero==='f'?'on':''}" onclick="onbSet('genero','f')">Feminino</button>
+        <button class="${onb.genero==='m'?'on':''}" onclick="onbSet('genero','m')">Masculino</button>
+        <button class="${onb.genero==='o'?'on':''}" onclick="onbSet('genero','o')">Outro</button>
+      </div>
       <!-- 25/08 (mig 62): pedido literal do Rege — "ele escolhe o contato, se
            ele quer um e-mail, se ele quer WhatsApp". É diferente do e-mail de
            login: login é porta, contato é como te acham pra marcar jogo. -->
@@ -5578,6 +5848,7 @@ function renderOnb(){
       </div>
       ${onb.canal ? `<input id="onb-contato" class="onb-input" placeholder="${onb.canal==='zap'?'(71) 90000-0000':'seu@email.com'}" value="${(onb.contato||'').replace(/"/g,'&quot;')}" oninput="onbSet2('contato',this.value)" maxlength="100" ${onb.canal==='zap'?'inputmode="tel"':'type="email" inputmode="email"'}>
       <p class="nota">Quem te desafiar vê isso. Dá pra deixar em branco e ser chamado só pelo app.</p>` : ''}
+      <button class="onb-check ${onb.termos?'on':''}" onclick="onbSet('termos',!onb.termos)"><span>Li e concordo com os <u>Termos de Uso</u>.</span></button>
       <div class="onb-nav"><button class="onb-prim" onclick="onbDadosOk()">Avançar</button></div>`;
   } else if(onb.step===3 && onb.perfil==='professor' && !onb.telaEsportiva){
     /* (66) A FICHA DO PROFESSOR — no lugar da Esportiva.
@@ -5714,6 +5985,23 @@ function renderOnb(){
 document.getElementById('nav').addEventListener('click', (e)=>{
   const b = e.target.closest('button[data-t]');
   if(b) trocarAba(b.dataset.t);
+});
+/* 29/08: mesma delegação, agora pras abas DENTRO da tela (abasHtml). No
+   document e não no #tela de propósito: as folhas do net.js vivem fora dele, e
+   uma aba pintada dentro de folha ficaria sem handler — que é o defeito
+   silencioso de sempre, só que num lugar novo. */
+document.addEventListener('click', (e)=>{
+  const b = e.target.closest('button[data-aba][data-aba-grupo]');
+  if(b) abaIr(b.dataset.abaGrupo, b.dataset.aba, b.dataset.abaFn);
+});
+/* 29/08 (board): as duas portas que saíram da barra de baixo.
+   `ir()` e não `trocarAba()` de propósito — nenhuma das duas tem item na nav,
+   e trocarAba deixaria `aba` apontando pra uma rota que pintarNav não conhece,
+   que é justamente o caso em que ele te devolve pra Home em silêncio. */
+$('#btSino').onclick = ()=>{ if(window.netAbrirInbox) netAbrirInbox(); };
+$('#btEu').onclick  = ()=> ir('ficha');
+document.getElementById('mais').addEventListener('click', (e)=>{
+  if(e.target.classList.contains('mais-fundo')) fecharMais();
 });
 $('#voltar').onclick=voltar;
 $('#cenas').onclick=(e)=>{ if(e.target.id==='cenas') fecharCena() };
