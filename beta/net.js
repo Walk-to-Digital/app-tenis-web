@@ -2511,6 +2511,82 @@ window.netAbrirBusca = netAbrirBusca;
    ========================================================================= */
 let _gnew = null;
 
+/* ===== 29/08 — O QUE AS MIGRAÇÕES 79, 80 E 81 DESTRAVARAM ==================
+   Três tabelas novas, e a leitura de cada uma é curta porque a fechadura mora
+   no banco: a policy já decide o que cada conta enxerga. Aqui não se filtra
+   nada por segurança — filtrar no cliente seria fechar a porta e deixar a
+   janela, e o PostgREST responde a quem perguntar direto. */
+
+/* POSTS (mig 79). `grupo_id is null` é o feed público; com id, é o do grupo.
+   O feed do perfil é o mesmo público, filtrado por autor. */
+async function netFeed({grupo=null, autor=null, limite=30}={}){
+  let q = sb.from('posts').select('*').order('criado_em',{ascending:false}).limit(limite);
+  q = grupo ? q.eq('grupo_id', grupo) : q.is('grupo_id', null);
+  if(autor) q = q.eq('autor_id', autor);
+  const { data, error } = await q;
+  if(error){ console.error('[net] feed', error); return []; }
+  return data||[];
+}
+async function netPostar(corpo, grupo){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const t = (corpo||'').trim();
+  if(!t) return {erro:'escreva alguma coisa'};
+  const { error } = await sb.from('posts').insert({ autor_id:MEU_UID, grupo_id:grupo||null, corpo:t });
+  /* o teto de 20/hora vem do trigger e chega como exceção do banco: repassar a
+     frase dele é melhor do que traduzir pra um "erro" genérico, porque ela já
+     diz o que fazer (esperar). */
+  return error ? {erro:error.message} : {ok:true};
+}
+async function netApagarPost(id){
+  const { error } = await sb.from('posts').delete().eq('id', id);
+  return error ? {erro:error.message} : {ok:true};
+}
+
+/* BLOQUEIO (mig 80). A leitura é só a MINHA lista — a policy garante isso, e
+   é de propósito: ninguém descobre quem o bloqueou. */
+async function netMeusBloqueios(){
+  const { data } = await sb.from('bloqueios').select('bloqueado');
+  return (data||[]).map(x=>x.bloqueado);
+}
+async function netBloquear(id){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const { error } = await sb.from('bloqueios').insert({ bloqueador:MEU_UID, bloqueado:id });
+  return error ? {erro:error.message} : {ok:true};
+}
+async function netDesbloquear(id){
+  const { error } = await sb.from('bloqueios').delete().eq('bloqueador',MEU_UID).eq('bloqueado',id);
+  return error ? {erro:error.message} : {ok:true};
+}
+
+/* AVALIAÇÕES (mig 81). Escrever exige uma partida CONFIRMADA contra a pessoa —
+   a policy cobra isso, e por isso a tela precisa oferecer QUAL partida. */
+async function netAvaliacoes(alvo){
+  const { data } = await sb.from('avaliacoes').select('*').eq('alvo_id',alvo)
+                            .order('criado_em',{ascending:false}).limit(30);
+  return data||[];
+}
+async function netAvaliar(alvo, matchId, texto){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const t = (texto||'').trim();
+  if(!t) return {erro:'escreva alguma coisa'};
+  const { error } = await sb.from('avaliacoes')
+    .insert({ autor_id:MEU_UID, alvo_id:alvo, match_id:matchId, texto:t });
+  return error ? {erro:error.message} : {ok:true};
+}
+/* as partidas confirmadas contra alguém que eu AINDA não avaliei — é o que a
+   tela precisa pra saber se o botão de avaliar existe, e sobre qual jogo */
+async function netPartidasParaAvaliar(alvo){
+  const todas = (window.__minhasPartidas||[]).filter(m=>
+    m.status==='confirmada' && (
+      (m.criador_id===MEU_UID && m.adversario_id===alvo) ||
+      (m.adversario_id===MEU_UID && m.criador_id===alvo)));
+  if(!todas.length) return [];
+  const { data } = await sb.from('avaliacoes').select('match_id')
+                     .eq('autor_id',MEU_UID).in('match_id', todas.map(m=>m.id));
+  const jaFeitas = new Set((data||[]).map(x=>x.match_id));
+  return todas.filter(m=>!jaFeitas.has(m.id));
+}
+
 async function netMeusGrupos(){
   const m = await sb.from('grupo_membros').select('grupo_id,papel').eq('player_id',MEU_UID);
   const papel={}; (m.data||[]).forEach(x=>papel[x.grupo_id]=x.papel);
@@ -6385,6 +6461,13 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   admDarPatch:_admDarPatch, meusPatches:netMeusPatches,
   pedirIdade:netPedirIdade, idadeConfirmar:_idadeConfirmar,
   sairBanido:_sairBanido,   // 18/08 (mig 41)
-  abrirMao:netAbrirMao, maoAdv:_maoAdv, maoFmt:_maoFmt, maoEnviar:_maoEnviar };
+  abrirMao:netAbrirMao, maoAdv:_maoAdv, maoFmt:_maoFmt, maoEnviar:_maoEnviar,
+  /* 29/08 (migs 79/80/81). Entram AQUI e não em outro lugar: o `onclick` do
+     HTML só enxerga o que está neste mapa, e função que fica de fora morre em
+     silêncio — o defeito que o `onQuando` custou em 13/08 e que o
+     prova-net.mjs passou a cobrar em 29/08. */
+  feed:netFeed, postar:netPostar, apagarPost:netApagarPost,
+  meusBloqueios:netMeusBloqueios, bloquear:netBloquear, desbloquear:netDesbloquear,
+  avaliacoes:netAvaliacoes, avaliar:netAvaliar, partidasParaAvaliar:netPartidasParaAvaliar };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;

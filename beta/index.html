@@ -1272,7 +1272,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788047209"></script>
+<script src="net.js?v=1788049373"></script>
 
 <script>
 /* =========================================================================
@@ -2263,7 +2263,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788047209"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788049373"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2365,7 +2365,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788047209"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788049373"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2582,6 +2582,42 @@ function dispCarregar(){
     .then(([m,t])=>{ window.__dispMinhas=m; window.__dispTodas=t; if(aba==='radar') render(); })
     .catch(()=>{ window.__dispMinhas=window.__dispMinhas||[]; window.__dispTodas=window.__dispTodas||{}; });
 }
+/* 29/08 (migs 79 e 81) — o que o perfil do oponente precisa buscar.
+   Cache por jogador, porque a tela é aberta de vários lugares e o boot não
+   traz nada disto: posts e avaliações são tabelas novas. */
+function perfilCarregar(id){
+  window.__perfCache = window.__perfCache || {};
+  if(window.__perfCache[id] !== undefined) return;
+  window.__perfCache[id] = null;                    // null = carregando
+  if(!(window._net && _net.feed)){ window.__perfCache[id] = {posts:[], avals:[], podeAvaliar:[]}; return }
+  Promise.all([ _net.feed({autor:id}), _net.avaliacoes(id), _net.partidasParaAvaliar(id) ])
+    .then(([posts, avals, podeAvaliar])=>{
+      window.__perfCache[id] = {posts, avals, podeAvaliar};
+      render();
+    })
+    .catch(()=>{ window.__perfCache[id] = {posts:[], avals:[], podeAvaliar:[]}; render(); });
+}
+/* escrever uma avaliação. A policy exige partida CONFIRMADA contra a pessoa e
+   uma por partida — a tela só mostra o campo quando existe partida elegível,
+   senão ofereceria uma porta que o banco fecha. */
+async function avaliarEnviar(alvo, matchId){
+  const el = document.getElementById('aval-txt');
+  const r = await _net.avaliar(alvo, matchId, el ? el.value : '');
+  if(r.erro){ alert('Não deu pra enviar: '+r.erro); return }
+  window.__perfCache[alvo] = undefined;             // força recarregar
+  toast('Avaliação publicada.');
+  perfilCarregar(alvo); render();
+}
+async function perfilBloquear(id){
+  const j = S.jogadores[id]||{};
+  const primeiro = (j.nome||'essa pessoa').split(' ')[0];
+  if(!confirm('Bloquear '+primeiro+'?\n\nVocês somem um do radar do outro, e ninguém é avisado. Dá pra desfazer depois.')) return;
+  const r = await _net.bloquear(id);
+  if(r.erro){ alert('Não deu pra bloquear: '+r.erro); return }
+  window.__dispLoad=false;                          // o radar tem que reler sem essa pessoa
+  toast(primeiro+' foi bloqueado.');
+  voltar();
+}
 function dispRotulo(sl){
   const dt=new Date(sl.quando), hoje=new Date();
   const dif=Math.floor((dt - new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()))/86400e3);
@@ -2617,8 +2653,8 @@ function perfilMenu(id){
   f.innerHTML = '<div class="puxador"></div>' +
     `<button class="mais-item" onclick="fecharMais(); perfilCompartilhar('${id}')">
        <i>⇪</i><span>Compartilhar perfil<small>Manda o nome e a classe de ${(j.nome||'').split(' ')[0]}</small></span></button>` +
-    `<button class="mais-item casca" disabled>
-       <i>⊘</i><span>Bloquear perfil<small>Precisa da tabela de bloqueio — ainda não existe</small></span></button>`;
+    `<button class="mais-item" onclick="fecharMais(); perfilBloquear('${id}')">
+       <i>⊘</i><span>Bloquear perfil<small>Vocês somem um do radar do outro</small></span></button>`;
   document.getElementById('mais').hidden = false;
 }
 /* Compartilhar é a única das duas que dá pra fazer hoje, e não precisa de
@@ -3196,7 +3232,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788047209"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788049373"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -5113,7 +5149,50 @@ jogador(p){
   const venci=h.filter(x=>x.venceu).length;
   const aba=abaDe('perfil','stats');
 
-  const corpo = aba==='feed' ? cascaNota('O feed do jogador chega com a tabela de posts — a mesma que o feed da comunidade espera. Até lá não há o que mostrar aqui, e post de exemplo seria invenção.')
+  perfilCarregar(p.id);
+  const dados = (window.__perfCache||{})[p.id];
+  const carregando = dados === null || dados === undefined;
+  const sub = abaDe('perfilFeed','posts');
+
+  const corpo = aba==='feed' ? (carregando
+      ? '<div class="card"><p class="nota">Carregando…</p></div>'
+      : abasHtml('perfilFeed',[['posts','Postagens'],['fb','Feedbacks']],'pilula') + (sub==='posts'
+        ? (dados.posts.length
+            ? dados.posts.map(x=>`<div class="card" style="margin-top:10px"><p style="font:400 13px/1.55 var(--f-ui)">${(x.corpo||'').replace(/</g,'&lt;')}</p>
+                <p class="nota" style="margin-top:6px">${new Date(x.criado_em).toLocaleDateString('pt-BR')}</p></div>`).join('')
+            : `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">✎</i>${nome(p.id).split(' ')[0]} ainda não publicou nada.</div></div>`)
+        : (()=>{
+            /* o campo de escrever só aparece com partida elegível: a policy da
+               mig 81 exige jogo CONFIRMADO contra a pessoa e uma avaliação por
+               partida. Oferecer o campo sem isso seria abrir uma porta que o
+               banco fecha na cara de quem escreveu. */
+            const podem = dados.podeAvaliar||[];
+            const escrever = podem.length
+              ? `<div class="card" style="margin-top:10px">
+                   <div class="rot" style="margin:0 0 8px">Escrever sobre este jogo</div>
+                   <textarea id="aval-txt" class="onb-area" maxlength="500" placeholder="Como foi jogar com ${nome(p.id).split(' ')[0]}? Fale do jogo, não da pessoa."></textarea>
+                   <button class="btn" style="margin-top:8px" onclick="avaliarEnviar('${p.id}','${podem[0].id}')">Publicar</button>
+                 </div>`
+              : `<p class="nota" style="margin-top:10px">Você só pode escrever sobre quem enfrentou numa partida confirmada — e uma vez por partida.</p>`;
+            const lista = dados.avals.length
+              /* ⚠️ quem escreveu pode NÃO estar no elenco local: o app carrega os
+                 adversários da sua faixa, e a avaliação pode ser de alguém de
+                 fora dela. `nome()` e `avatar()` estouram nesse caso e derrubam
+                 o render inteiro — tela em branco, o pior modo de falha. Aqui
+                 cai num rótulo neutro em vez de inventar identidade. */
+              ? dados.avals.map(x=>{
+                  const conhecido = !!S.jogadores[x.autor_id];
+                  const quem = conhecido ? nome(x.autor_id) : 'Outro jogador';
+                  const face = conhecido ? avatar(x.autor_id,'') : '<div class="av">◈</div>';
+                  return `<div class="card" style="margin-top:10px">
+                  <div class="linha-item" style="align-items:flex-start">${face}
+                  <div class="txt"><b>${quem}</b>
+                  <small style="color:var(--ink2);line-height:1.5">${(x.texto||'').replace(/</g,'&lt;')}</small></div>
+                  <div class="nota">${new Date(x.criado_em).toLocaleDateString('pt-BR')}</div></div></div>`;
+                }).join('')
+              : `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">♦</i>Ninguém escreveu sobre ${nome(p.id).split(' ')[0]} ainda.</div></div>`;
+            return escrever + lista;
+          })()))
     : aba==='conq' ? cascaNota('As conquistas de OUTRA pessoa não são carregadas hoje: o app só busca os troféus de quem está logado. Precisa de uma consulta nova, não de tela.')
     : `
       <div class="pstats">
