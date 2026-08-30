@@ -1750,23 +1750,46 @@ async function netContestar(matchId){
 function netFecharOnline(){ _on=null; const el=document.getElementById('net-online'); if(el) el.remove(); }
 function netFecharInbox(){ const el=document.getElementById('net-inbox'); if(el) el.remove(); }
 
-const _wrap = (inner)=>`<div style="width:100%;max-width:460px;background:var(--sup);border:1px solid var(--linha);
-    border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));color:var(--ink);
-    font-family:system-ui,sans-serif;max-height:82vh;overflow:auto">${inner}</div>`;
+/* `cartao` (29/08): cantos arredondados nos QUATRO lados e sem a barra de
+   segurança de baixo — ele não encosta na borda da tela, então não precisa
+   dela. O resto é idêntico à folha, de propósito: o que muda entre os dois é
+   onde o bloco fica, não o que ele é por dentro. */
+const _wrap = (inner, cartao)=>`<div style="width:100%;max-width:460px;background:var(--sup);border:1px solid var(--linha);
+    border-radius:${cartao?'16px':'20px 20px 0 0'};padding:20px 18px ${cartao?'20px':'calc(20px + env(safe-area-inset-bottom))'};color:var(--ink);
+    font-family:system-ui,sans-serif;max-height:${cartao?'88vh':'82vh'};overflow:auto">${inner}</div>`;
 /* `extra` (13/08) sobrescreve o flex pra um botão ocupar a linha inteira —
    é o que separa "Propor outro dia" da dupla Recusar/Aceitar sem espremer
    três rótulos numa fileira só. */
 const _btn = (txt,onclick,tipo,extra)=>`<button onclick="${onclick}" style="flex:1;padding:13px;border-radius:12px;
     border:1px solid var(--linha2);font:600 14px system-ui;cursor:pointer;
     background:${tipo==='ok'?'#2C5A00':tipo==='no'?'var(--dn-bg)':'var(--sup2)'};color:#fff;${extra||''}">${txt}</button>`;
-const _sheet = (id, inner)=>{
+/* 29/08 — `opts.cartao`: a tela CRIAR GRUPOS do board (177:2733) não é folha
+   que sobe de baixo. É um CARTÃO no meio da tela, com o fundo à mostra e sem
+   blur — dá pra ver a aba Grupos por trás, e é isso que faz ele parecer parte
+   da tela em vez de outra tela.
+
+   Entra como OPÇÃO e o padrão não muda uma linha: 22 folhas usam este mesmo
+   `_sheet`, e trocar o comportamento delas pra acertar uma seria o oposto do
+   conserto. Quem quiser o cartão pede; todo o resto continua folha. */
+const _sheet = (id, inner, opts)=>{
+  const cartao = !!(opts && opts.cartao);
   let el=document.getElementById(id);
   if(!el){ el=document.createElement('div'); el.id=id;
-    el.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(10,7,5,.72);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px)';
+    el.style.cssText='position:fixed;inset:0;z-index:10000;display:flex;justify-content:center;'
+      + (cartao
+          ? 'background:rgba(10,7,5,.42);align-items:center;padding:16px'
+          : 'background:rgba(10,7,5,.72);align-items:flex-end;backdrop-filter:blur(3px)');
     el.onclick=(e)=>{ if(e.target===el){ if(id==='net-online') _on=null; el.remove(); } };
     document.body.appendChild(el);
   }
-  el.innerHTML=_wrap(inner);
+  /* `opts.pe` sai FORA do cartão, empilhado embaixo — é onde o board põe o
+     botão laranja de criar. Só existe no modo cartão: numa folha que encosta na
+     borda de baixo não há "fora". A coluna intermediária não fecha ao clique
+     (só `el` fecha), o que está certo: quem clica no botão não quer sair. */
+  el.innerHTML = cartao
+    ? `<div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:460px">
+         ${_wrap(inner, true)}${(opts && opts.pe) || ''}</div>`
+    : _wrap(inner, false);
   return el;
 };
 
@@ -3109,12 +3132,13 @@ function netCriarGrupoUI(){
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Descrição do grupo</div>
-        <textarea oninput="_net.gset('regras',this.value)" maxlength="400" rows="6" placeholder="Como funciona: dia, quadra, quem entra." style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:400 12.5px/1.5 system-ui;resize:none;box-sizing:border-box">${(_gnew.regras||'').replace(/</g,'&lt;')}</textarea>
+        <textarea oninput="_net.gset('regras',this.value)" maxlength="400" rows="5" placeholder="Como funciona: dia, quadra, quem entra." style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:400 12.5px/1.5 system-ui;resize:none;box-sizing:border-box">${(_gnew.regras||'').replace(/</g,'&lt;')}</textarea>
+        <div style="font-size:12px;color:var(--ink2);margin:15px 0 6px">Privacidade</div>
+        <div style="display:flex;gap:7px">${seg('aberto',[[true,'Público'],[false,'Privado']])}</div>
       </div>
     </div>
 
-    <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Privacidade</div><div style="display:flex;gap:8px">${seg('aberto',[[true,'Público'],[false,'Privado']])}</div>
-    <div style="font-size:11px;color:var(--ink3);margin-top:6px">Público = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Privado = só entra pelo link de convite.</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:14px">Público = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Privado = só entra pelo link de convite.</div>
     <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Link de convite</div>
     <input disabled value="gerado depois de criar o grupo" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha);background:var(--sup);color:var(--ink3);font:600 13px system-ui;box-sizing:border-box"/>
     <div style="font-size:11px;color:var(--ink3);margin-top:5px">O link carrega o id do grupo — ele só existe depois que o grupo existe. Está no detalhe, em "Copiar link de convite".</div>
@@ -3124,7 +3148,12 @@ function netCriarGrupoUI(){
       <option value="" ${!_gnew.local_id?'selected':''}>Sem casa fixa</option>
       ${_locais.map(l=>`<option value="${l.id}" ${_gnew.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
     </select>`:''}
-    <button onclick="_net.gcriar()" style="width:100%;padding:14px;border-radius:var(--rp);border:none;background:var(--marca);color:var(--marca-ink);font:700 14px system-ui;cursor:pointer;margin-top:20px">Criar novo grupo</button>`);
+    `, { cartao:true,
+         /* o botão fica FORA do cartão, como o board desenha, e por isso vai no
+            `pe` do _sheet e não no corpo. 51% da largura: cheio ele lê como
+            "salvar formulário"; estreito e centrado lê como o ato que fecha a
+            tela. */
+         pe:`<button onclick="_net.gcriar()" style="width:51%;min-width:200px;padding:11px 0;border-radius:var(--rp);border:none;background:var(--marca);color:var(--marca-ink);font:700 14px system-ui;cursor:pointer;margin-top:12px">Criar novo grupo</button>` });
   const el=document.getElementById('gn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
 /* os campos de TEXTO não repintam a folha: repintar a cada tecla recria o
