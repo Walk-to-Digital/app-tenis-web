@@ -3072,29 +3072,82 @@ async function _cinturaoTentarPassar(m){
 }
 
 // -- criar comunidade --
+/* CRIAR GRUPO — a tela 16 do board (node 177:2733). 29/08.
+   O board acrescenta DESCRIÇÃO e troca o rótulo da privacidade; mantém o resto.
+   Três coisas que ele desenha e que esta folha responde de outro jeito, com o
+   porquê à vista em vez de escondido:
+
+   · FOTO DE CAPA — é Storage, não tabela: policy de BUCKET, superfície própria,
+     migração e decisão próprias. Fica como casca declarada. Um seletor de
+     arquivo que não sobe nada seria pior do que não ter: o botão promete.
+
+   · LINK DE CONVITE — o board o mostra PREENCHIDO num formulário de criação, e
+     isso não pode existir: o link carrega o id do grupo, e o grupo ainda não
+     existe. O campo fica desabilitado dizendo quando aparece. (Depois de criar,
+     é o "🔗 Copiar link de convite" do detalhe, que já existe.)
+
+   · ESPORTE e ONDE JOGA — o board não os desenha e eles ficam. Tênis e beach
+     têm ranking separado, e a casa da comunidade alimenta o radar: nenhum dos
+     dois é enfeite, e sumir com eles seria trocar função por semelhança. */
 function netCriarGrupoUI(){
-  _gnew = _gnew || { nome:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', aberto:false };
-  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;background:${_gnew[campo]==v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
+  _gnew = _gnew || { nome:'', regras:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', aberto:false };
+  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid ${_gnew[campo]==v?'var(--acc)':'var(--linha2)'};font:600 13px system-ui;cursor:pointer;background:${_gnew[campo]==v?'var(--acc)':'var(--sup2)'};color:${_gnew[campo]==v?'var(--acc-ink)':'#fff'}">${n}</button>`).join('');
   _sheet('net-gnew', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Criar comunidade</div>
+      <div style="font:700 17px system-ui">Criar grupo</div>
       <button onclick="_net.fecharGnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <input id="gn-nome" value="${(_gnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.gset('nome',this.value)" placeholder="Nome da comunidade" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
-    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
-    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem acha a comunidade</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Fechado (só convite)'],[true,'Aberto (aceita pedidos)']])}</div>
-    <div style="font-size:11px;color:var(--ink3);margin-top:6px">Aberto = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Fechado = só entra pelo link de convite.</div>
+    <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Nome do grupo</div>
+    <input id="gn-nome" value="${(_gnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.gset('nome',this.value)" maxlength="60" placeholder="Panela do sábado" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="off"/>
+
+    <div style="display:flex;gap:10px;margin-top:16px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Foto de capa</div>
+        <div style="aspect-ratio:1/1;border:1px dashed var(--marca);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center">
+          <div style="font:300 26px/1 system-ui;color:var(--marca)">+</div>
+          <div style="font:600 9px system-ui;color:var(--marca);letter-spacing:.06em">SEM DADO REAL</div>
+        </div>
+        <div style="font-size:10px;color:var(--ink3);margin-top:5px;line-height:1.4">Foto de grupo depende de Storage, que o app ainda não tem. O cartão usa a inicial do nome até lá.</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Descrição do grupo</div>
+        <textarea oninput="_net.gset('regras',this.value)" maxlength="400" rows="6" placeholder="Como funciona: dia, quadra, quem entra." style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:400 12.5px/1.5 system-ui;resize:none;box-sizing:border-box">${(_gnew.regras||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Privacidade</div><div style="display:flex;gap:8px">${seg('aberto',[[true,'Público'],[false,'Privado']])}</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:6px">Público = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Privado = só entra pelo link de convite.</div>
+    <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Link de convite</div>
+    <input disabled value="gerado depois de criar o grupo" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha);background:var(--sup);color:var(--ink3);font:600 13px system-ui;box-sizing:border-box"/>
+    <div style="font-size:11px;color:var(--ink3);margin-top:5px">O link carrega o id do grupo — ele só existe depois que o grupo existe. Está no detalhe, em "Copiar link de convite".</div>
+    <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
     ${(_locais&&_locais.length)?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">📍 Onde joga <span style="color:var(--ink3)">(opcional)</span></div>
     <select onchange="_net.gset('local_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
       <option value="" ${!_gnew.local_id?'selected':''}>Sem casa fixa</option>
       ${_locais.map(l=>`<option value="${l.id}" ${_gnew.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
     </select>`:''}
-    <button onclick="_net.gcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">Criar comunidade</button>`);
+    <button onclick="_net.gcriar()" style="width:100%;padding:14px;border-radius:var(--rp);border:none;background:var(--marca);color:var(--marca-ink);font:700 14px system-ui;cursor:pointer;margin-top:20px">Criar novo grupo</button>`);
   const el=document.getElementById('gn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
-function _gset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; _gnew[campo]=v; if(campo!=='nome') netCriarGrupoUI(); }
+/* os campos de TEXTO não repintam a folha: repintar a cada tecla recria o
+   input e o cursor volta pro começo — o campo fica intragável. Só os segmentados
+   (esporte, privacidade) e o select precisam de repintura, porque neles o
+   estado É a aparência. `regras` entrou nesta lista junto com a tela 16: sem
+   isso a descrição do board seria impossível de digitar. */
+const _GSET_MUDO = ['nome','regras'];
+function _gset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; _gnew[campo]=v; if(!_GSET_MUDO.includes(campo)) netCriarGrupoUI(); }
 async function _gcriar(){
-  if(!_gnew.nome || !_gnew.nome.trim()){ alert('Dá um nome pra comunidade.'); return; }
+  /* o piso de 2 é o mesmo do `grupos_nome_tam` (mig 82). Cobrar aqui é conforto
+     — dizer antes de a rede negar; a cerca é o check, porque quem manda o POST
+     pode ser qualquer coisa. */
+  if(!_gnew.nome || _gnew.nome.trim().length < 2){ alert('Dá um nome pro grupo — pelo menos duas letras.'); return; }
   try{ if(window.netSyncJogador && typeof S!=='undefined') await netSyncJogador(S.jogadores[EU]); }catch(e){}
-  const { data, error } = await sb.from('grupos').insert({ nome:_gnew.nome, dono_id:MEU_UID, esporte:_gnew.esporte, aberto:!!_gnew.aberto, local_id:_gnew.local_id||null }).select().single();
+  /* `regras` é a DESCRIÇÃO do board (tela 16). Coluna da mig 4 que existia sem
+     leitor nenhum; a mig 82 pôs teto nela (400) e no nome (2–60) antes de a
+     tela começar a escrever — ligar coluna esquecida é abrir superfície nova, e
+     superfície nova não herda trava nenhuma, nem as que a antiga nunca teve.
+     Vazia vira null e não string vazia: "sem descrição" é ausência, não texto
+     de comprimento zero, e as duas se comportam diferente em toda consulta. */
+  const desc = (_gnew.regras||'').trim();
+  const { data, error } = await sb.from('grupos').insert({ nome:_gnew.nome.trim(), dono_id:MEU_UID, regras:desc||null, esporte:_gnew.esporte, aberto:!!_gnew.aberto, local_id:_gnew.local_id||null }).select().single();
   if(error){ alert('Erro ao criar: '+error.message); return; }
   await sb.from('grupo_membros').insert({ grupo_id:data.id, player_id:MEU_UID, papel:'dono' });
   _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove();
@@ -3112,6 +3165,30 @@ async function netPedirEntrar(gid){
   if(window.toast) toast('Pedido enviado. O gestor da comunidade aprova.');
   // atualiza a tela de onde o pedido saiu (detalhe ou lista)
   if(document.getElementById('net-gver')) netVerGrupo(gid); else netAbrirGrupos();
+}
+
+/* O RESUMO DO GRUPO — a tela 17 do board (node 177:2956). 29/08.
+   Devolve só o que a TELA lê: a linha do grupo, os membros com papel e os
+   Pontos no escopo dele. As ações de gestão (promover, remover, aceitar
+   pedido, link de convite) NÃO vêm pra cá: continuam na folha `netVerGrupo`
+   logo abaixo, que já as tem e já foi auditada. Duplicar ato de gestão em duas
+   superfícies é como duas telas passam a discordar sobre quem pode o quê.
+
+   A ordenação é a mesma de lá — Pontos, Nível de desempate — e isso não é
+   coincidência a manter à mão: as duas respondem à mesma pergunta, e responder
+   em ordens diferentes seria dois rankings pro mesmo grupo. */
+async function netGrupoResumo(gid){
+  const g = (await sb.from('grupos').select('*').eq('id',gid).maybeSingle()).data;
+  if(!g) return { g:null, membros:[], pts:{}, souMembro:false };
+  const membros = (await sb.from('grupo_membros').select('player_id,papel').eq('grupo_id',gid)).data||[];
+  /* o elenco local pode não ter quem entrou depois da última carga — sem isto
+     o nome do membro sai vazio. Mesmo remendo que o `netVerGrupo` faz, pela
+     mesma razão. */
+  if(window.aplicarJogadoresReais && membros.some(p=> p.player_id!==MEU_UID && !S.jogadores[p.player_id])){
+    try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){}
+  }
+  const pts = await netRanking('grupo:'+gid, g.esporte||'tenis');
+  return { g, membros, pts, souMembro: membros.some(m=>m.player_id===MEU_UID) };
 }
 
 // -- detalhe do grupo: membros, pedidos (gestor), papéis, link --
@@ -6467,6 +6544,12 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
      silêncio — o defeito que o `onQuando` custou em 13/08 e que o
      prova-net.mjs passou a cobrar em 29/08. */
   feed:netFeed, postar:netPostar, apagarPost:netApagarPost,
+  /* (Fase 2) o ranking GERAL da temporada, que a aba Ranking da Comunidade lê.
+     É a `netRanking` com o escopo já preso em 'geral': quem chama de fora não
+     precisa saber que existe string de escopo, e assim ninguém inventa um
+     terceiro formato dela. */
+  rankingGeral:(esporte)=>netRanking('geral', esporte||'tenis'),
+  grupoResumo:netGrupoResumo,
   meusBloqueios:netMeusBloqueios, bloquear:netBloquear, desbloquear:netDesbloquear,
   avaliacoes:netAvaliacoes, avaliar:netAvaliar, partidasParaAvaliar:netPartidasParaAvaliar };
 window.netAbrirMeusLocais = netAbrirMeusLocais;

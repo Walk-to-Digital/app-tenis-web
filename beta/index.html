@@ -34,6 +34,16 @@
    quem age é o laranja (--marca), quem confirma escolha é o lime (--acc). */
 :root{
   --bg:#060B08; --sup:#0C1013; --sup2:#131920; --linha:#1B2320; --linha2:#2A3430;
+  /* 29/08 — AS DUAS RÉGUAS DO BOARD. `--linha` e `--linha2` foram feitas pra
+     contornar CARTÃO: escuras de propósito, pra que a borda não competisse com
+     o conteúdo. O board usa a linha de outro jeito — como DIVISOR estrutural,
+     e ali ela precisa ser vista: medidas ~#636461 na régua de cabeçalho (topo,
+     abas, filete da classe) e ~#4D504A no separador entre linhas de lista.
+     São dois valores porque no board são dois: a régua que separa SEÇÕES é
+     mais forte que a que separa ITENS de uma mesma lista, e usar um só apaga
+     essa hierarquia. As antigas continuam onde sempre estiveram — contorno de
+     cartão segue discreto, inclusive no board. */
+  --linha3:#636461; --linha4:#4D504A;
   --ink:#FFFEFD; --ink2:#BFC6B6; --ink3:#BCBCBC;   /* 29/08: --ink3 era #A6A6A7; o board mede #BCBCBC — mais claro, contrasta melhor no preto */
   --acc:#83E000; --acc-ink:#0A1100;          /* lime = seleção/ativo */
   --up:#83E000; --up-bg:#16240A;             /* o lime da bola premia */
@@ -124,7 +134,7 @@ button,input,select{font:inherit;color:inherit}
    0 e o padding original tem que continuar valendo. */
 .topo{
   flex:0 0 auto;padding:max(6px,env(safe-area-inset-top)) var(--pad-lado) 13px;display:flex;align-items:center;gap:12px;
-  border-bottom:1px solid var(--linha);background:var(--bg);z-index:2;position:relative;
+  border-bottom:1px solid var(--linha3);background:var(--bg);z-index:2;position:relative;
 }
 .topo .voltar{
   width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--linha2);
@@ -155,6 +165,22 @@ button,input,select{font:inherit;color:inherit}
   font-weight:700;margin-bottom:11px;display:flex;justify-content:space-between;align-items:baseline;
 }
 .rot span{letter-spacing:0;text-transform:none;font-size:10.5px;font-weight:400}
+/* 29/08 — O RÓTULO DAS TELAS DO BOARD. No app o `.rot` é o texto mais FRACO da
+   tela: 9,5px, caixa alta, tracking largo, `--ink3`. No board ele é dos mais
+   FORTES — "Notícias do tennis", "Seus Grupos" são 15px brancos, caixa normal,
+   sem tracking. Não é ajuste de gosto: é inversão de hierarquia, e ela muda o
+   que o olho encontra primeiro ao abrir a tela.
+   Entra como VARIANTE e não como troca do `.rot`: o rótulo fraco está certo em
+   dezenas de blocos que o board não desenha (o radar, o registrar, a agenda),
+   onde ele é etiqueta de apoio e não título. Trocar o global acertaria seis
+   telas e desarrumaria as outras. */
+.rot.tit{font-size:15px;letter-spacing:0;text-transform:none;color:var(--ink);
+  font-weight:700;margin-bottom:12px}
+.rot.tit span{font-size:11px;color:var(--ink3)}
+/* a notícia tem rótulo próprio (`.news-rot`) porque nasceu na home; no escopo
+   `.noticias` ela é o título da seção, então segue a mesma regra */
+.noticias .news-rot{font-size:15px;letter-spacing:0;text-transform:none;
+  color:var(--ink);font-weight:700;margin-bottom:11px}
 
 /* ---------- componentes ---------- */
 .card{
@@ -294,6 +320,168 @@ button,input,select{font:inherit;color:inherit}
 .abas button{background:none;border:0;padding:12px 0;font-size:12.5px;color:var(--ink3);
   cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
 .abas button.on{color:var(--ink);border-bottom-color:var(--acc)}
+/* 29/08 — nas telas do board o sublinhado da aba ativa é BRANCO e mais grosso,
+   não lime. O lime ali disputa atenção com o que ele marca em toda tela do
+   app (o dado que premia: pontos, vitória, membro). Escopado em `.abas.esp`,
+   que é a barra desenhada pelo board — o Histórico e o Perfil seguem lime até
+   os boards deles serem lidos, e mudar o global sem olhá-los seria trocar
+   quatro telas pra acertar duas. */
+.abas.esp button.on{border-bottom-color:var(--ink);border-bottom-width:3px}
+/* as abas do board dividem a LARGURA em partes iguais — sem isso o `gap:20px`
+   as encosta à esquerda e sobra meia linha vazia. `esp` de espalhada e não
+   `tres`: a barra do grupo (tela 17) tem duas, e uma classe chamada "tres"
+   aplicada a duas abas é um nome que mente pra quem for ler o CSS depois. */
+.abas.esp{gap:0;border-bottom-color:var(--linha3)}
+.abas.esp button{flex:1}
+
+/* ===== COMUNIDADE — telas 12 a 17 do board (29/08, Fase 2) ================
+   Tudo daqui pra baixo nasce do board e não existia antes. As classes ficam
+   juntas e prefixadas por superfície pra que apagar uma tela não deixe CSS
+   órfão espalhado pelo arquivo. */
+
+/* -- o pódio (tela 14 · node 169:1313) --
+   Três colunas de larguras iguais alinhadas pela BASE, com o degrau do meio
+   mais alto. `align-items:end` é o que faz o 1º subir sem posicionamento
+   absoluto — o board desenha alturas 108/150/86 e a proporção é o que importa,
+   não o pixel. */
+/* O pódio do board é uma MASSA LARANJA CONTÍNUA, não três barras soltas: sem
+   vão entre os degraus, sem canto arredondado no encontro deles e sem caixa em
+   volta. E o degrau do campeão é o mais ESTREITO dos três, não o mais largo —
+   ele ganha altura, não largura. Eu tinha invertido as duas coisas. */
+.podio{display:grid;grid-template-columns:1fr .88fr 1fr;align-items:end;gap:0;
+  padding:24px 10px 0;background:transparent}
+.podio .col{display:flex;flex-direction:column;align-items:center;min-width:0}
+.podio .qnome{font:700 12px/1.3 var(--f-ui);color:var(--ink);text-align:center;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.podio .qpts{font:700 10.5px var(--f-ui);color:var(--acc);margin-top:2px;text-align:center}
+.podio .fig{margin:8px 0 0;height:96px;display:flex;align-items:flex-end;justify-content:center}
+.podio .col.p1 .fig{height:118px}
+.podio .deg{width:100%;background:linear-gradient(180deg,#F46400,#C85200);
+  border-top:2px solid #5C2600;display:flex;align-items:flex-start;justify-content:center;
+  padding-top:9px;font:800 20px var(--f-ui);color:#5C2600}
+/* só as pontas externas arredondam — por dentro os degraus se encostam */
+.podio .col.p2 .deg{border-radius:6px 0 0 0}
+.podio .col.p3 .deg{border-radius:0 6px 0 0}
+.podio .col.p1 .deg{height:64px} .podio .col.p2 .deg{height:44px} .podio .col.p3 .deg{height:34px}
+.podio .vazia{opacity:.35}
+
+/* -- o cartão "sua classe" (tela 14, meio) -- */
+.cls-hero{margin-top:12px}
+.cls-hero .topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.cls-hero .letra{font:800 46px/0.9 var(--f-ui);color:var(--ink);display:flex;align-items:flex-start}
+.cls-hero .letra sup{font:800 17px var(--f-ui);color:var(--acc);margin-left:2px;top:.15em;position:relative}
+.cls-hero .dir{text-align:right}
+.cls-hero .dir b{font:700 15px var(--f-ui);color:var(--ink)}
+.cls-hero .dir .prox{color:var(--ink2);font-weight:700}
+.cls-hero .dir small{display:block;font:700 10.5px var(--f-ui);color:var(--acc);margin-top:3px}
+.cls-hero .barra{height:3px;border-radius:2px;background:var(--linha2);margin:12px 0 10px;overflow:hidden}
+.cls-hero .barra i{display:block;height:100%;background:var(--acc)}
+
+/* -- a lista de classes (tela 14, embaixo) --
+   O board põe foto de quadra atrás de cada card. Foto de classe não existe no
+   app (é asset, não dado), então o fundo é o gradiente da marca — placeholder
+   declarado, não foto inventada. */
+.cls-card{position:relative;overflow:hidden;margin-top:10px;padding:15px;
+  border:1px solid var(--linha2);border-radius:var(--r);
+  background:linear-gradient(105deg,var(--sup2) 0%,var(--sup) 55%,rgba(131,224,0,.07) 100%);cursor:pointer}
+.cls-card b{font:700 15px var(--f-ui);color:var(--acc)}
+.cls-card p{font:400 11.5px/1.45 var(--f-ui);color:var(--ink2);margin:3px 0 0}
+.cls-card .pe{display:flex;align-items:center;justify-content:space-between;margin-top:16px}
+.cls-card .pe .faixa{font:700 11.5px var(--f-ui);color:var(--ink)}
+.cls-card .pe .ver{font:600 11px var(--f-ui);color:var(--ink2)}
+.cls-card.aqui{border-color:var(--acc)}
+
+/* -- o cabeçalho da classe e as linhas (tela 13 · node 176:1884) -- */
+.cls-cab{display:flex;align-items:center;gap:12px;margin:4px 0 6px}
+/* `cbadge` e não `chip`: `.chip` JÁ EXISTE no app (a pílula de filtro do radar)
+   e tem a regra `#fone.noturno .chip:not(.on)`, que é mais específica que
+   qualquer `.cls-cab .chip` e repintava o fundo de escuro — sobrando texto
+   preto em cima de preto. Disputar especificidade com `!important` esconderia
+   a colisão; o nome próprio a elimina, e de quebra impede que esta regra vaze
+   pros chips do radar. */
+.cls-cab .cbadge{flex:0 0 auto;min-width:44px;height:44px;padding:0 9px;border-radius:var(--rp);
+  background:#fff;color:#0A0A0A;display:flex;align-items:center;justify-content:center;
+  font:800 14px var(--f-ui)}
+.cls-cab .risco{flex:1;height:1px;background:var(--linha3)}
+.cls-cab .faixa{flex:0 0 auto;font:600 11px var(--f-ui);color:var(--ink2)}
+.rk-ln{display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:1px solid var(--linha4)}
+.rk-ln .pos{flex:0 0 22px;text-align:center;font:700 14px var(--f-ui);color:var(--ink2)}
+.rk-ln.p1 .pos{color:var(--marca)} .rk-ln.p2 .pos,.rk-ln.p3 .pos{color:var(--acc)}
+.rk-ln .nm{flex:1;min-width:0}
+/* o board cola o número grande NO NOME, na mesma linha de base — não o joga na
+   borda direita. Com o nome de largura real a distância chegava a ~285px, e os
+   dois deixavam de se ler como uma coisa só. */
+.rk-ln .l1{display:flex;align-items:baseline;gap:12px;min-width:0}
+.rk-ln .nm b{flex:0 1 auto;font:700 13.5px var(--f-ui);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk-ln.p1 .nm b{color:var(--marca)}
+.rk-ln .nm small{display:block;font:600 10.5px var(--f-ui);color:var(--ink2)}
+.rk-ln .nv{flex:0 0 auto;font:700 14px var(--f-ui);color:var(--ink)}
+.rk-ln.p1 .nv{color:var(--marca)} .rk-ln.p2 .nv,.rk-ln.p3 .nv{color:var(--acc)}
+.rk-ln.eu{background:linear-gradient(90deg,rgba(131,224,0,.09),transparent);
+  border-radius:10px;padding-left:8px;padding-right:8px}
+
+/* -- post do feed (telas 12 e 17) -- */
+.post{margin-top:10px;padding:15px;border:1px solid var(--linha);border-radius:var(--r);background:var(--sup)}
+.post .cab{display:flex;align-items:center;gap:11px}
+.post .cab .txt{flex:1;min-width:0}
+.post .cab b{display:block;font:700 13.5px var(--f-ui);color:var(--ink)}
+.post .cab small{font:600 10.5px var(--f-ui);color:var(--ink2)}
+.post .cab .men{background:none;border:0;color:var(--ink2);font-size:17px;cursor:pointer;padding:0 2px;line-height:1}
+.post .corpo{font:400 12.5px/1.6 var(--f-ui);color:var(--ink2);margin-top:11px;white-space:pre-wrap;word-break:break-word}
+
+/* -- cartões de grupo (tela 15) --
+   Tira horizontal com rolagem, como o board. `scroll-snap` porque o card é
+   largo e parar no meio de dois é o defeito clássico da tira em celular. */
+/* ⚠️ `scroll-padding-left` NÃO é redundante com o `padding-left`, e a tira
+   nasce torta sem ele. Com `scroll-snap-type: x mandatory` o navegador faz um
+   snap na primeira pintura: ele alinha o primeiro cartão ao início do
+   SNAPPORT, que por padrão é a borda do container — e o padding de 26px fica
+   do lado de fora, rolado pra trás. Medido: a tira abria com
+   `scrollLeft: 26.5`, exatamente o padding, e o primeiro cartão encostava na
+   borda esquerda enquanto a tira de baixo (que não rola, porque cabe) aparecia
+   alinhada. Duas tiras iguais em posições diferentes.
+   `scroll-padding-left` move o snapport pra dentro, e aí o snap alinha o cartão
+   ONDE o padding o pôs. */
+.tira{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:2px 0 6px;margin:0 calc(var(--pad-lado)*-1);padding-left:var(--pad-lado);padding-right:var(--pad-lado);
+  scroll-padding-left:var(--pad-lado);
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tira::-webkit-scrollbar{display:none}
+/* 28% e 6:7, medidos no board: com 44% quadrado cabiam dois cartões e um fio do
+   terceiro, e a tira parecia truncada em vez de rolável. Em 28% entram três
+   inteiros mais a espiada do quarto, que é o que diz "tem mais pro lado". */
+.gcard{flex:0 0 28%;scroll-snap-align:start;position:relative;aspect-ratio:6/7;
+  border:1px solid var(--linha2);border-radius:8px;overflow:hidden;cursor:pointer;
+  background:linear-gradient(150deg,var(--sup2),var(--sup))}
+.gcard .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:800 34px var(--f-ui);color:var(--linha2)}
+.gcard .pe{position:absolute;left:0;right:0;bottom:0;padding:10px;
+  background:linear-gradient(transparent,rgba(0,0,0,.85))}
+/* DUAS linhas, e não reticências. No board o cartão mede 28% e o nome cabe
+   numa linha — mas o board escreve "Nome do grupo"; com nome real ("Panela do
+   Bahiano", "Beach da Pituba") o mesmo cartão trunca no meio da palavra. Entre
+   estreitar o cartão (e perder o terceiro inteiro que o board mostra) ou deixar
+   o nome quebrar, quebra o nome: a tira continua com a proporção desenhada e
+   ninguém perde o nome da própria comunidade. */
+.gcard .pe b{font:700 12px/1.25 var(--f-ui);color:var(--ink);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gcard .pe small{font:600 10px var(--f-ui);color:var(--acc)}
+.gnovo{display:flex;align-items:center;gap:14px;padding:16px;
+  border:1px solid var(--linha2);border-radius:var(--r);background:var(--sup);cursor:pointer}
+.gnovo .mais{flex:0 0 auto;font:300 30px/1 var(--f-ui);color:var(--acc)}
+.gnovo b{font:700 14px var(--f-ui);color:var(--ink)}
+.gnovo p{font:400 11.5px/1.45 var(--f-ui);color:var(--ink2);margin:3px 0 0}
+
+/* -- hero do grupo (tela 17) -- */
+.ghero{position:relative;border:1px solid var(--linha2);border-radius:var(--r);overflow:hidden;
+  background:linear-gradient(150deg,var(--sup2),var(--sup));min-height:150px;display:flex;align-items:flex-end}
+.ghero .dentro{position:relative;width:100%;padding:15px;
+  background:linear-gradient(transparent,rgba(0,0,0,.7))}
+.ghero .l1{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.ghero h3{font:700 19px var(--f-ui);color:var(--ink);margin:0}
+.ghero .mem{font:700 11px var(--f-ui);color:var(--ink);white-space:nowrap}
+.ghero p{font:400 11px/1.5 var(--f-ui);color:var(--ink2);margin:8px 0 0}
 
 /* barra inferior */
 .nav{
@@ -741,22 +929,34 @@ button,input,select{font:inherit;color:inherit}
    manchete que passa de raspão não é lida, e aqui a peça É o texto. A miniatura
    é opcional de propósito — notícia sem foto continua valendo, e exigir imagem
    faria a curadoria travar por falta de arte. */
-.ini .news-wrap{position:relative;z-index:2;padding:0 16px 20px}
-.ini .news-rot{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);
+/* 29/08 — O SEGUNDO ESCOPO. Estas quinze regras nasceram em 19/08 debaixo de
+   `.ini` porque a home era o único lugar que tinha notícia. A aba Feed da
+   Comunidade (board 159:2357) abre com o mesmo bloco, chamando a MESMA
+   `noticiasHTML()` — e fora de `.ini` ele saía como uma lista de links azuis
+   sublinhados, markup certo e CSS nenhum.
+   O conserto não é copiar as regras: é dar a elas o segundo escopo, `.noticias`,
+   pra que quem mexer na aparência da notícia mexa nos dois lugares de uma vez.
+   Duas cópias divergem na primeira correção que só uma receber — foi assim que
+   a ficha do jogador virou duas em 26/08. */
+.ini .news-wrap,.noticias .news-wrap{position:relative;z-index:2;padding:0 16px 20px}
+.ini .news-rot,.noticias .news-rot{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);
   font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
-.ini .news{display:flex;flex-direction:column;gap:8px}
-.ini .nitem{display:flex;gap:10px;align-items:center;text-decoration:none;
+.ini .news,.noticias .news{display:flex;flex-direction:column;gap:8px}
+.ini .nitem,.noticias .nitem{display:flex;gap:10px;align-items:center;text-decoration:none;
   background:rgba(30,23,20,.82);border:1px solid var(--linha);border-radius:10px;
   padding:10px 12px;backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent}
-.ini .nitem:active{background:var(--sup2)}
-.ini .nthumb{flex:0 0 52px;width:52px;height:52px;border-radius:8px;object-fit:cover;
+.ini .nitem:active,.noticias .nitem:active{background:var(--sup2)}
+.ini .nthumb,.noticias .nthumb{flex:0 0 52px;width:52px;height:52px;border-radius:8px;object-fit:cover;
   background:var(--sup2);display:block}
-.ini .ntxt{flex:1;min-width:0}
-.ini .ntxt b{display:block;font-size:12.5px;color:var(--ink);font-weight:700;line-height:1.32;
+.ini .ntxt,.noticias .ntxt{flex:1;min-width:0}
+.ini .ntxt b,.noticias .ntxt b{display:block;font-size:12.5px;color:var(--ink);font-weight:700;line-height:1.32;
   /* duas linhas e reticências: manchete longa não pode empurrar a nav pra fora */
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ini .ntxt small{display:block;font-size:10.5px;color:var(--ink3);margin-top:3px}
-.ini .nseta{color:var(--ink3);font-size:15px;flex:0 0 auto}
+.ini .ntxt small,.noticias .ntxt small{display:block;font-size:10.5px;color:var(--ink3);margin-top:3px}
+.ini .nseta,.noticias .nseta{color:var(--ink3);font-size:15px;flex:0 0 auto}
+/* a home é full-bleed e paga a margem lateral aqui dentro; a aba Feed vive numa
+   .sec, que já a paga. Só o padding muda entre os dois escopos. */
+.noticias .news-wrap{padding:18px var(--pad-lado) 0}
 /* 19/08 — o espaço de mídia da home (inventário próprio, no molde do Cartola:
    uma peça só, no fim do feed, vendida por nós e não sorteada por rede).
 
@@ -789,7 +989,13 @@ button,input,select{font:inherit;color:inherit}
     var(--cena-url,url('../quadras/saibro-noite.jpg')) center 14% / cover no-repeat;}
 #fone.noturno #amb{opacity:1}
 /* topo e nav viram vidro pra a quadra correr contínua por baixo */
-#fone.noturno .topo{background:rgba(21,16,13,.60);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:rgba(122,106,92,.18)}
+/* 29/08 — a régua do topo sobe de .18 pra .55 de opacidade. O board desenha um
+   divisor VISÍVEL abaixo do topo, e a .18 sumia. Mas ela não vira `--linha3`
+   opaca: aqui o topo é vidro fosco com a quadra correndo por baixo — coisa que
+   o board não tem, porque o fundo dele é chapado. Uma linha sólida em cima do
+   blur endurece a borda e denuncia o recorte do vidro. Translúcida e mais
+   forte chega ao mesmo lugar sem desmanchar o material. */
+#fone.noturno .topo{background:rgba(21,16,13,.60);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:rgba(99,100,97,.55)}
 #fone.noturno .nav{background:rgba(21,16,13,.64);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top-color:rgba(122,106,92,.18)}
 /* superfícies flutuam como painéis de vidro sobre a quadra */
 #fone.noturno .card,
@@ -1272,7 +1478,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788049373"></script>
+<script src="net.js?v=1788054959"></script>
 
 <script>
 /* =========================================================================
@@ -2042,7 +2248,7 @@ function maisItens(){
   eu.push(['1-1','Registrar placar','Uma partida que já aconteceu', "_net.abrirMao()", false]);
   eu.push(['◎','Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
   eu.push(['✚','Registrar atividade','Ainda não existe no app', "", true]);
-  eu.push(['✎','Novo post no feed','Chega com o feed da comunidade', "", true]);
+  eu.push(['✎','Novo post no feed','Escrever pra comunidade', "irFeed()", false]);
   /* a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse; ela
      reaparece aqui — mesma superfície, um toque, outro lugar. */
   if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')", false]);
@@ -2056,6 +2262,18 @@ function abrirMais(){
   document.getElementById('mais').hidden = false;
 }
 function fecharMais(){ document.getElementById('mais').hidden = true; }
+/* a porta do "+ › Novo post no feed" (29/08): leva à Comunidade já na aba Feed,
+   com o cursor no campo. O item era casca — "chega com o feed da comunidade" —
+   e deixou de ser no instante em que a aba passou a existir.
+   `trocarAba` só serve pra quem tem Comunidade na barra: a barra do professor é
+   Turma/Aulas, e mandar trocarAba pra uma rota que o pintarNav não conhece o
+   devolve pra Home em silêncio. Pra ele a mesma tela vem por `ir()`. */
+function irFeed(){
+  S.abas = S.abas || {}; S.abas.comu = 'feed'; salvar();
+  if(veProfessor()) ir('comunidade'); else trocarAba('comunidade');
+  setTimeout(()=>{ const el=document.getElementById('post-txt');
+    if(el){ el.focus(); el.scrollIntoView({block:'center'}) } }, 60);
+}
 
 function navAbas(){
   const mais = {t:'__mais', i:'+', r:'', cta:true};
@@ -2118,6 +2336,17 @@ function trocarAba(t){
   salvar(); render() }
 // o quadro virou aba interna da Comunidade (05/08: "a comunidade é aba, não o app inteiro")
 function verQuadro(){ trocarAba('comunidade'); ir('quadro') }
+
+/* 29/08 — as abas pintadas DENTRO do ranking de classe precisam de destino.
+   O `abaIr` grava a aba escolhida e chama `render()`, e o render pinta o topo
+   da PILHA: com `rankingClasse` empilhado, a aba mudava de cor e a tela ficava
+   igual. Aba que acende e não leva a lugar nenhum é pior que aba ausente.
+   `trocarAba` já esvazia a pilha; pro professor, que não tem Comunidade na
+   barra, o caminho é `ir()` com a pilha zerada antes. */
+function comuVoltarAba(){
+  if(veProfessor()){ pilha=[]; ir('comunidade'); }
+  else trocarAba('comunidade');
+}
 
 /* 18/08: a porta ÚNICA pra ficha de outro jogador. Existiam duas — a folha do
    net.js (radar: Desafiar e Pedir amizade) e a vista `jogador` daqui (quadro:
@@ -2263,7 +2492,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788049373"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788054959"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2365,7 +2594,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788049373"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788054959"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2518,9 +2747,14 @@ function abaIr(grupo, v, fn){
 /* itens: [[chave, rótulo], ...] — a PRIMEIRA é o padrão.
    estilo: 'linha' (sublinhado, o das telas do board) ou 'pilula' (o do radar).
    aoTrocar: nome de função global, só quando isto for pintado dentro de folha. */
-function abasHtml(grupo, itens, estilo, aoTrocar){
+function abasHtml(grupo, itens, estilo, aoTrocar, cls){
   const atual = abaDe(grupo, itens[0][0]);
-  const casca = estilo==='pilula' ? 'rtabs' : 'abas';
+  /* `cls` é classe EXTRA na casca, não substituta: a barra da Comunidade tem
+     três abas e o board as espalha pela largura (`abas tres`), enquanto as do
+     perfil e do histórico continuam encostadas à esquerda. Sem o parâmetro a
+     única saída seria decidir pelo NÚMERO de abas — e aí o perfil, que também
+     tem três, mudaria de layout sem ninguém pedir. */
+  const casca = (estilo==='pilula' ? 'rtabs' : 'abas') + (cls ? ' '+cls : '');
   const bt    = estilo==='pilula' ? 'rtab'  : '';
   const fn    = aoTrocar ? ` data-aba-fn="${aoTrocar}"` : '';
   return `<div class="${casca}">${itens.map(([k,r])=>{
@@ -2607,6 +2841,323 @@ async function avaliarEnviar(alvo, matchId){
   window.__perfCache[alvo] = undefined;             // força recarregar
   toast('Avaliação publicada.');
   perfilCarregar(alvo); render();
+}
+
+/* ===== COMUNIDADE — TELAS 12 a 17 DO BOARD (29/08, Fase 2) ================
+
+   O board transforma a Comunidade num lugar de TRÊS abas — Feed, Ranking e
+   Grupos — e não num menu de cards. As três são vistas do mesmo assunto ("quem
+   mais está aqui"), e por isso moram numa rota só, com `abasHtml`.
+
+   O QUE SAIU DO CAMINHO E PRA ONDE FOI. O board não desenha os cards que a
+   aba tinha (torneios, "Você dá aula?", os quatro do ADM, o Quadro, o
+   cinturão, os patches e a copa). Nenhum deles morreu — todos são porta viva:
+     · Quadro, cinturão, patches e copa → a aba RANKING, embaixo. É a mesma
+       pergunta que o pódio faz, só que dentro da sua comunidade.
+     · Torneios, "Você dá aula?" e o ADM → o fim da aba GRUPOS, que é a aba de
+       "onde eu pertenço".
+   Apagar porta viva porque o board não a desenhou seria trocar funcionalidade
+   por semelhança. O board diz onde as coisas ficam, não o que o app perde.
+
+   TRÊS CARGAS ASSÍNCRONAS, o mesmo padrão do `perfilCarregar`: `undefined` =
+   nunca pediu, `null` = pedindo, valor = chegou. O render é síncrono e não
+   espera query — quem espera é a tela, dizendo que está carregando. */
+
+/* -- FEED (tela 12 · node 159:2357) -------------------------------------
+   `posts` com `grupo_id` nulo é o feed público: a mesma tabela do feed do
+   perfil (filtrado por autor) e do feed de grupo (filtrado por grupo). Uma
+   tabela, três leituras — que é o desenho da mig 79. */
+function comuFeedCarregar(){
+  if(window.__comuFeed !== undefined) return;
+  window.__comuFeed = null;
+  if(!(window._net && _net.feed)){ window.__comuFeed = []; return }
+  _net.feed({limite:30}).then(l=>{ window.__comuFeed = l||[]; render() })
+                        .catch(()=>{ window.__comuFeed = []; render() });
+}
+async function comuPostar(){
+  const el = document.getElementById('post-txt');
+  const t = el ? el.value : '';
+  if(!t.trim()){ toast('Escreve alguma coisa antes de publicar.'); return }
+  const r = await _net.postar(t, null);
+  /* o teto de 20 posts por hora é trigger no banco e chega como exceção. A
+     frase dele já diz o que fazer, então ela sobe inteira em vez de virar um
+     "erro" genérico que não ensina nada. */
+  if(r.erro){ alert('Não deu pra publicar: '+r.erro); return }
+  if(el) el.value='';
+  window.__comuFeed = undefined;              // força reler
+  toast('Publicado.');
+  comuFeedCarregar(); render();
+}
+async function comuApagarPost(id){
+  if(!confirm('Apagar esta publicação? Não dá pra desfazer.')) return;
+  const r = await _net.apagarPost(id);
+  if(r.erro){ alert('Não deu pra apagar: '+r.erro); return }
+  window.__comuFeed = undefined; window.__grupoFeed = undefined;
+  toast('Apagada.');
+  render();
+}
+/* um post, do jeito que o board desenha (autor, data, menu, corpo). Serve o
+   feed público e o de grupo — são o mesmo objeto.
+   ⚠️ o autor pode NÃO estar no elenco local: `posts` é público e quem escreveu
+   pode ter sido banido ou entrado depois da última carga do elenco. `nome()` e
+   `avatar()` estouram nesse caso e derrubam o render INTEIRO. É o mesmo defeito
+   que a avaliação teve em 29/08, e cai no mesmo lugar: rótulo neutro em vez de
+   identidade inventada. */
+function postHtml(x){
+  const meu = MEU_UID && x.autor_id===MEU_UID;
+  const local = meu ? EU : x.autor_id;
+  const conhecido = !!S.jogadores[local];
+  const quem = meu ? 'Você' : conhecido ? nome(local) : 'Outro jogador';
+  const face = conhecido ? avatar(local,'') : '<div class="av">◈</div>';
+  const dia  = new Date(x.criado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'});
+  return `<div class="post">
+      <div class="cab">${face}
+        <div class="txt"><b>${quem}</b><small>${dia}</small></div>
+        ${meu?`<button class="men" onclick="comuApagarPost('${x.id}')" title="Apagar">⋮</button>`:''}
+      </div>
+      <div class="corpo">${(x.corpo||'').replace(/</g,'&lt;')}</div>
+    </div>`;
+}
+function comuFeed(){
+  comuFeedCarregar();
+  const l = window.__comuFeed;
+  /* ⚠️ SEM `.sec` aqui: este bloco JÁ é pintado dentro de uma `.sec` lá embaixo,
+     e `.sec` tem `padding:18px var(--pad-lado) 0`. Aninhado, o padding lateral
+     dobrava — medido: 46,8px no campo de escrever contra 23,4px nos posts logo
+     abaixo, com o campo visivelmente mais estreito e fora da coluna. */
+  const escrever = `<textarea id="post-txt" class="onb-area" maxlength="1000"
+        placeholder="Conta pra comunidade — um jogo, uma quadra, uma pergunta."></textarea>
+      <button class="btn" style="margin-top:8px" onclick="comuPostar()">Publicar</button>`;
+  const corpo = l === null
+    ? `<div class="card"><p class="nota">Carregando o feed…</p></div>`
+    : l.length ? l.map(postHtml).join('')
+    : `<div class="card"><div class="vazio"><i class="ic">✎</i>Ninguém publicou nada ainda. O primeiro post é seu.</div></div>`;
+  /* as notícias são as mesmas da vitrine — arquivo curado, sem tabela. O board
+     as põe no topo desta aba, e é o mesmo bloco: não há segunda fonte. */
+  /* o `.noticias` não é enfeite: as regras da notícia nasceram debaixo de
+     `.ini` (a home) e sem um segundo escopo este bloco sai sem CSS nenhum —
+     lista de links azuis. Ver o comentário delas no <style>. */
+  return `<div class="noticias">${noticiasHTML()}</div><div class="sec">${escrever}${corpo}</div>`;
+}
+
+/* -- RANKING (telas 14 e 13 · nodes 169:1313 e 176:1884) ------------------
+   O ranking GERAL, que o app nunca teve em tela: o que existia era o quadro da
+   comunidade. As duas fontes são reais e já estavam no app —
+     · quem compete: `S.comunidade.membros`, que o `aplicarJogadoresReais`
+       monta filtrando `joga` (mig 66). Professor que só dá aula não entra, e
+       essa regra não se reescreve aqui.
+     · quanto pontuou: `pontos_lancamentos` no escopo 'geral', pela `netRanking`.
+   Nada é inventado e nada é estimado: sem temporada aberta o mapa vem vazio e
+   todo mundo aparece com 0, que é a verdade do pré-lançamento. */
+function rankGeralCarregar(){
+  if(window.__rankGeral !== undefined) return;
+  window.__rankGeral = null;
+  if(!(window._net && _net.rankingGeral)){ window.__rankGeral = {}; return }
+  _net.rankingGeral(S.esporte||'tenis')
+    .then(m=>{ window.__rankGeral = m||{}; render() })
+    .catch(()=>{ window.__rankGeral = {}; render() });
+}
+function rankLista(){
+  const pts = window.__rankGeral || {};
+  return (S.comunidade.membros||[]).map(id=>{
+    const j = S.jogadores[id]; if(!j) return null;
+    const uid = (id===EU) ? (typeof MEU_UID!=='undefined' ? MEU_UID : null) : id;
+    const nv = nivelDe(j), cl = divDe(j);
+    return { id, j, nv, cl, cat:categoriaDe(nv,cl), pts:(uid && pts[uid]) || 0 };
+  }).filter(Boolean)
+    /* Pontos primeiro, Nível de desempate: no começo da temporada todo mundo
+       tem 0 ponto e sem o segundo critério a lista sairia aleatória. É a mesma
+       ordenação que o `netVerGrupo` usa desde 09/08 — duas superfícies com a
+       mesma pergunta não podem responder em ordens diferentes. */
+    .sort((a,b)=> b.pts-a.pts || b.nv-a.nv);
+}
+function rankLinha(r, i){
+  const p = i+1;
+  return `<div class="rk-ln ${p<=3?'p'+p:''} ${r.id===EU?'eu':''}" onclick="verJogador('${r.id}')">
+      <div class="pos">${p}</div>
+      ${avatar(r.id)}
+      <div class="nm">
+        <div class="l1"><b>${r.id===EU?'Você':nome(r.id)}</b><div class="nv">${r.nv}</div></div>
+        <small>${catNome(r.cl,r.cat)} · ${r.pts} pts</small></div>
+    </div>`;
+}
+const CLASSE_TXT = {
+  A:'O topo da régua. Nível 1750 pra cima — quem chega aqui joga contra quem também chegou.',
+  B:'Jogo consolidado. Entre 1500 e 1750, a faixa onde a partida já é disputada ponto a ponto.',
+  C:'O meio da tabela, e a classe mais cheia. Entre 1250 e 1500.',
+  D:'Onde todo mundo começa. Até 1250 — três partidas e a calibragem já te tira daqui.'
+};
+function comuRanking(){
+  rankGeralCarregar();
+  if(window.__rankGeral === null) return `<div class="card"><p class="nota">Carregando o ranking…</p></div>`;
+  const lista = rankLista();
+  const eu = S.jogadores[EU];
+
+  /* O PÓDIO. Três degraus com o 1º no meio, como o board. Sem gente suficiente
+     o degrau fica VAZIO em vez de repetir alguém ou inventar: pódio com nome
+     que não existe é a pior mentira que uma tela de ranking pode contar. */
+  const deg = (r, p)=> `<div class="col p${p}${r?'':' vazia'}">
+      ${r ? `<div class="qnome">${r.id===EU?'Você':nome(r.id).split(' ')[0]}</div>
+             <div class="qpts">${catNome(r.cl,r.cat)} · ${r.pts} pts</div>` : `<div class="qnome">—</div><div class="qpts">vago</div>`}
+      <div class="fig">${r ? avatar(r.id,'gg') : '<div class="av gg">·</div>'}</div>
+      <div class="deg">${p}</div>
+    </div>`;
+  const podio = `<div class="podio">${deg(lista[1],2)}${deg(lista[0],1)}${deg(lista[2],3)}</div>`;
+
+  /* A SUA CLASSE. O board escreve "0.000 pts › B / Faltam 100 pts", medindo a
+     promoção em PONTOS. No app quem promove é o NÍVEL (as faixas da
+     CLASSE_FAIXA), e a decisão de 29/08 é explícita: classe manda sobre o
+     decimal do board. Então o número muda de unidade e o rótulo diz qual é —
+     mostrar "faltam 100" sem dizer de quê seria herdar a tela e perder a
+     regra. */
+  const cl = divDe(eu), nv = nivelDe(eu), cat = categoriaDe(nv, cl);
+  const [piso, teto] = CLASSE_FAIXA[cl] || CLASSE_FAIXA.C;
+  const ACIMA = {D:'C', C:'B', B:'A', A:null};
+  const prog = Math.max(4, Math.min(100, Math.round((nv-piso)/(teto-piso)*100)));
+  const meusPts = (lista.find(r=>r.id===EU)||{}).pts || 0;
+  const acima = ACIMA[cl];
+  const hero = `<div class="card cls-hero">
+      <div class="topo">
+        <div class="letra">${cl}<sup>${CAT_SUFIXO[cat]}</sup></div>
+        <div class="dir"><b>${meusPts} pts</b>${acima?` <span class="prox">› ${acima}</span>`:''}
+          <small>${acima?`Faltam ${Math.max(0,Math.ceil(teto-nv))} de Nível`:'Você está no topo da régua'}</small></div>
+      </div>
+      <div class="barra"><i style="width:${prog}%"></i></div>
+      <p class="nota">Você está na Classe ${cl} com Nível ${nv}. Quem promove é o Nível, não os Pontos — os Pontos ordenam a temporada, o Nível diz em que faixa você joga.</p>
+    </div>`;
+
+  const classes = ['A','B','C','D'].map(k=>{
+    const [p1,p2] = CLASSE_FAIXA[k];
+    const n = lista.filter(r=>r.cl===k).length;
+    return `<div class="cls-card ${k===cl?'aqui':''}" onclick="ir('rankingClasse',{cl:'${k}'})">
+        <b>Classe ${k}</b>
+        <p>${CLASSE_TXT[k]}</p>
+        <div class="pe"><span class="faixa">Nível ${p1}–${p2} · ${n} ${n===1?'jogador':'jogadores'}</span>
+          <span class="ver">Ver ranking ›</span></div>
+      </div>`;
+  }).join('');
+
+  /* O QUE ERA DA ABA e continua sendo porta: o quadro da sua comunidade, o
+     cinturão e os patches vivem lá dentro — mesma pergunta, outro escopo. */
+  const meus = `<div class="sec">
+      <div class="rot tit">Na sua comunidade</div>
+      <div class="card clic" onclick="ir('quadro')">
+        <div class="linha-item"><div class="av">◈</div>
+          <div class="txt"><b>Quadro da comunidade</b><small>A tabela dos seus, o cinturão e os patches</small></div>
+          <div class="seta">›</div></div>
+      </div>
+    </div>`;
+
+  return `<div class="sec">${podio}${hero}</div>
+    <div class="sec"><div class="rot tit">As classes</div>${classes}</div>${meus}`;
+}
+
+/* -- GRUPOS (tela 15 · node 177:2332) -------------------------------------
+   `netMeusGrupos` já devolvia tudo o que o board pede — os meus, os abertos e a
+   contagem de membros. O que muda é a forma: tira horizontal de cartões em vez
+   de lista, e a folha de Comunidades deixa de ser o único caminho.
+   ⚠️ FOTO DE CAPA NÃO EXISTE. O board põe foto em todo cartão de grupo, e isso
+   é Storage — policy de BUCKET, superfície diferente da RLS de tabela, com
+   migração e decisão próprias. Enquanto não existir, o cartão traz a inicial
+   do nome sobre o gradiente da marca: placeholder declarado, não foto falsa. */
+function gruposCarregar(){
+  if(window.__gruposCache !== undefined) return;
+  window.__gruposCache = null;
+  if(!(window._net && _net.meusGrupos)){ window.__gruposCache = {meus:[],abertos:[],cont:{}}; return }
+  _net.meusGrupos().then(g=>{ window.__gruposCache = g||{meus:[],abertos:[],cont:{}}; render() })
+                   .catch(()=>{ window.__gruposCache = {meus:[],abertos:[],cont:{}}; render() });
+}
+function gcard(g, cont){
+  const n = cont[g.id]||0;
+  return `<div class="gcard" onclick="ir('grupo',{id:'${g.id}'})">
+      <div class="ini">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>
+      <div class="pe"><b>${g.nome}</b><small>${n} ${n===1?'membro':'membros'}</small></div>
+    </div>`;
+}
+/* -- FEED DO GRUPO (tela 17 · node 177:2956) ------------------------------
+   O grupo deixa de ser só a folha de gestão e ganha tela: capa, descrição e
+   duas abas — Feed e Partidas e Torneios. A folha continua existindo e é pra
+   onde o botão de gerir aponta: ela tem os pedidos, os papéis e o link, e
+   duplicar ato de gestão em duas superfícies é como as duas passam a discordar
+   sobre quem pode o quê.
+   ⚠️ O board desenha CAPA e uma barra de curtir/comentar/compartilhar em cada
+   post. Capa é Storage; curtida e comentário são duas tabelas que não existem.
+   As duas coisas ficam de fora com o motivo escrito, e não em botão morto. */
+function grupoCarregar(id){
+  window.__grupoCache = window.__grupoCache || {};
+  if(window.__grupoCache[id] !== undefined) return;
+  window.__grupoCache[id] = null;
+  const vazio = {g:null, membros:[], pts:{}, souMembro:false, posts:[]};
+  if(!(window._net && _net.grupoResumo)){ window.__grupoCache[id] = vazio; return }
+  Promise.all([ _net.grupoResumo(id), _net.feed({grupo:id, limite:30}) ])
+    .then(([r, posts])=>{ window.__grupoCache[id] = Object.assign({posts:posts||[]}, r); render() })
+    .catch(()=>{ window.__grupoCache[id] = vazio; render() });
+}
+async function grupoPostar(gid){
+  const el = document.getElementById('gpost-txt');
+  const t = el ? el.value : '';
+  if(!t.trim()){ toast('Escreve alguma coisa antes de publicar.'); return }
+  const r = await _net.postar(t, gid);
+  if(r.erro){ alert('Não deu pra publicar: '+r.erro); return }
+  if(el) el.value='';
+  if(window.__grupoCache) window.__grupoCache[gid] = undefined;
+  toast('Publicado no grupo.');
+  grupoCarregar(gid); render();
+}
+
+function comuGrupos(){
+  gruposCarregar();
+  const g = window.__gruposCache;
+  if(g === null) return `<div class="card"><p class="nota">Carregando as comunidades…</p></div>`;
+  const cont = g.cont||{};
+  const meus = (g.meus||[]).length
+    ? `<div class="tira">${g.meus.map(x=>gcard(x,cont)).join('')}</div>`
+    : `<div class="card"><div class="vazio"><i class="ic">▣</i>Você ainda não está em nenhuma comunidade. É nela que a partida entre membros vira ranking próprio — e onde o cinturão existe.</div></div>`;
+  /* "recomendados" no board = os ABERTOS aqui. Não há motor de recomendação e
+     não vai haver um hoje: chamar de recomendado o que é só "aberto" seria
+     prometer curadoria que ninguém faz. O rótulo diz o que a lista é. */
+  const abertos = (g.abertos||[]).length
+    ? `<div class="sec"><div class="rot tit">Comunidades abertas <span>pedir pra entrar</span></div>
+         <div class="tira">${g.abertos.map(x=>gcard(x,cont)).join('')}</div></div>`
+    : '';
+  const outras = `<div class="sec">
+      <div class="rot tit">Também aqui</div>
+      <div class="card clic" onclick="netAbrirTorneios()">
+        <div class="linha-item"><div class="av">🏆</div>
+          <div class="txt"><b>Meus torneios</b><small>Os seus e os torneios abertos pra se inscrever</small></div>
+          <div class="seta">›</div></div>
+      </div>
+      ${!ehProfessor() ? `<div class="card clic" onclick="ir('souProfessor')">
+        <div class="linha-item"><div class="av">🎾</div>
+          <div class="txt"><b>Você dá aula?</b><small>Apareça em Encontrar › Professores pra quem procura aula</small></div>
+          <div class="seta">›</div></div>
+      </div>` : ''}
+      ${window.__ehAdm ? `
+      <div class="card clic" onclick="ir('admLugares')">
+        <div class="linha-item"><div class="av">📞</div>
+          <div class="txt"><b>Contatos dos lugares</b><small>Telefone de quem loca e se o lugar aluga</small></div>
+          <div class="seta">›</div></div></div>
+      <div class="card clic" onclick="ir('admMidia')">
+        <div class="linha-item"><div class="av">📊</div>
+          <div class="txt"><b>Espaço de mídia</b><small>Impressões, cliques e alcance por campanha</small></div>
+          <div class="seta">›</div></div></div>
+      <div class="card clic" onclick="ir('admTorneio')">
+        <div class="linha-item"><div class="av">✦</div>
+          <div class="txt"><b>Cadastrar torneio de fora</b><small>De graça pro organizador — entra na agenda</small></div>
+          <div class="seta">›</div></div></div>
+      <div class="card clic" onclick="netAbrirAdm()">
+        <div class="linha-item"><div class="av">🛠</div>
+          <div class="txt"><b>ADM do aplicativo</b><small>Dar troféu, consertar apuração e cadastrar clube</small></div>
+          <div class="seta">›</div></div></div>` : ''}
+    </div>`;
+  return `<div class="sec">
+      <div class="gnovo" onclick="_net.criarGrupo()">
+        <div class="mais">+</div>
+        <div><b>Criar novo grupo</b><p>Junta o pessoal que já joga com você. Partida entre membros vira ranking próprio, com cinturão e conversa.</p></div>
+      </div>
+    </div>
+    <div class="sec"><div class="rot tit">Seus grupos${(g.meus||[]).length?` <span>${g.meus.length}</span>`:''}</div>${meus}</div>
+    ${abertos}${outras}`;
 }
 async function perfilBloquear(id){
   const j = S.jogadores[id]||{};
@@ -3232,7 +3783,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788049373"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788054959"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -3666,6 +4217,12 @@ vestiario(){
 /* ---------------- QUADRO ---------------- */
 quadro(){
   const eu=S.jogadores[EU], pos=posicoes();
+  /* 29/08: o cinturão, os patches e a copa VIERAM da aba Comunidade, que o
+     board reorganizou em Feed/Ranking/Grupos e não tem mais onde os pôr. É o
+     lugar certo: os três são sobre a MINHA comunidade, que é o assunto desta
+     tela — e tê-los espalhados em duas abas era o que fazia ninguém achar o
+     cinturão. A guarda do `c` vem junto: cinturao nasce null. */
+  const c=S.comunidade.cinturao;
   const ordem=ordena(tabelaPontos().comunidade);
   const linhas = ordem.map((id,i)=>`
     <div class="ln ${id===EU?'eu':''}" onclick="verJogador('${id}')">
@@ -3757,7 +4314,56 @@ quadro(){
     <div class="sec">
       <div class="rot">Agora na comunidade</div>
       ${feed}
-    </div>`};
+    </div>
+
+    <div class="sec">
+      <div class="rot">Cinturão</div>
+      ${(c && S.jogadores[c.dono]) ? `<div class="card" style="border-color:var(--gold)">
+        <div class="linha-item">
+          ${avatar(c.dono,'g')}
+          <div class="txt"><b>${nome(c.dono)}</b><small>♦ Campeão há ${c.desde} dias</small></div>
+          <span class="pil gold">Dono</span>
+        </div>
+        <!-- 12/08: aqui havia "Aspirante", com ap(c.aspirante) sem guarda — e
+             aspirante NÃO EXISTE MAIS desde 09/08: o cinturão passa pra quem
+             vencer o dono numa partida normal, sem desafio formal e sem
+             cooldown. Além de contar um modelo revogado, quebrava a aba inteira
+             quando o campo faltava, que é o formato que vem do banco hoje
+             (cinturao_dono_id + cinturao_desde, e nada mais).
+             O que a tela mostra agora é o que a decisão manda: o histórico na
+             cara, e o relógio que impede o "não jogar" de ser a estratégia. -->
+        <div class="stats" style="margin-top:13px">
+          <div><div class="v" style="font-size:14px">${c.desde}d</div><div class="k">Reinado</div></div>
+          <div><div class="v" style="font-size:14px">${c.defesas ?? 0}</div><div class="k">Defesas</div></div>
+          <div><div class="v" style="font-size:14px">${c.prazoDias}d</div><div class="k">Vence em</div></div>
+        </div>
+        <p class="nota" style="margin-top:11px">Não existe desafio formal: o cinturão passa pra quem vencer o dono numa partida normal. Ficar 14 dias sem jogar congela o reinado, e 30 dias entregam o cinturão pro 1º do ranking da comunidade — segurar parando não funciona.</p>
+      </div>` : `<div class="card"><p class="nota">O cinturão ainda não tem dono. Quando a comunidade tiver disputa rolando, o primeiro campeão aparece aqui.</p></div>`}
+    </div>
+
+    <div class="sec">
+      <div class="rot">Patches <span>pertencimento, não mérito</span></div>
+      ${S.comunidade.patches.map(p=>`
+        <div class="card"><div class="linha-item">
+          <div class="av">◈</div>
+          <div class="txt"><b>${p.t}</b><small>criado por ${nome(p.de)}</small></div>
+        </div></div>`).join('')}
+      <!-- 11/08 (noite): o backend chegou (migração 22) e o botão morto virou
+           porta: patch mora na comunidade real, então o caminho é abrir a sua
+           e criar lá — o sheet dela tem o "◈ Patches da comunidade". -->
+      <button class="btn gh" onclick="netAbrirGrupos()">◈ Criar e mandar patch — na sua comunidade</button>
+      <p class="nota" style="margin-top:9px">Até 24 caracteres, filtro de 3 camadas, autoria sempre visível. Patch não se ganha — se recebe.</p>
+    </div>
+
+    <div class="sec">
+      <div class="rot">Copa interna</div>
+      <div class="card clic" onclick="toast('A copa organiza partidas — não cria outro ranking. Cada resultado conta nas comunidades onde os dois jogadores estão.')">
+        <div class="linha-item">
+          <div class="txt"><b>Copa do Sábado</b><small>Chave de 8 · eliminatória simples</small></div>
+          <div class="seta">›</div>
+        </div></div>
+    </div>
+`};
 },
 
 /* ---------------- RADAR ---------------- */
@@ -4717,142 +5323,129 @@ mexeu(){
 },
 
 /* ---------------- PANELA ---------------- */
+/* ---------------- COMUNIDADE — as três abas do board ----------------
+   Feed · Ranking · Grupos, numa rota só. As cargas assíncronas e os três
+   renderizadores vivem juntos lá em cima, no bloco "COMUNIDADE — TELAS 12 a
+   17 DO BOARD" — aqui fica só o roteador, que é o que esta função é.
+
+   O cinturão, os patches e a copa saíram daqui e foram pro QUADRO, junto com
+   a tabela da comunidade: é lá que a pergunta "como vai a minha comunidade"
+   se responde inteira, e ter metade dela em cada aba era o que fazia ninguém
+   achar o cinturão. A lista "Os N da comunidade" não foi junto porque o
+   Quadro já a desenha — eram duas telas do mesmo dado. */
 comunidade(){
-  const c=S.comunidade.cinturao;
-  const ordem=ordena(tabelaPontos().comunidade);
-  return {titulo:S.comunidade.nome, dir:`${S.comunidade.membros.length} membros`, html:`
-    <div class="sec">
-      <!-- 16/08: os dois primeiros cards da aba passam a ser a PORTA, não um
-           menu. As páginas de Comunidades e Torneios já existiam desde sempre
-           (netAbrirGrupos / netAbrirTorneios), com "Suas comunidades" +
-           "Comunidades abertas" e "Seus torneios" + "Torneios abertos" com o
-           botão de entrar — mas estavam dois toques fundo, atrás de um card
-           que parecia um item de lista qualquer. Ninguém achava.
-           Agora abrem em destaque, e o texto diz o que tem lá dentro em vez de
-           descrever o que a pessoa poderia fazer. -->
-      <div class="card clic" onclick="netAbrirGrupos()" style="border-color:var(--linha2)">
-        <div class="linha-item">
-          <div class="av">▣</div>
-          <div class="txt"><b>Minhas comunidades</b><small>As que você participa e as abertas pra pedir entrada</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>
-      <div class="card clic" onclick="netAbrirTorneios()" style="border-color:var(--linha2)">
-        <div class="linha-item">
-          <div class="av">🏆</div>
-          <div class="txt"><b>Meus torneios</b><small>Os seus e os torneios abertos pra se inscrever</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>
-      <!-- 25/08 (mig 66): os cards "Dou aula" e "Minha turma" SAÍRAM daqui.
-           Eram dois defeitos num só: o comentário dizia que ficavam na ficha e
-           eles estavam na Comunidade, e a limpeza de cache            o trocarAba da aba ficha — ou seja, numa aba que nao os continha.
-           Abrir Comunidade › Minha turma duas vezes servia dado velho.
-           Agora Turma é aba do professor, e quem só joga chega pelo card
-           abaixo, que aparece só pra ele. -->
-      ${!ehProfessor() ? `<div class="card clic" onclick="ir('souProfessor')">
-        <div class="linha-item">
-          <div class="av">🎾</div>
-          <div class="txt"><b>Você dá aula?</b><small>Apareça em Encontrar › Professores pra quem procura aula</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>` : ''}
-      ${window.__ehAdm ? `
-      <div class="card clic" onclick="ir('admLugares')">
-        <div class="linha-item">
-          <div class="av">📞</div>
-          <div class="txt"><b>Contatos dos lugares</b><small>Telefone de quem loca e se o lugar aluga — mantenha atualizado</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>
-      <div class="card clic" onclick="ir('admMidia')">
-        <div class="linha-item">
-          <div class="av">📊</div>
-          <div class="txt"><b>Espaço de mídia</b><small>Impressões, cliques e alcance por campanha — o número que vira proposta</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>
-      <div class="card clic" onclick="ir('admTorneio')">
-        <div class="linha-item">
-          <div class="av">✦</div>
-          <div class="txt"><b>Cadastrar torneio de fora</b><small>De graça pro organizador — entra na agenda e na página pública</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>
-      <div class="card clic" onclick="netAbrirAdm()">
-        <div class="linha-item">
-          <div class="av">🛠</div>
-          <div class="txt"><b>ADM do aplicativo</b><small>Dar troféu, consertar apuração e cadastrar clube</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>` : ''}
-      <div class="card clic" onclick="ir('quadro')">
-        <div class="linha-item">
-          <div class="av">◈</div>
-          <div class="txt"><b>Quadro</b><small>A tabela completa da comunidade e as suas comunidades</small></div>
-          <div class="seta">›</div>
-        </div>
-      </div>
-    </div>
+  const aba = abaDe('comu','feed');
+  const corpo = aba==='ranking' ? comuRanking()
+              : aba==='grupos'  ? comuGrupos()
+              : comuFeed();
+  return {titulo:'Comunidade', dir:'', html:
+    abasHtml('comu',[['feed','Feed'],['ranking','Ranking'],['grupos','Grupos']],'linha',null,'esp') + corpo};
+},
 
+/* ---------------- RANKING DE UMA CLASSE (board 176:1884) ----------------
+   O que "Ver ranking" abre no cartão da classe. Mesma lista do pódio, cortada
+   pela faixa de Nível — não é outra consulta nem outra ordem. */
+rankingClasse(p){
+  const cl = (p && p.cl) || divDe(S.jogadores[EU]);
+  rankGeralCarregar();
+  if(window.__rankGeral === null)
+    return {titulo:'Classe '+cl, dir:'', html:`<div class="card"><p class="nota">Carregando o ranking…</p></div>`};
+  const [n1,n2] = CLASSE_FAIXA[cl] || CLASSE_FAIXA.C;
+  const lista = rankLista().filter(r=>r.cl===cl);
+  const linhas = lista.length
+    ? lista.map(rankLinha).join('')
+    : `<div class="card"><div class="vazio"><i class="ic">◈</i>Ninguém na Classe ${cl} ainda. Ela enche quando as partidas começarem a entrar.</div></div>`;
+  /* as ABAS ficam. No board esta não é uma tela solta: é a aba Ranking
+     mostrando uma classe, com Feed/Ranking/Grupos ainda no topo. Ela continua
+     sendo rota empilhada aqui — o ‹ de voltar é bom e o board não o tem —, mas
+     sem a barra ela parecia ter saído da Comunidade. */
+  return {titulo:'Classe '+cl, dir:`${lista.length} ${lista.length===1?'jogador':'jogadores'}`, html:
+    abasHtml('comu',[['feed','Feed'],['ranking','Ranking'],['grupos','Grupos']],'linha','comuVoltarAba','esp') + `
     <div class="sec">
-      <div class="rot">Cinturão</div>
-      ${(c && S.jogadores[c.dono]) ? `<div class="card" style="border-color:var(--gold)">
-        <div class="linha-item">
-          ${avatar(c.dono,'g')}
-          <div class="txt"><b>${nome(c.dono)}</b><small>♦ Campeão há ${c.desde} dias</small></div>
-          <span class="pil gold">Dono</span>
-        </div>
-        <!-- 12/08: aqui havia "Aspirante", com ap(c.aspirante) sem guarda — e
-             aspirante NÃO EXISTE MAIS desde 09/08: o cinturão passa pra quem
-             vencer o dono numa partida normal, sem desafio formal e sem
-             cooldown. Além de contar um modelo revogado, quebrava a aba inteira
-             quando o campo faltava, que é o formato que vem do banco hoje
-             (cinturao_dono_id + cinturao_desde, e nada mais).
-             O que a tela mostra agora é o que a decisão manda: o histórico na
-             cara, e o relógio que impede o "não jogar" de ser a estratégia. -->
-        <div class="stats" style="margin-top:13px">
-          <div><div class="v" style="font-size:14px">${c.desde}d</div><div class="k">Reinado</div></div>
-          <div><div class="v" style="font-size:14px">${c.defesas ?? 0}</div><div class="k">Defesas</div></div>
-          <div><div class="v" style="font-size:14px">${c.prazoDias}d</div><div class="k">Vence em</div></div>
-        </div>
-        <p class="nota" style="margin-top:11px">Não existe desafio formal: o cinturão passa pra quem vencer o dono numa partida normal. Ficar 14 dias sem jogar congela o reinado, e 30 dias entregam o cinturão pro 1º do ranking da comunidade — segurar parando não funciona.</p>
-      </div>` : `<div class="card"><p class="nota">O cinturão ainda não tem dono. Quando a comunidade tiver disputa rolando, o primeiro campeão aparece aqui.</p></div>`}
-    </div>
-
-    <div class="sec">
-      <div class="rot">Os ${S.comunidade.membros.length} da comunidade</div>
-      ${ordem.map((id,i)=>`
-        <div class="card clic" onclick="verJogador('${id}')">
-          <div class="linha-item">
-            ${avatar(id)}
-            <div class="txt"><b>${id===EU?'Você':nome(id)}</b><small>${i+1}º · ${tabelaPontos().comunidade[id]} pts · Nível ${nivelDe(S.jogadores[id])}</small></div>
-            ${(c && c.dono===id)?'<span class="pil gold">♦</span>':''}
-          </div></div>`).join('')}
-    </div>
-
-    <div class="sec">
-      <div class="rot">Patches <span>pertencimento, não mérito</span></div>
-      ${S.comunidade.patches.map(p=>`
-        <div class="card"><div class="linha-item">
-          <div class="av">◈</div>
-          <div class="txt"><b>${p.t}</b><small>criado por ${nome(p.de)}</small></div>
-        </div></div>`).join('')}
-      <!-- 11/08 (noite): o backend chegou (migração 22) e o botão morto virou
-           porta: patch mora na comunidade real, então o caminho é abrir a sua
-           e criar lá — o sheet dela tem o "◈ Patches da comunidade". -->
-      <button class="btn gh" onclick="netAbrirGrupos()">◈ Criar e mandar patch — na sua comunidade</button>
-      <p class="nota" style="margin-top:9px">Até 24 caracteres, filtro de 3 camadas, autoria sempre visível. Patch não se ganha — se recebe.</p>
-    </div>
-
-    <div class="sec">
-      <div class="rot">Copa interna</div>
-      <div class="card clic" onclick="toast('A copa organiza partidas — não cria outro ranking. Cada resultado conta nas comunidades onde os dois jogadores estão.')">
-        <div class="linha-item">
-          <div class="txt"><b>Copa do Sábado</b><small>Chave de 8 · eliminatória simples</small></div>
-          <div class="seta">›</div>
-        </div></div>
+      <div class="cls-cab">
+        <div class="cbadge">${cl}</div>
+        <div class="risco"></div>
+        <div class="faixa">Nível ${n1}–${n2}</div>
+      </div>
+      ${linhas}
+      <p class="nota" style="margin-top:13px">A ordem é por Pontos da temporada, com o Nível de desempate — a mesma do quadro de comunidade. Classe é a faixa em que você joga; Pontos é como você vai nesta temporada.</p>
     </div>`};
+},
+
+/* ---------------- FEED DO GRUPO (board 177:2956) ----------------
+   O cartão da aba Grupos abre AQUI, e não mais na folha de gestão. A folha
+   continua sendo a porta de gerir — pedidos, papéis e link de convite —, e o
+   botão no fim da segunda aba é quem a abre. */
+grupo(p){
+  const id = p && p.id;
+  if(!id) return {titulo:'Grupo', dir:'', html:`<div class="card"><p class="nota">Grupo não informado.</p></div>`};
+  grupoCarregar(id);
+  const d = (window.__grupoCache||{})[id];
+  if(d === null || d === undefined)
+    return {titulo:'Grupo', dir:'', html:`<div class="card"><p class="nota">Carregando o grupo…</p></div>`};
+  /* `g` nulo é o grupo que sumiu OU o fechado que a policy não deixa ler —
+     as duas coisas se parecem daqui de fora, de propósito: dizer "existe mas
+     você não pode ver" já entrega que ele existe. */
+  if(!d.g) return {titulo:'Grupo', dir:'', html:
+    `<div class="card"><div class="vazio"><i class="ic">▣</i>Essa comunidade não existe mais, ou não está aberta pra você.</div></div>`};
+
+  const g = d.g, n = d.membros.length;
+  const aba = abaDe('grupoAba','feed');
+  /* quem sou eu dentro de `S.jogadores`: o elenco guarda todo mundo pelo uuid,
+     menos eu, que sou a chave EU. Sem esta tradução o meu nome sai como
+     "Outro jogador" na minha própria comunidade. */
+  const chave = (uid)=> (typeof MEU_UID!=='undefined' && uid===MEU_UID) ? EU : uid;
+
+  const hero = `<div class="ghero">
+      <div class="ini" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 62px var(--f-ui);color:var(--linha2)">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>
+      <div class="dentro">
+        <div class="l1"><h3>${g.nome}</h3><div class="mem">${n} ${n===1?'membro':'membros'}</div></div>
+        ${g.regras ? `<p>${g.regras.replace(/</g,'&lt;')}</p>`
+                   : `<p>${g.esporte==='beach'?'Beach tennis':'Tênis'} · ${g.aberto?'aberto — qualquer um pode pedir pra entrar':'privado — só entra por convite'}</p>`}
+      </div>
+    </div>`;
+
+  let corpo;
+  if(aba==='partidas'){
+    /* A segunda aba do board. O que o app tem de "partidas do grupo" é o
+       RANKING dele — a soma do livro-caixa no escopo `grupo:<id>`, que só
+       recebe partida entre membros. Ordem igual à da folha: Pontos, Nível de
+       desempate. */
+    const linhas = d.membros.map(m=>({ m, k:chave(m.player_id), pts:d.pts[m.player_id]||0 }))
+      .map(x=> Object.assign(x, {j:S.jogadores[x.k]}))
+      .sort((a,b)=> b.pts-a.pts || ((a.j&&b.j)? nivelDe(b.j)-nivelDe(a.j) : 0))
+      .map((x,i)=>{
+        const conhecido = !!x.j;
+        const ehDono = x.m.player_id===g.dono_id;
+        return `<div class="rk-ln ${i<3?'p'+(i+1):''} ${x.k===EU?'eu':''}" ${conhecido?`onclick="verJogador('${x.k}')"`:''}>
+            <div class="pos">${i+1}</div>
+            ${conhecido ? avatar(x.k) : '<div class="av">◈</div>'}
+            <div class="nm">
+              <div class="l1"><b>${x.k===EU?'Você':conhecido?nome(x.k):'Outro jogador'}</b><div class="nv">${conhecido?nivelDe(x.j):'—'}</div></div>
+              <small>${x.pts} pts${ehDono?' · dono':x.m.papel==='admin'?' · admin':''}</small></div>
+          </div>`;
+      }).join('');
+    corpo = `<div class="sec">
+        <div class="rot tit">Ranking do grupo <span>só partida entre membros</span></div>
+        ${linhas || `<div class="card"><div class="vazio"><i class="ic">◈</i>Sem membros ainda.</div></div>`}
+        <p class="nota" style="margin-top:12px">Torneio do grupo ainda não existe como objeto próprio — o que conta aqui é a partida entre membros. Os torneios abertos ficam em Comunidade › Grupos › Meus torneios.</p>
+        <button class="btn gh" style="margin-top:12px" onclick="_net.verGrupo('${id}')">Gerir a comunidade — membros, pedidos e link</button>
+      </div>`;
+  } else {
+    const posts = d.posts||[];
+    // sem `.sec` própria: já vem dentro de uma. Ver a nota no `comuFeed`.
+    const escrever = d.souMembro ? `<textarea id="gpost-txt" class="onb-area" maxlength="1000" placeholder="Escreve pro grupo."></textarea>
+        <button class="btn" style="margin-top:8px" onclick="grupoPostar('${id}')">Publicar no grupo</button>`
+      : `<p class="nota" style="margin-top:12px">Só quem é do grupo publica aqui — a policy da mig 79 cobra isso no banco, não só na tela.</p>`;
+    const lista = posts.length ? posts.map(postHtml).join('')
+      : `<div class="card"><div class="vazio"><i class="ic">✎</i>Ninguém publicou nada neste grupo ainda.</div></div>`;
+    corpo = `<div class="sec">${escrever}${lista}</div>`;
+  }
+
+  return {titulo:g.nome, dir:`${n} ${n===1?'membro':'membros'}`, html:
+    `<div class="sec">${hero}</div>`
+    + abasHtml('grupoAba',[['feed','Feed'],['partidas','Partidas e Torneios']],'linha',null,'esp')
+    + corpo};
 },
 
 /* ---------------- FICHA ---------------- */
