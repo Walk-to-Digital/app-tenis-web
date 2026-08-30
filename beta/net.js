@@ -166,7 +166,13 @@ async function netAdversarios(){
      patrocinador seria falso. São escolhas de exibição, públicas por natureza
      (estão na camisa), e `players_select` é `using(true)`. */
   const { data, error } = await sb.from('players')
-    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc, perfil, joga, bio')
+    /* 29/08: `app_visto_em` viaja pro elenco. Ele existe desde a mig 32 como
+       carimbo de sincronização (FORÇADO a now() pelo trigger — carimbo é prova,
+       e prova que o interessado escreve não é prova), e nunca chegou a tela
+       nenhuma. O board pede "Online agora" no topo da conversa, e é ele que
+       responde: não é presença de verdade (não há socket), é "esteve aqui
+       agora há pouco" — que é o que a frase promete e o que o dado sustenta. */
+    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc, perfil, joga, bio, app_visto_em')
     .neq('id', MEU_UID)
     .order('nome');
   if(error){ console.error('[net] lista falhou', error); return []; }
@@ -934,6 +940,10 @@ function netDesafiar(id){
             nivel_duplas:j.nivel_duplas, nivelb_duplas:j.nivelb_duplas},
           localId: princ, quadra: null, quando: null,
           quadraPor: null, bolaPor: null,
+          // (83) tipo de quadra: saibro | dura | rapida. Nasce VAZIO — quem
+          // marca "sábado, a gente vê onde" não deve ser obrigado a decidir o
+          // piso, e um default seria o app respondendo no lugar da pessoa.
+          piso: null,
           // (45) nasce simples: duplas é escolha explícita, nunca default
           dupla: false, parCri: null, parAdv: null };
   _farmContar(id);   // 5ª do mês contra ele? o aviso chega antes do Desafiar
@@ -949,6 +959,10 @@ function _onLocal(v){ _on.localId = v || null; _on.quadra = null;
 /* 'eu' | 'ele' | null — vira uuid só na hora de gravar. Clicar no que já está
    escolhido desmarca: a escolha é opcional e precisa ter volta. */
 function _onQuadraPor(v){ _on.quadraPor = (_on.quadraPor===v) ? null : v; netRenderOnline(); }
+/* (83) saibro | dura | rapida. Clicar no que já está escolhido DESMARCA, pela
+   mesma razão do quadraPor: o piso é opcional e a escolha precisa ter volta —
+   sem isso, quem tocou por engano fica preso a um combinado que não fez. */
+function _onPiso(v){ _on.piso = (_on.piso===v) ? null : v; netRenderOnline(); }
 function _onBolaPor(v){   _on.bolaPor   = (_on.bolaPor===v)   ? null : v; netRenderOnline(); }
 const _porUid = (lado)=> lado==='eu' ? MEU_UID : lado==='ele' ? (_on.advId||null) : null;
 const _quadraPorUid = ()=> _porUid(_on.quadraPor);
@@ -1065,6 +1079,9 @@ async function _onConfirmarDesafio(){
       ...(_on.dupla ? { parceiro_criador_id:_on.parCri, parceiro_adversario_id:_on.parAdv } : {}),
       local_id: _on.localId || null, quadra: _on.quadra || null,
       quando: _on.quando || null,
+      // (83) o TIPO de quadra, que não é o número dela. Null quando ninguém
+      // escolheu — o check da coluna aceita, e "a gente vê lá" é resposta.
+      piso: _on.piso || null,
       // só entram na criação: a trava (5) do trigger congela os dois no
       // UPDATE, e daí em diante eles só mudam pela contraproposta
       quadra_por: _quadraPorUid(), bola_por: _bolaPorUid(),
@@ -1094,6 +1111,11 @@ function netAbrirContra(matchId){
           localId: m[base+'local_id'] || null,
           quadra:  m[base+'quadra']   || null,
           quando:  m[base+'quando']   || null,
+          /* (83) o piso entra no `base` como todo o resto: contraproposta é
+             EDIÇÃO do combinado, e um campo que nascesse vazio aqui seria um
+             campo que a pessoa apaga sem querer só por não tê-lo preenchido de
+             novo. */
+          piso:    m[base+'piso']     || null,
           quadraPor: lado(m[base+'quadra_por']),
           bolaPor:   lado(m[base+'bola_por']),
           rodadas: m.prop_rodadas||0 };
@@ -1106,6 +1128,10 @@ async function _onEnviarContra(){
       p_match: _on.matchId, p_quando: _on.quando || null,
       p_local: _on.localId || null, p_quadra: _on.quadra || null,
       p_quadra_por: _quadraPorUid(), p_bola_por: _bolaPorUid(),
+      /* (83) o piso VIAJA na contraproposta. Sem esta linha, contrapropor dia e
+         lugar deixaria o piso da proposta anterior de pé — e a `aceitar` copia
+         `prop_piso` pro combinado, então o silêncio viraria dado gravado. */
+      p_piso: _on.piso || null,
     });
     if(error) throw error;
     const nome0=_on.adv.nome.split(' ')[0];
@@ -1771,14 +1797,26 @@ const _btn = (txt,onclick,tipo,extra)=>`<button onclick="${onclick}" style="flex
    Entra como OPÇÃO e o padrão não muda uma linha: 22 folhas usam este mesmo
    `_sheet`, e trocar o comportamento delas pra acertar uma seria o oposto do
    conserto. Quem quiser o cartão pede; todo o resto continua folha. */
+/* 29/08 — `opts.cheia`: as telas de CHATS do board (64:569, 64:68, 71:289) são
+   tela INTEIRA, não folha de 82vh. A conversa é o único lugar do app onde a
+   pessoa fica — todo o resto é decidir e sair —, e uma janela de 46vh de
+   histórico faz rolar duas vezes pra ler o que cabia de uma.
+
+   ⚠️ É folha em tela cheia, e NÃO rota, de propósito. Virar rota obrigaria a
+   refazer junto o `_chatCarregar`, o realtime e o apagar, que hoje conversam
+   com o `_chat` global e com `netRenderChat` imperativo. Refazer três coisas
+   que funcionam pra ganhar moldura é trocar risco por acabamento. Quando a
+   conversa precisar de rota de verdade — link direto pra uma sala, por
+   exemplo —, aí o custo se paga. */
 const _sheet = (id, inner, opts)=>{
   const cartao = !!(opts && opts.cartao);
+  const cheia  = !!(opts && opts.cheia);
   let el=document.getElementById(id);
   if(!el){ el=document.createElement('div'); el.id=id;
     el.style.cssText='position:fixed;inset:0;z-index:10000;display:flex;justify-content:center;'
-      + (cartao
-          ? 'background:rgba(10,7,5,.42);align-items:center;padding:16px'
-          : 'background:rgba(10,7,5,.72);align-items:flex-end;backdrop-filter:blur(3px)');
+      + (cartao ? 'background:rgba(10,7,5,.42);align-items:center;padding:16px'
+        : cheia ? 'background:var(--bg);align-items:stretch'
+        : 'background:rgba(10,7,5,.72);align-items:flex-end;backdrop-filter:blur(3px)');
     el.onclick=(e)=>{ if(e.target===el){ if(id==='net-online') _on=null; el.remove(); } };
     document.body.appendChild(el);
   }
@@ -1789,9 +1827,15 @@ const _sheet = (id, inner, opts)=>{
   el.innerHTML = cartao
     ? `<div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:460px">
          ${_wrap(inner, true)}${(opts && opts.pe) || ''}</div>`
+    : cheia ? _wrapCheia(inner)
     : _wrap(inner, false);
   return el;
 };
+/* a casca da tela cheia: sem borda, sem canto e sem teto de altura — ela É a
+   tela. `min-height:0` no meio é o que deixa a lista rolar dentro do flex em
+   vez de empurrar o campo de escrever pra fora da viewport. */
+const _wrapCheia = (inner)=>`<div style="width:100%;max-width:460px;background:var(--bg);color:var(--ink);
+    font-family:system-ui,sans-serif;display:flex;flex-direction:column;height:100%;overflow:hidden">${inner}</div>`;
 
 function netAbrirInbox(){ _fbPend=null; _fbAberto=null; netRenderInbox(); }
 /* "🗓 sáb 15/08 · 19h" + "📍 Clube Bahiano de Tênis · Quadra 3 — endereço" —
@@ -1831,11 +1875,22 @@ const _pinDe = (m, pref='')=>{
   if(qp) linha(`🏟 ${qp===MEU_UID?'<b>Você reserva</b> a quadra':_nomeDe(qp).split(' ')[0]+' reserva a quadra'}`);
   const bp = F('bola_por');
   if(bp) linha(`🎾 ${bp===MEU_UID?'<b>Você leva</b> a bola':_nomeDe(bp).split(' ')[0]+' leva a bola'}`);
+  /* (83) o TIPO de quadra. Entra aqui e não numa tela própria porque é
+     combinado de partida como os outros — e porque este render é o único lugar
+     que já sabe desenhar o combinado VIGENTE e o PROPOSTO lado a lado (o
+     `pref`). Um campo do combinado fora daqui seria um campo que a
+     contraproposta muda e ninguém vê mudar. */
+  const pz = F('piso');
+  if(pz) linha(`▦ Quadra de ${PISO_NOME[pz] || pz}`);
   /* segue devolvendo vazio quando não há nada: este render também roda no card
      de placar já lançado, e "a combinar" numa partida que já aconteceu é ruído.
      Quem precisa do texto do vazio é a contraproposta, que pede o dito lá. */
   return h;
 };
+/* (83) os três pisos, escritos uma vez. O banco guarda a chave (`rapida`, sem
+   acento, porque valor de domínio não carrega ortografia); a tela mostra o
+   nome. Duas listas divergem na primeira que alguém editar sozinha. */
+const PISO_NOME = { saibro:'saibro', dura:'piso duro', rapida:'piso rápido' };
 const _pinOuVazio = (m, pref='')=> _pinDe(m, pref)
   || `<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">a combinar</div>`;
 
@@ -3412,12 +3467,19 @@ async function netAbrirChat(gid){
    sala é o do outro, porque a sala é a partida e a partida é com ele. */
 async function netAbrirChatPartida(matchId){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  /* a LINHA INTEIRA, e não as quatro colunas de antes: o card da proposta
+     (board 64:68 e 71:289) lê `quando`, `local_id`, `quadra`, `piso`, os
+     `prop_*` e o `prop_rodadas` pra saber qual dos três estados desenhar. Com
+     o select curto o card nasceria sempre no estado "sem combinado". */
   const m = _inbox.find(x=>x.id===matchId)
-         || (await sb.from('matches').select('id,criador_id,adversario_id,status').eq('id',matchId).maybeSingle()).data;
+         || (await sb.from('matches').select('*').eq('id',matchId).maybeSingle()).data;
   if(!m){ alert('Partida não encontrada.'); return; }
   const aberta = ['desafiado','aceito','pendente'].includes(m.status);
   _chat = { sala:_SALAS.partida, id:matchId, nome:_nomeDe(_advId(m)), msgs:[], rascunho:'',
-            carregando:true, aberta, dono_id:null };
+            carregando:true, aberta, dono_id:null,
+            // (board) quem é o outro — o cabeçalho precisa do avatar e do
+            // "Online agora", e o card da proposta precisa da partida inteira
+            advId:_advId(m), match:m };
   netRenderChat();
   await _chatCarregar();
 }
@@ -4118,6 +4180,78 @@ function _chatHora(iso){
   return `${p(d.getDate())}/${p(d.getMonth()+1)} ${hm}`;
 }
 
+/* "Online agora" — o topo das telas de CHATS do board (64:68, 71:289).
+   ⚠️ NÃO é presença: não há socket, e o app nunca soube quem está com a tela
+   aberta. É o `app_visto_em` (mig 32), o carimbo da última sincronização, com
+   uma janela de 5 minutos. A frase do board é honesta sob essa leitura — quem
+   sincronizou agora há pouco ESTÁ no app —, e fora da janela a tela diz quando
+   foi, em vez de mentir por omissão. */
+const _ONLINE_MIN = 5;
+function _vistoTxt(uid){
+  const j = S.jogadores && S.jogadores[_chaveLocal(uid)];
+  const v = j && j.vistoEm;
+  if(!v) return null;
+  const min = Math.floor((Date.now() - new Date(v).getTime()) / 60000);
+  if(min < 0)            return null;                 // relógio do aparelho adiantado
+  if(min < _ONLINE_MIN)  return {txt:'Online agora', on:true};
+  if(min < 60)           return {txt:`Visto há ${min} min`, on:false};
+  const h = Math.floor(min/60);
+  if(h < 24)             return {txt:`Visto há ${h}h`, on:false};
+  return {txt:`Visto há ${Math.floor(h/24)}d`, on:false};
+}
+
+/* O CARD DA PROPOSTA DENTRO DA CONVERSA — telas 64:68 e 71:289 do board.
+   O board tem dois estados e o app tem os dois dados pra distinguir:
+     · sem `quando` combinado  → PREENCHER (o formulário, tela 64:68)
+     · com combinado na mesa   → ENVIADA/RECEBIDA (tela 71:289)
+   Nada aqui é objeto novo: a proposta É a partida, e "Editar proposta" é a
+   contraproposta que a mig 25 já sustenta. Um card que fosse mensagem numa
+   tabela viraria a segunda verdade sobre o mesmo combinado. */
+function _propCard(){
+  const m = _chat && _chat.match;
+  if(!m || _chat.sala !== _SALAS.partida) return '';
+  if(m.status !== 'desafiado') return '';        // aceita/recusada: o card sai
+
+  const meu       = m.prop_por ? (m.prop_por === MEU_UID) : (m.criador_id === MEU_UID);
+  const semCombin = !m.quando && !m.prop_quando;
+  const pin       = _pinDe(m, m.prop_por ? 'prop_' : '');
+  const nome0     = (_chat.nome||'').split(' ')[0];
+
+  const cx = (dentro)=> `<div style="border:1px solid var(--acc);border-radius:16px;padding:15px;margin:10px 0">${dentro}</div>`;
+
+  if(semCombin){
+    /* A tela 64:68. O formulário não é redesenhado aqui: o botão abre a folha
+       do desafio, que é o MESMO formulário com os mesmos cinco campos e as
+       validações que a `contraproposta_por` cobra. Ter dois formulários pro
+       mesmo combinado é como eles passam a divergir — foi o que aconteceu com
+       a ficha do jogador até 26/08. */
+    return cx(`<div style="font:700 15px system-ui;color:var(--acc)">Preencher proposta de partida</div>
+      <div style="font-size:11.5px;color:var(--ink2);margin-top:5px;line-height:1.5">Data, horário, local, simples ou duplas e o tipo de quadra. ${nome0} responde aqui mesmo.</div>
+      <button onclick="_net.abrirContra('${m.id}')" style="width:100%;margin-top:12px;padding:11px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px system-ui;cursor:pointer">Enviar proposta de jogo</button>`);
+  }
+
+  if(meu){
+    // tela 71:289 — a minha proposta está na mesa
+    return cx(`<div style="font:700 15px system-ui;color:var(--acc)">Proposta de jogo enviada</div>
+      <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">Agora é só aguardar ${nome0} aceitar o desafio.</div>
+      ${pin}
+      ${_podeContrapor(m) ? `<div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="_net.abrirContra('${m.id}')" style="flex:1;padding:9px;border-radius:999px;border:1px solid var(--linha2);background:none;color:var(--ink);font:600 12px system-ui;cursor:pointer">Editar proposta</button>
+      </div>` : ''}`);
+  }
+
+  /* Proposta de quem está do outro lado. Aceitar e recusar NÃO nascem aqui —
+     eles moram no inbox, com o resumo do que está em jogo e a contagem do
+     anti-farm. Duplicar o ato de aceitar em duas telas é como as duas passam a
+     discordar sobre o que ele faz. */
+  return cx(`<div style="font:700 15px system-ui;color:var(--acc)">${nome0} propôs um jogo</div>
+    ${pin}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="_net.abrirInbox()" style="flex:1;padding:9px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 12px system-ui;cursor:pointer">Ver proposta</button>
+      ${_podeContrapor(m) ? `<button onclick="_net.abrirContra('${m.id}')" style="flex:1;padding:9px;border-radius:999px;border:1px solid var(--linha2);background:none;color:var(--ink);font:600 12px system-ui;cursor:pointer">Propor outro dia</button>` : ''}
+    </div>`);
+}
+
 function netRenderChat(){
   if(!_chat) return;
   const podeApagar = (m)=> m.autor_id===MEU_UID || _chat.dono_id===MEU_UID || window.__ehAdm;
@@ -4139,31 +4273,47 @@ function netRenderChat(){
 
   const corpo = _chat.carregando ? `<div style="color:var(--ink3);font-size:12.5px;padding:18px 0;text-align:center">Carregando a conversa…</div>`
     : _chat.erro ? `<div style="color:var(--dn);font-size:12.5px;padding:18px 0;text-align:center">Não deu pra ler a conversa.<br><span style="color:var(--ink3);font-size:11px">${_admEsc(_chat.erro)}</span></div>`
-    : bolhas || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
+    : (_propCard() + bolhas) || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
 
   const ehPartida = _chat.sala === _SALAS.partida;
   /* o campo só existe enquanto a sala está ABERTA — na partida encerrada a
      policy recusaria o insert, e campo que devolve erro não é campo */
   const entrada = _chat.aberta ? `
     <div style="display:flex;gap:8px;align-items:flex-end">
-      <textarea id="net-chat-in" rows="1" maxlength="500" placeholder="${ehPartida?'Tô chegando, atrasei 10, leva bola…':'Escreve aí…'}"
+      <textarea id="net-chat-in" rows="1" maxlength="500" placeholder="${ehPartida?'Tô chegando, atrasei 10, leva bola…':'Enviar mensagem'}"
         oninput="_net.chatDigitou(this.value);this.style.height='auto';this.style.height=Math.min(96,this.scrollHeight)+'px'"
-        style="flex:1;padding:11px 13px;border-radius:14px;border:1px solid var(--linha2);background:var(--bg);color:#fff;
+        style="flex:1;padding:12px 16px;border-radius:999px;border:1px solid var(--linha2);background:var(--bg);color:#fff;
                font:400 13.5px system-ui;resize:none;max-height:96px;line-height:1.4">${_admEsc(_chat.rascunho||'')}</textarea>
-      <button onclick="_net.chatEnviar()" style="flex:0 0 auto;padding:11px 16px;border-radius:14px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer">Enviar</button>
-    </div>
-    <div style="font-size:10.5px;color:var(--ink3);margin-top:7px">Mensagem não se edita — se errou, apaga e manda de novo. ${ehPartida?'Só vocês dois leem, e a conversa fecha com a partida.':'Só quem é da comunidade lê.'}</div>`
+      <button onclick="_net.chatEnviar()" aria-label="Enviar" style="flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:none;background:var(--acc);color:var(--acc-ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center">➤</button>
+    </div>`
   : `<div style="font-size:11.5px;color:var(--ink3);text-align:center;padding:10px 0 2px">A partida encerrou — a conversa fica, mas não recebe mais mensagem.</div>`;
 
-  _sheet('net-chat', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="min-width:0">
-        <div style="font:700 17px system-ui">${_chat.sala.titulo}</div>
-        <div style="font-size:11.5px;color:var(--ink2)">${ehPartida?'com ':''}${_admEsc(_chat.nome||'')}</div>
-      </div>
-      <button onclick="_net.fecharChat()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer;flex:0 0 auto">×</button></div>
+  /* O CABEÇALHO DO BOARD: volta, avatar do outro, nome e o estado. Na sala de
+     GRUPO não há "o outro" — o avatar sai e o subtítulo diz o que a sala é. */
+  const visto = ehPartida && _chat.advId ? _vistoTxt(_chat.advId) : null;
+  const face  = ehPartida && _chat.advId ? _discoUid(_chat.advId, 44)
+              : `<div style="width:44px;height:44px;border-radius:50%;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 44px">💬</div>`;
+  const sub   = ehPartida
+    ? (visto ? `<span style="color:${visto.on?'var(--acc)':'var(--ink3)'}">${visto.txt}</span>` : 'Conversa da partida')
+    : 'Conversa da comunidade';
 
-    <div id="net-chat-lista" style="max-height:46vh;overflow-y:auto;margin:12px 0 10px;padding-right:2px">${corpo}</div>
-    ${entrada}`);
+  _sheet('net-chat', `
+    <div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:max(10px,env(safe-area-inset-top)) 16px 13px;border-bottom:1px solid var(--linha3)">
+      <button onclick="_net.fecharChat()" aria-label="Voltar" style="width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--linha3);background:none;color:var(--ink2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center">‹</button>
+      ${face}
+      <div style="flex:1;min-width:0">
+        <div style="font:700 16px system-ui;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_admEsc(_chat.nome||'')}</div>
+        <div style="font-size:11.5px;margin-top:1px;color:var(--ink2)">${sub}</div>
+      </div>
+    </div>
+
+    <div id="net-chat-lista" style="flex:1;min-height:0;overflow-y:auto;padding:14px 16px">
+      <div style="text-align:center;font-size:11px;color:var(--ink3);margin-bottom:4px">Hoje</div>
+      ${corpo}
+    </div>
+
+    <div style="flex:0 0 auto;padding:10px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--linha)">${entrada}</div>`,
+    { cheia:true });
 
   // o fim da conversa é o que interessa: abre no rodapé, não no topo
   const lista = document.getElementById('net-chat-lista');
@@ -6559,6 +6709,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
      silêncio nas DUAS folhas que o usam (desafiar e lançar na mão): o horário
      escolhido nunca chegava em `_on.quando` e a partida saía sem hora. */
   onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
+  onPiso:_onPiso,   // (83) saibro | dura | rapida
   cancelarDesafio:netCancelarDesafio,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
   verProfessor:netVerProfessor, vpEstrela:_vpEstrela, enviarElogio:_vpEnviar, turmasAbertas:netTurmasAbertas,
