@@ -6712,6 +6712,12 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   onPiso:_onPiso,   // (83) saibro | dura | rapida
   cancelarDesafio:netCancelarDesafio,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
+  /* (30/08) `trofeusDe` já existia desde 18/08, escrita com este uso em mente
+     — o comentário dela diz "a ficha do outro jogador precisa dos troféus
+     dele". Ficou fora da ponte, e por isso a aba Conquistas do oponente passou
+     doze dias em casca dizendo que "precisa de uma consulta nova". Precisava
+     era de uma linha aqui. */
+  trofeusDe:netTrofeusDe,
   verProfessor:netVerProfessor, vpEstrela:_vpEstrela, enviarElogio:_vpEnviar, turmasAbertas:netTurmasAbertas,
   abrirPatches:netAbrirPatches, fecharPatches:netFecharPatches, patDigitou:_patDigitou,
   patMandando:_patMandando, patCriar:_patCriar, patMandar:_patMandar,

@@ -315,6 +315,16 @@ button,input,select{font:inherit;color:inherit}
 .selo b{font-size:7px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);font-weight:700}
 .selo.off{opacity:.28}
 
+/* a grade de conquistas do outro jogador (board 159:1470) — escudos, não os
+   círculos de `.selo`: aqueles são a lista fixa de quem está logado. */
+.cgrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:10px;margin-top:10px}
+.cselo{aspect-ratio:5/6;border:1px solid var(--linha2);border-radius:10px;background:var(--sup);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px;text-align:center}
+.cselo i{font-style:normal;font-size:20px;color:var(--gold);line-height:1}
+.cselo b{font:700 7.5px var(--f-ui);letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cselo small{font:700 7px var(--f-ui);color:var(--ink3)}
+
 /* abas */
 .abas{display:flex;border-bottom:1px solid var(--linha);padding:0 var(--pad-lado);gap:20px;position:sticky;top:0;background:var(--bg);z-index:3}
 .abas button{background:none;border:0;padding:12px 0;font-size:12.5px;color:var(--ink3);
@@ -1527,7 +1537,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788058645"></script>
+<script src="net.js?v=1788058979"></script>
 
 <script>
 /* =========================================================================
@@ -2541,7 +2551,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788058645"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788058979"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2673,7 +2683,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788058645"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788058979"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2902,13 +2912,18 @@ function perfilCarregar(id){
   window.__perfCache = window.__perfCache || {};
   if(window.__perfCache[id] !== undefined) return;
   window.__perfCache[id] = null;                    // null = carregando
-  if(!(window._net && _net.feed)){ window.__perfCache[id] = {posts:[], avals:[], podeAvaliar:[]}; return }
-  Promise.all([ _net.feed({autor:id}), _net.avaliacoes(id), _net.partidasParaAvaliar(id) ])
-    .then(([posts, avals, podeAvaliar])=>{
-      window.__perfCache[id] = {posts, avals, podeAvaliar};
+  const vazio = {posts:[], avals:[], podeAvaliar:[], trofeus:[]};
+  if(!(window._net && _net.feed)){ window.__perfCache[id] = vazio; return }
+  Promise.all([ _net.feed({autor:id}), _net.avaliacoes(id), _net.partidasParaAvaliar(id),
+                /* os troféus DELE. `trofeus_sel` é `for select using (true)`
+                   (mig 13) — troféu é fato público, quem ganhou ganhou —,
+                   então não há o que decidir de acesso aqui. */
+                _net.trofeusDe(id) ])
+    .then(([posts, avals, podeAvaliar, trofeus])=>{
+      window.__perfCache[id] = {posts, avals, podeAvaliar, trofeus:trofeus||[]};
       render();
     })
-    .catch(()=>{ window.__perfCache[id] = {posts:[], avals:[], podeAvaliar:[]}; render(); });
+    .catch(()=>{ window.__perfCache[id] = vazio; render(); });
 }
 /* escrever uma avaliação. A policy exige partida CONFIRMADA contra a pessoa e
    uma por partida — a tela só mostra o campo quando existe partida elegível,
@@ -2920,6 +2935,29 @@ async function avaliarEnviar(alvo, matchId){
   window.__perfCache[alvo] = undefined;             // força recarregar
   toast('Avaliação publicada.');
   perfilCarregar(alvo); render();
+}
+
+/* A GRADE DE CONQUISTAS do board (tela 21, node 159:1470) — 30/08.
+   Escudos em grade, e não os círculos de `.selo`: os `.selo` desenham a lista
+   FIXA de selos do app (estado local de quem está logado, `S.selos`), e os
+   troféus do outro vêm do banco, são variáveis em número e cada um tem
+   temporada. Duas coisas diferentes com a mesma cara confundiriam as duas.
+
+   ⚠️ SÓ DESENHA O QUE O BANCO DEVOLVE. `trofeus_temporada` tem hoje dois tipos
+   (`reinado` e `coroa`, mig 13) — os cinco escudos que o board mostra (100
+   VITÓRIAS, DESAFIADOR TOP 100, REGULAR C1, FAIR PLAY, 10 TORNEIOS) são
+   ilustração do designer, não uma lista que exista em algum lugar. Desenhar os
+   cinco fixos seria inventar conquista sobre pessoa real. */
+const TROFEU_IC = { reinado:'♛', coroa:'♦' };
+function trofeusHtml(lista, nome0){
+  const l = lista || [];
+  if(!l.length) return `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">♦</i>${nome0} ainda não tem conquista nenhuma. Elas vêm do cinturão e do fim de temporada.</div></div>`;
+  return `<div class="cgrade">${l.map(t=>`
+      <div class="cselo" title="${(t.etiqueta||t.nome||'').replace(/"/g,'&quot;')}">
+        <i>${TROFEU_IC[t.tipo] || '♦'}</i>
+        <b>${(t.nome || t.tipo || '').replace(/</g,'&lt;')}</b>
+        ${t.temporada ? `<small>T${t.temporada}</small>` : ''}
+      </div>`).join('')}</div>`;
 }
 
 /* ===== COMUNIDADE — TELAS 12 a 17 DO BOARD (29/08, Fase 2) ================
@@ -3868,7 +3906,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788058645"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788058979"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -5882,7 +5920,15 @@ jogador(p){
               : `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">♦</i>Ninguém escreveu sobre ${nome(p.id).split(' ')[0]} ainda.</div></div>`;
             return escrever + lista;
           })()))
-    : aba==='conq' ? cascaNota('As conquistas de OUTRA pessoa não são carregadas hoje: o app só busca os troféus de quem está logado. Precisa de uma consulta nova, não de tela.')
+    /* 30/08 — SAIU DA CASCA. A casca dizia "precisa de uma consulta nova" e
+       não precisava: a `netTrofeusDe(uid)` existe desde 18/08, escrita com
+       exatamente este uso em mente, e a policy `trofeus_sel` é
+       `for select using (true)` porque troféu é fato público. O que faltava
+       era a linha na ponte. Doze dias de casca por uma consulta que já estava
+       pronta — vale a lição: antes de escrever "não existe", grepar. */
+    : aba==='conq' ? (carregando
+        ? '<div class="card"><p class="nota">Carregando as conquistas…</p></div>'
+        : trofeusHtml(dados.trofeus, nome(p.id).split(' ')[0]))
     : `
       <div class="pstats">
         <div><div class="v">${venci}</div><div class="k"><i class="ic">♦</i>Vitórias suas</div></div>
