@@ -1442,51 +1442,69 @@ button,input,select{font:inherit;color:inherit}
 .ini .mcard .mtx small{font-size:var(--t-caption);color:var(--ink3)}
 .ini .mcard .mv{margin-left:auto;font-family:var(--f-disp);font-size:var(--t-body);font-weight:700;color:var(--up)}
 
-/* ===== AMBIENTE NOTURNO — a mesma quadra Saibro Noturno corre por baixo das telas internas ===== */
+/* ===== O FUNDO DAS TELAS INTERNAS =====
+   02/09 — A QUADRA SAI DE BAIXO DAS TELAS INTERNAS.
+
+   Até aqui a mesma foto (Saibro Noturno) corria por baixo de tudo o que não
+   fosse a home, e sobre ela havia um SISTEMA INTEIRO construído para
+   sobreviver à foto: cartões de vidro marrom `rgba(30,23,20,.74)`, topo e
+   barra em `rgba(21,16,13,.6)`, blur de 10 a 12px em oito superfícies, e
+   sombra de texto em todo rótulo que pousasse direto na quadra.
+
+   No arquivo NENHUMA tela interna tem foto: são #0B0B0B com o brilho radial
+   lime, e as superfícies são os quase-pretos da paleta. Por isso o marrom sai
+   junto com a foto — ele não era uma escolha de cor, era a resposta a ela.
+   Mantido sobre fundo chapado, daria marrom sobre preto, que é a divergência
+   que mais se via nas telas internas.
+
+   Some junto tudo o que só existia por causa da foto:
+     · o blur (não há o que desfocar atrás de uma cor chapada, e ele custa
+       composição a cada rolagem no aparelho)
+     · a sombra de texto (existia pra o rótulo não brigar com o saibro)
+     · a régua translúcida do topo, que virou a régua sólida do board
+
+   ⚠️ A FOTO NÃO MORREU. Ela continua sendo o fundo da HOME (que no arquivo
+   TEM foto, node 35:771) e do VESTIÁRIO, que pintam a própria cena — as duas
+   rotas que o `render()` marca como `cenaPropria`. O que muda é só o que
+   corre por baixo das telas internas. */
 #amb{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .25s;
-  background:
-    linear-gradient(180deg,rgba(11,8,6,.64) 0%,rgba(11,8,6,.44) 15%,rgba(11,8,6,.42) 46%,rgba(11,8,6,.58) 70%,rgba(11,8,6,.90) 100%),
-    var(--cena-url,url('../quadras/saibro-noite.jpg')) center 14% / cover no-repeat;}
-#fone.noturno #amb{opacity:1}
-/* topo e nav viram vidro pra a quadra correr contínua por baixo */
-/* 29/08 — a régua do topo sobe de .18 pra .55 de opacidade. O board desenha um
-   divisor VISÍVEL abaixo do topo, e a .18 sumia. Mas ela não vira `--linha3`
-   opaca: aqui o topo é vidro fosco com a quadra correndo por baixo — coisa que
-   o board não tem, porque o fundo dele é chapado. Uma linha sólida em cima do
-   blur endurece a borda e denuncia o recorte do vidro. Translúcida e mais
-   forte chega ao mesmo lugar sem desmanchar o material. */
-#fone.noturno .topo{background:rgba(21,16,13,.60);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:rgba(99,100,97,.55)}
-#fone.noturno .nav{background:rgba(21,16,13,.64);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top-color:rgba(122,106,92,.18)}
-/* superfícies flutuam como painéis de vidro sobre a quadra */
+  background:#0B0B0B}
+#fone.noturno #amb{opacity:1;background:#0B0B0B}
+/* o brilho do arquivo, a mesma camada que já vale na home e no cadastro */
+#fone.noturno #amb::after{content:"";position:absolute;inset:0;background:var(--brilho)}
+
+/* topo e barra: o #0A1100 do arquivo (bg/header), chapado. */
+#fone.noturno .topo{background:#0A1100;border-bottom-color:var(--linha3)}
+#fone.noturno .nav{background:#0A1100;border-top-color:var(--linha3)}
+
+/* as superfícies: o `surface/card` do arquivo, rgba(11,11,11,.8). */
 #fone.noturno .card,
 #fone.noturno .tab,
 #fone.noturno .placar,
-#fone.noturno .mexeu{background:rgba(30,23,20,.74);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:rgba(122,106,92,.30)}
-#fone.noturno .card.clic:active{background:rgba(40,32,26,.84)}
-#fone.noturno .stats{background:rgba(122,106,92,.18);border-color:rgba(122,106,92,.30)}
-#fone.noturno .stats>div{background:rgba(30,23,20,.70);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-#fone.noturno .tab .cab{border-bottom-color:rgba(122,106,92,.2)}
-#fone.noturno .ln{border-bottom-color:rgba(122,106,92,.14)}
-#fone.noturno .ln.eu{background:rgba(201,102,60,.15)}
-#fone.noturno .selo{background:rgba(30,23,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-color:rgba(122,106,92,.22)}
-#fone.noturno .sets b{background:rgba(30,23,20,.62)}
-/* 15/08 — o `:not(.on)` é o conserto, e a razão é de especificidade.
-   Este seletor tem ID (1,2,0) e o `.chip.on` tem só classes (0,2,0), então no
-   modo noturno o fundo translúcido escuro ganhava do fundo claro do chip
-   SELECIONADO — que continuava com `color:var(--acc-ink)`, quase preto. Dava
-   preto sobre preto: 1,05:1 medido, contra os 4,5:1 que o WCAG AA pede pra
-   texto pequeno. Fora do noturno o mesmo chip dá 19,07:1.
-   O vidro fosco existe pra o chip NÃO escolhido se dissolver na cena; o
-   escolhido precisa do oposto, então ele fica de fora da regra. */
-#fone.noturno .chip:not(.on){background:rgba(30,23,20,.60);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#fone.noturno .abas{background:rgba(21,16,13,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-#fone.noturno #toast{background:rgba(36,28,24,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-/* o hero deixa a quadra aparecer e ganha um respiro de luz lime no topo, como a celebra */
-#fone.noturno .hero{background:radial-gradient(120% 80% at 50% 0%,rgba(198,255,61,.07),transparent 60%);border-bottom-color:rgba(122,106,92,.18)}
-/* texto que pousa direto na quadra (rótulos de seção, herói, notas soltas) ganha respiro pra não brigar com o saibro */
-#fone.noturno .rot,
-#fone.noturno .hero .nm,#fone.noturno .hero .n,#fone.noturno .hero .sub,#fone.noturno .hero .lb,#fone.noturno .hero .d,
-#fone.noturno .sec>.nota,#fone.noturno .vazio{text-shadow:0 1px 10px rgba(11,8,6,.85),0 1px 2px rgba(11,8,6,.7)}
+#fone.noturno .mexeu{background:rgba(11,11,11,.8);border-color:var(--linha)}
+#fone.noturno .card.clic:active{background:rgba(24,24,24,.9)}
+#fone.noturno .stats{background:transparent;border-color:var(--linha)}
+#fone.noturno .stats>div{background:rgba(11,11,11,.8)}
+#fone.noturno .tab .cab{border-bottom-color:var(--linha4)}
+#fone.noturno .ln{border-bottom-color:var(--linha4)}
+/* a minha linha na tabela: era um lavado do laranja da camisa sobre a quadra.
+   Sobre fundo chapado o mesmo lavado some, e o lime é quem marca "sou eu" no
+   resto do app. */
+#fone.noturno .ln.eu{background:rgba(131,224,0,.10)}
+#fone.noturno .selo{background:rgba(18,18,18,.6);border-color:var(--linha2)}
+#fone.noturno .sets b{background:rgba(18,18,18,.6)}
+/* 15/08 — o `:not(.on)` continua sendo o conserto, e a razão continua sendo de
+   especificidade: este seletor tem ID (1,2,0) e o `.chip.on` tem só classes
+   (0,2,0), então sem ele o fundo escuro ganharia do fundo claro do chip
+   ESCOLHIDO, que segue com `color:var(--acc-ink)` quase preto. Dava 1,05:1
+   contra os 4,5:1 do AA. O material mudou; a armadilha de cascata não. */
+#fone.noturno .chip:not(.on){background:rgba(18,18,18,.6)}
+#fone.noturno .abas{background:transparent}
+#fone.noturno #toast{background:rgba(18,18,18,.94)}
+/* o respiro de luz lime no topo do herói fica: ele é do arquivo (o mesmo
+   brilho), não da foto. */
+#fone.noturno .hero{background:radial-gradient(120% 80% at 50% 0%,rgba(131,224,0,.07),transparent 60%);
+  border-bottom-color:var(--linha)}
 
 /* ===== VESTIÁRIO / PERSONALIZAR ===== */
 .ini .boneco{cursor:pointer}
@@ -2048,7 +2066,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788369248"></script>
+<script src="net.js?v=1788369634"></script>
 
 <script>
 /* =========================================================================
@@ -3093,7 +3111,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788369248"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788369634"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3225,7 +3243,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788369248"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788369634"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4607,7 +4625,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788369248"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788369634"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
