@@ -48,7 +48,17 @@
   --acc:#83E000; --acc-ink:#0A1100;          /* lime = seleção/ativo */
   --up:#83E000; --up-bg:#16240A;             /* o lime da bola premia */
   --dn:#E8433C; --dn-bg:#2B0F0C;             /* vermelho, não laranja */
-  --marca:#FF6A00; --marca-ink:#FFFEFD;      /* laranja = ação */
+  /* 02/09 — o RÓTULO do laranja deixa de ser branco.
+     É a única falha de contraste real do arquivo (§7, R3): #FFFEFD sobre
+     #FF6A00 dá 2,87:1 e reprova o AA em texto normal (4,5:1) e até em texto
+     grande (3:1). Afeta o CTA principal — "Ver oponentes no seu radar",
+     "Publicar", "Convidar", "Aplicar filtros" —, ou seja, o botão que mais
+     importa em cada tela. Com #0A1100 sobe pra 6,7:1.
+     E não é invenção minha: #0A1100 é exatamente o que o próprio arquivo já
+     usa como texto sobre o lime. O laranja passa a seguir a mesma regra do
+     verde em vez de ter uma própria. A COR DE MARCA não muda — a alternativa
+     era escurecer o laranja pra ~#C24E00, e essa sim mexeria na identidade. */
+  --marca:#FF6A00; --marca-ink:#0A1100;      /* laranja = ação */
   --gold:#E0C48A; --gold-bg:#26220F;
   --r:14px; --rp:999px;
   /* 29/08 — A MARGEM LATERAL, agora proporcional.
@@ -97,8 +107,19 @@
    `dvh` é a altura DINÂMICA: acompanha a barra aparecendo e sumindo. Quem não
    entende a unidade ignora a segunda linha e fica no comportamento de antes. */
 html,body{height:100%;height:100dvh}
+/* 01/09 — O FUNDO DAS TELAS, pelo código dos nodes (10 de 10 telas do Figma
+   têm a mesma camada, ex. node 28:155 no Radar): base #0A1100 com um brilho
+   RADIAL lime (#83E000 a 10%) descendo do canto superior direito.
+   O app tinha #060A00 chapado — é a divergência que mais aparece no
+   levantamento: 50 ocorrências nas 10 telas.
+   ⚠️ Na HOME ele quase não se vê, porque lá a foto da quadra fica na frente
+   dele. Nas telas sem foto, ele É o fundo. */
 body{
-  background:#060A00;color:var(--ink);font:14px/1.5 var(--f-ui);
+  /* usa a var(--brilho) que já existia desde 29/08 e nunca tinha sido ligada em
+     lugar nenhum — o brilho estava definido e apagado. Base #0A1100, que é a cor
+     do node, no lugar do #060A00 que estava aqui. */
+  background:var(--brilho), #0a1100;
+  color:var(--ink);font:14px/1.5 var(--f-ui);
   display:flex;align-items:center;justify-content:center;
   -webkit-font-smoothing:antialiased;
 }
@@ -142,7 +163,7 @@ button,input,select{font:inherit;color:inherit}
 }
 .topo.temvoltar .voltar{display:flex}
 .topo h1{
-  font-family:var(--f-disp);font-size:17px;font-weight:700;text-transform:uppercase;
+  font-family:var(--f-disp);font-size:var(--t-title-s);font-weight:700;text-transform:uppercase;
   letter-spacing:.07em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .topo .dir{font-size:11px;color:var(--ink3);white-space:nowrap}
@@ -160,11 +181,18 @@ button,input,select{font:inherit;color:inherit}
 #tela::-webkit-scrollbar{width:0}
 .pad{padding:16px var(--pad-lado)}
 .sec{padding:18px var(--pad-lado) 0}
-.rot{
-  font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);
-  font-weight:700;margin-bottom:11px;display:flex;justify-content:space-between;align-items:baseline;
-}
-.rot span{letter-spacing:0;text-transform:none;font-size:10.5px;font-weight:400}
+/* 01/09 — O TÍTULO DE SEÇÃO DO FIGMA é branco, caixa normal, sem tracking
+   (conferido em 6 telas do levantamento: Radar, Feed, Ranking, Grupos, Feed do
+   grupo e Perfil). O app usava rótulo miúdo em CAIXA ALTA cinza em todas.
+   A variante `.rot.tit` com o desenho certo existia desde 29/08 e nunca foi
+   aplicada em lugar nenhum — então em vez de trocar dezenas de chamadas, a
+   BASE passa a ser a do Figma, e o rótulo miúdo vira a variante `.rot.mini`
+   pra onde ele ainda fizer sentido. */
+.rot{font-size:var(--t-body);letter-spacing:0;text-transform:none;color:var(--ink);
+  font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:baseline}
+.rot span{font-size:var(--t-caption);color:var(--ink3);font-weight:400}
+.rot.mini{font-size:var(--t-nav);letter-spacing:.16em;text-transform:uppercase;color:var(--ink3)}
+.rot span{letter-spacing:0;text-transform:none;font-size:var(--t-caption);font-weight:400}
 /* 29/08 — O RÓTULO DAS TELAS DO BOARD. No app o `.rot` é o texto mais FRACO da
    tela: 9,5px, caixa alta, tracking largo, `--ink3`. No board ele é dos mais
    FORTES — "Notícias do tennis", "Seus Grupos" são 15px brancos, caixa normal,
@@ -176,23 +204,26 @@ button,input,select{font:inherit;color:inherit}
    telas e desarrumaria as outras. */
 .rot.tit{font-size:15px;letter-spacing:0;text-transform:none;color:var(--ink);
   font-weight:700;margin-bottom:12px}
-.rot.tit span{font-size:11px;color:var(--ink3)}
+.rot.tit span{font-size:var(--t-caption);color:var(--ink3)}
 /* a notícia tem rótulo próprio (`.news-rot`) porque nasceu na home; no escopo
    `.noticias` ela é o título da seção, então segue a mesma regra */
 .noticias .news-rot{font-size:15px;letter-spacing:0;text-transform:none;
   color:var(--ink);font-weight:700;margin-bottom:11px}
 
 /* ---------- componentes ---------- */
+/* 01/09 — o card do Figma tem raio 20 e NÃO tem stroke: o contorno vem de um
+   segundo retângulo em rgba(11,11,11,.2) deslocado 2px (node 28:149 e outros 6).
+   O app usava raio 14 e borda #1B2320, que é linha de divisor, não de card. */
 .card{
-  background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);
+  background:var(--sup);border:1px solid rgba(11,11,11,.2);border-radius:20px;
   padding:14px;margin-bottom:10px;
 }
 .card.clic{cursor:pointer;transition:.12s}
 .card.clic:active{background:var(--sup2)}
 .linha-item{display:flex;align-items:center;gap:12px}
 .linha-item .txt{flex:1;min-width:0}
-.linha-item .txt b{font-size:13.5px;font-weight:650;display:block;letter-spacing:-.005em}
-.linha-item .txt small{font-size:11px;color:var(--ink3);display:block;margin-top:2px}
+.linha-item .txt b{font-size:var(--t-label);font-weight:650;display:block;letter-spacing:-.005em}
+.linha-item .txt small{font-size:var(--t-caption);color:var(--ink3);display:block;margin-top:2px}
 .linha-item .seta{color:var(--ink3);font-size:15px}
 
 /* avatar = boneco recortado + aro na cor da camisa (a cor é o identificador) */
@@ -232,7 +263,7 @@ button,input,select{font:inherit;color:inherit}
 .btn.gh{background:transparent;border:1px dashed var(--linha2);color:var(--ink3);
   text-transform:none;letter-spacing:0;font-weight:500}
 
-.nota{font-size:11px;color:var(--ink3);line-height:1.55;margin-top:2px}
+.nota{font-size:var(--t-caption);color:var(--ink3);line-height:1.55;margin-top:2px}
 .nota b{color:var(--ink2)}
 
 /* 29/08: CASCA — a marca de "esta tela está de pé, mas o dado por trás não
@@ -247,31 +278,31 @@ button,input,select{font:inherit;color:inherit}
 .casca{position:relative;border:1px dashed var(--marca);border-radius:var(--r);
   padding:26px 18px 18px;margin:10px 0;opacity:.78}
 .casca::before{content:'SEM DADO REAL';position:absolute;top:8px;left:14px;
-  font:700 8.5px var(--f-ui);letter-spacing:.14em;color:var(--marca)}
+  font:700 var(--t-nav) var(--f-ui);letter-spacing:.14em;color:var(--marca)}
 .casca .nota{color:var(--ink2)}
 
 /* grade de seleção (propor horário) */
 .grade{display:flex;flex-wrap:wrap;gap:8px}
 .chip{background:var(--sup);border:1px solid var(--linha2);color:var(--ink2);
-  padding:10px 14px;border-radius:var(--r);font-size:13px;cursor:pointer;min-width:52px;text-align:center}
+  padding:10px 14px;border-radius:var(--r);font-size:var(--t-label);cursor:pointer;min-width:52px;text-align:center}
 .chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 
 /* hero do jogador */
 .hero{padding:20px 18px 18px;border-bottom:1px solid var(--linha);position:relative}
 .hero .cab-hero{display:flex;align-items:center;gap:14px;margin-bottom:2px}
 .hero .cab-hero .txt{flex:1;min-width:0}
-.hero .nm{font-family:var(--f-disp);font-size:25px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.08}
-.hero .sub{font-size:11.5px;color:var(--ink3);margin-top:5px}
+.hero .nm{font-family:var(--f-disp);font-size:var(--t-title-l);font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.08}
+.hero .sub{font-size:var(--t-label);color:var(--ink3);margin-top:5px}
 .hero .linha-nivel{display:flex;align-items:flex-end;gap:11px;margin-top:16px}
-.hero .n{font-family:var(--f-disp);font-size:54px;font-weight:700;line-height:.85;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-.hero .d{font-family:var(--f-disp);font-size:17px;font-weight:700;padding-bottom:6px}
-.hero .lb{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);padding-bottom:8px;font-weight:700}
+.hero .n{font-family:var(--f-disp);font-size:var(--t-display);font-weight:700;line-height:.85;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.hero .d{font-family:var(--f-disp);font-size:var(--t-title-s);font-weight:700;padding-bottom:6px}
+.hero .lb{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);padding-bottom:8px;font-weight:700}
 
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--linha);
   border:1px solid var(--linha);border-radius:var(--r);overflow:hidden;margin-top:15px}
 .stats>div{background:var(--sup);padding:11px 10px}
-.stats .v{font-family:var(--f-disp);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
-.stats .k{font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);margin-top:3px;font-weight:700}
+.stats .v{font-family:var(--f-disp);font-weight:700;font-size:var(--t-title-m);font-variant-numeric:tabular-nums}
+.stats .k{font-size:var(--t-nav);letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);margin-top:3px;font-weight:700}
 
 /* tabela */
 .tab{background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);overflow:hidden}
@@ -281,23 +312,23 @@ button,input,select{font:inherit;color:inherit}
 .tab .cab .r{text-align:right}
 .tab .cab .c{text-align:center}
 .ln{display:grid;grid-template-columns:22px 30px 1fr 40px 48px;gap:8px;align-items:center;
-  padding:10px 12px;border-bottom:1px solid var(--linha);font-size:13px;cursor:pointer}
+  padding:10px 12px;border-bottom:1px solid var(--linha);font-size:var(--t-label);cursor:pointer}
 .ln .av{width:30px;height:30px;flex:0 0 30px}
 .ln:last-child{border-bottom:0}
 .ln.eu{background:var(--sup2)}
 .ln .pos{font-family:var(--f-disp);font-weight:700;font-size:14px;color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
 .ln.eu .pos{color:var(--acc)}
 .ln .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ln .nm small{display:block;font-weight:400;font-size:10.5px;color:var(--ink3);margin-top:1px}
-.ln .mv{font-size:11px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.ln .nm small{display:block;font-weight:400;font-size:var(--t-caption);color:var(--ink3);margin-top:1px}
+.ln .mv{font-size:var(--t-nav);font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
 .ln .mv.up{color:var(--up)} .ln .mv.dn{color:var(--dn)} .ln .mv.eq{color:var(--ink3);opacity:.45}
-.ln .pt{font-family:var(--f-disp);font-weight:700;text-align:right;font-size:15px;font-variant-numeric:tabular-nums}
+.ln .pt{font-family:var(--f-disp);font-weight:700;text-align:right;font-size:var(--t-caption);font-variant-numeric:tabular-nums}
 
 /* placar */
 .placar{background:var(--sup);border:1px solid var(--linha);border-radius:var(--r);padding:14px;margin-bottom:10px}
 .pl-lado{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0}
 .pl-lado+.pl-lado{border-top:1px solid var(--linha)}
-.pl-lado .q{display:flex;align-items:center;gap:9px;font-weight:650;font-size:13.5px;min-width:0}
+.pl-lado .q{display:flex;align-items:center;gap:9px;font-weight:650;font-size:var(--t-label);min-width:0}
 .pl-lado .q span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sets{display:flex;gap:6px;flex:0 0 auto}
 .sets b{
@@ -361,14 +392,14 @@ button,input,select{font:inherit;color:inherit}
 .podio{display:grid;grid-template-columns:1fr .88fr 1fr;align-items:end;gap:0;
   padding:24px 10px 0;background:transparent}
 .podio .col{display:flex;flex-direction:column;align-items:center;min-width:0}
-.podio .qnome{font:700 12px/1.3 var(--f-ui);color:var(--ink);text-align:center;
+.podio .qnome{font:700 var(--t-caption)/1.3 var(--f-ui);color:var(--ink);text-align:center;
   max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.podio .qpts{font:700 10.5px var(--f-ui);color:var(--acc);margin-top:2px;text-align:center}
+.podio .qpts{font:700 var(--t-caption) var(--f-ui);color:var(--acc);margin-top:2px;text-align:center}
 .podio .fig{margin:8px 0 0;height:96px;display:flex;align-items:flex-end;justify-content:center}
 .podio .col.p1 .fig{height:118px}
 .podio .deg{width:100%;background:linear-gradient(180deg,#F46400,#C85200);
   border-top:2px solid #5C2600;display:flex;align-items:flex-start;justify-content:center;
-  padding-top:9px;font:800 20px var(--f-ui);color:#5C2600}
+  padding-top:9px;font:800 var(--t-title-m) var(--f-ui);color:#5C2600}
 /* só as pontas externas arredondam — por dentro os degraus se encostam */
 .podio .col.p2 .deg{border-radius:6px 0 0 0}
 .podio .col.p3 .deg{border-radius:0 6px 0 0}
@@ -378,14 +409,32 @@ button,input,select{font:inherit;color:inherit}
 /* -- o cartão "sua classe" (tela 14, meio) -- */
 .cls-hero{margin-top:12px}
 .cls-hero .topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.cls-hero .letra{font:800 46px/0.9 var(--f-ui);color:var(--ink);display:flex;align-items:flex-start}
+.cls-hero .letra{font:800 var(--t-display)/0.9 var(--f-ui);color:var(--ink);display:flex;align-items:flex-start}
 .cls-hero .letra sup{font:800 17px var(--f-ui);color:var(--acc);margin-left:2px;top:.15em;position:relative}
 .cls-hero .dir{text-align:right}
-.cls-hero .dir b{font:700 15px var(--f-ui);color:var(--ink)}
-.cls-hero .dir .prox{color:var(--ink2);font-weight:700}
-.cls-hero .dir small{display:block;font:700 10.5px var(--f-ui);color:var(--acc);margin-top:3px}
-.cls-hero .barra{height:3px;border-radius:2px;background:var(--linha2);margin:12px 0 10px;overflow:hidden}
-.cls-hero .barra i{display:block;height:100%;background:var(--acc)}
+.cls-hero .dir b{font:700 var(--t-title-s) var(--f-ui);color:var(--ink)}
+/* 02/09: o "› B" é #BCBCBC no arquivo (node 174:1865), não o cinza-esverdeado
+   do --ink2. É a classe de DESTINO, e ela é deliberadamente apagada: quem tem
+   que puxar o olho ali é o "Faltam", que é lime. */
+.cls-hero .dir .prox{color:var(--ink3);font-weight:700}
+.cls-hero .dir small{display:block;font:700 var(--t-caption) var(--f-ui);color:var(--acc);margin-top:3px}
+/* 02/09 — a BARRA pelo node 174:1874: trilho de 6px em #0A1100 com raio 100 e
+   preenchimento lime. O app tinha 3px sobre --linha2 (#2A3430): metade da
+   altura e um trilho que se confunde com borda de cartão. O #0A1100 é o mesmo
+   quase-preto do cabeçalho — o trilho é um vazio, não uma linha. */
+.cls-hero .barra{height:6px;border-radius:100px;background:#0A1100;margin:12px 0 10px;overflow:hidden}
+.cls-hero .barra i{display:block;height:100%;border-radius:100px;background:var(--acc)}
+
+/* 02/09 — O ENVELOPE DA ABA RANKING (node 173:1809, "Rectangle 156").
+   Pódio, cartão da sua classe e a lista de classes NÃO são três blocos soltos
+   no arquivo: são o conteúdo de UM contêiner de 970 de largura, sem fundo,
+   com raio 30 (→ 12pt pela §5) e borda de 1px em #83E000. É a única borda
+   lime de tela cheia do board inteiro, e é ela que diz "isto aqui é o
+   ranking" — sem ela os três blocos leem como três assuntos.
+   Sem fundo de propósito: o que se vê por dentro é o fundo da tela. */
+.rk-env{border:1px solid var(--acc);border-radius:12px;padding:14px;margin-top:2px}
+.rk-env .podio{margin-top:2px}
+.rk-env .cls-hero{border:0;background:rgba(11,11,11,.8)}
 
 /* -- a lista de classes (tela 14, embaixo) --
    O board põe foto de quadra atrás de cada card. Foto de classe não existe no
@@ -394,11 +443,11 @@ button,input,select{font:inherit;color:inherit}
 .cls-card{position:relative;overflow:hidden;margin-top:10px;padding:15px;
   border:1px solid var(--linha2);border-radius:var(--r);
   background:linear-gradient(105deg,var(--sup2) 0%,var(--sup) 55%,rgba(131,224,0,.07) 100%);cursor:pointer}
-.cls-card b{font:700 15px var(--f-ui);color:var(--acc)}
-.cls-card p{font:400 11.5px/1.45 var(--f-ui);color:var(--ink2);margin:3px 0 0}
+.cls-card b{font:700 var(--t-title-s) var(--f-ui);color:var(--acc)}
+.cls-card p{font:400 var(--t-caption)/1.45 var(--f-ui);color:var(--ink2);margin:3px 0 0}
 .cls-card .pe{display:flex;align-items:center;justify-content:space-between;margin-top:16px}
-.cls-card .pe .faixa{font:700 11.5px var(--f-ui);color:var(--ink)}
-.cls-card .pe .ver{font:600 11px var(--f-ui);color:var(--ink2)}
+.cls-card .pe .faixa{font:700 var(--t-nav) var(--f-ui);color:var(--ink)}
+.cls-card .pe .ver{font:600 var(--t-nav) var(--f-ui);color:var(--ink2)}
 .cls-card.aqui{border-color:var(--acc)}
 
 /* -- o cabeçalho da classe e as linhas (tela 13 · node 176:1884) -- */
@@ -413,7 +462,7 @@ button,input,select{font:inherit;color:inherit}
 .cls-cab{display:flex;align-items:center;margin:4px 0 6px;min-height:37px}
 .cls-cab .cbadge{position:relative;z-index:2;margin-right:-14px}
 .cls-cab .risco{flex:1;position:relative;z-index:1}
-.cls-cab .faixa{margin-left:11px}
+.cls-cab .faixa{margin-left:var(--t-nav)}
 /* `cbadge` e não `chip`: `.chip` JÁ EXISTE no app (a pílula de filtro do radar)
    e tem a regra `#fone.noturno .chip:not(.on)`, que é mais específica que
    qualquer `.cls-cab .chip` e repintava o fundo de escuro — sobrando texto
@@ -433,10 +482,10 @@ button,input,select{font:inherit;color:inherit}
    borda direita. Com o nome de largura real a distância chegava a ~285px, e os
    dois deixavam de se ler como uma coisa só. */
 .rk-ln .l1{display:flex;align-items:baseline;gap:12px;min-width:0}
-.rk-ln .nm b{flex:0 1 auto;font:700 13.5px var(--f-ui);color:var(--ink);
+.rk-ln .nm b{flex:0 1 auto;font:700 var(--t-label) var(--f-ui);color:var(--ink);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rk-ln.p1 .nm b{color:var(--marca)}
-.rk-ln .nm small{display:block;font:600 10.5px var(--f-ui);color:var(--ink2)}
+.rk-ln .nm small{display:block;font:600 var(--t-caption) var(--f-ui);color:var(--ink2)}
 /* no board o pódio colore a LINHA INTEIRA, não só o número: a linha de pontos
    acompanha a posição. Sem isso o 1º lugar sai laranja em cima e cinza embaixo,
    e a cor deixa de significar "este é o primeiro" pra significar "esta palavra
@@ -452,10 +501,10 @@ button,input,select{font:inherit;color:inherit}
 .post{margin-top:10px;padding:15px;border:1px solid var(--linha);border-radius:var(--r);background:var(--sup)}
 .post .cab{display:flex;align-items:center;gap:11px}
 .post .cab .txt{flex:1;min-width:0}
-.post .cab b{display:block;font:700 13.5px var(--f-ui);color:var(--ink)}
-.post .cab small{font:600 10.5px var(--f-ui);color:var(--ink2)}
+.post .cab b{display:block;font:700 var(--t-label) var(--f-ui);color:var(--ink)}
+.post .cab small{font:600 var(--t-caption) var(--f-ui);color:var(--ink2)}
 .post .cab .men{background:none;border:0;color:var(--ink2);font-size:17px;cursor:pointer;padding:0 2px;line-height:1}
-.post .corpo{font:400 12.5px/1.45 var(--f-ui);color:var(--ink);margin-top:16px;white-space:pre-wrap;word-break:break-word}
+.post .corpo{font:400 var(--t-body)/1.45 var(--f-ui);color:var(--ink);margin-top:16px;white-space:pre-wrap;word-break:break-word}
 /* o board separa post de post mais do que separa o post do que vem antes dele */
 .post + .post{margin-top:20px}
 
@@ -484,7 +533,13 @@ button,input,select{font:inherit;color:inherit}
   border:1px solid var(--linha2);border-radius:8px;overflow:hidden;cursor:pointer;
   background:linear-gradient(150deg,var(--sup2),var(--sup))}
 .gcard .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font:800 34px var(--f-ui);color:var(--linha2)}
+  font:800 var(--t-display) var(--f-ui);color:var(--linha2)}
+/* a capa cobre o cartão e o rodapé fica por cima dela — o `.pe` já tem
+   gradiente próprio, então o nome continua legível sobre qualquer foto.
+   A inicial e a capa NUNCA convivem: as duas são `inset:0`, e desenhar as
+   duas poria a letra em cima da foto. Quem tem capa não desenha inicial. */
+.gcard .capa{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.gcard .pe{position:relative;z-index:1}
 .gcard .pe{position:absolute;left:0;right:0;bottom:0;padding:10px;
   background:linear-gradient(transparent,rgba(0,0,0,.85))}
 /* DUAS linhas, e não reticências. No board o cartão mede 28% e o nome cabe
@@ -509,29 +564,52 @@ button,input,select{font:inherit;color:inherit}
 .gnovo .mais::before,.gnovo .mais::after{content:'';position:absolute;background:var(--acc)}
 .gnovo .mais::before{left:0;right:0;top:11px;height:2px}
 .gnovo .mais::after{top:0;bottom:0;left:11px;width:2px}
-.gnovo b{font:700 14px var(--f-ui);color:var(--ink)}
-.gnovo p{font:400 11.5px/1.45 var(--f-ui);color:var(--ink2);margin:3px 0 0}
+.gnovo b{font:700 var(--t-title-s) var(--f-ui);color:var(--ink)}
+.gnovo p{font:400 var(--t-caption)/1.45 var(--f-ui);color:var(--ink2);margin:3px 0 0}
 
 /* -- hero do grupo (tela 17) -- */
+/* a capa do grupo e o botão de trocar. O botão fica no canto de cima, acima
+   da foto e fora do `.dentro` — dentro dele o gradiente do texto passaria por
+   cima e ele sumiria justamente sobre as fotos claras. */
+.ghero .capa{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ghero .capa-bt{position:absolute;top:10px;right:10px;z-index:2;cursor:pointer;
+  padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.28);
+  background:rgba(0,0,0,.45);color:#fff;font:600 var(--t-nav) var(--f-ui);
+  backdrop-filter:blur(4px)}
 .ghero{position:relative;border:1px solid var(--linha2);border-radius:var(--r);overflow:hidden;
   background:linear-gradient(150deg,var(--sup2),var(--sup));min-height:150px;display:flex;align-items:flex-end}
-.ghero .dentro{position:relative;width:100%;padding:15px;
+.ghero .dentro{position:relative;z-index:1;width:100%;padding:15px;
   background:linear-gradient(transparent,rgba(0,0,0,.7))}
 .ghero .l1{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-.ghero h3{font:700 19px var(--f-ui);color:var(--ink);margin:0}
-.ghero .mem{font:700 11px var(--f-ui);color:var(--ink);white-space:nowrap}
-.ghero p{font:400 11px/1.5 var(--f-ui);color:var(--ink2);margin:8px 0 0}
+.ghero h3{font:700 var(--t-title-m) var(--f-ui);color:var(--ink);margin:0}
+.ghero .mem{font:700 var(--t-nav) var(--f-ui);color:var(--ink);white-space:nowrap}
+.ghero p{font:400 var(--t-caption)/1.5 var(--f-ui);color:var(--ink2);margin:8px 0 0}
 
 /* barra inferior */
 .nav{
   flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);
   border-top:1px solid var(--linha);background:var(--sup);padding:8px 0 max(14px,env(safe-area-inset-bottom));z-index:3;
 }
+/* 02/09 — o RÓTULO da barra pelo token de nav.
+   Estava em 8,5px, abaixo do piso de 11 que a especificação fixou (§3, token
+   `nav`: Figma 16px uppercase → 11pt + tracking). 8,5px uppercase com tracking
+   é o menor texto do app inteiro e fica na aresta do ilegível no aparelho. */
 .nav button{background:none;border:0;cursor:pointer;text-align:center;
-  font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);font-weight:700}
-.nav button i{display:block;font-style:normal;font-size:17px;margin-bottom:3px;opacity:.5}
+  font-size:var(--t-nav);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+/* 02/09 — os ÍCONES são os do arquivo, não glifos de texto.
+   Eram ◈ ◎ ▣ 💬 — caracteres, não os desenhos do board. Agora saem dos SVGs
+   exportados dos próprios nodes (Navigation/House_03, Navigation/Compass, o
+   Vector da COMUNIDADE e Communication/Chat), inline pra que o traço herde a
+   cor do botão: #BCBCBC parado, lime ativo, que é o que o Figma pinta.
+   ⚠️ `opacity` saiu: com o traço em currentColor quem diz o estado é a COR, e
+   meia opacidade sobre #BCBCBC derrubava o contraste sem motivo.
+   Altura 24px por R12 da especificação — no arquivo eles medem 17,7 a 21,5pt,
+   pequenos demais pro padrão de barra (24–28). A largura sai do viewBox de
+   cada um, não de uma regra só: são três proporções diferentes. */
+.nav button i{display:block;font-style:normal;font-size:17px;margin-bottom:3px;
+  line-height:0;color:inherit}
+.nav button i svg{display:block;margin:0 auto;height:24px;width:auto}
 .nav button.on{color:var(--acc)}
-.nav button.on i{opacity:1}
 /* 29/08 (board): o + central. É item do array da nav como qualquer outro —
    o grid e a delegação do clique não sabem que ele é diferente, só o CSS sabe.
    ⚠️ O lime aqui é EXCEÇÃO DECLARADA à regra de :20-34 (quem age é o laranja).
@@ -568,10 +646,10 @@ button,input,select{font:inherit;color:inherit}
   padding:10px 18px max(18px,env(safe-area-inset-bottom))}
 #mais .puxador{width:38px;height:4px;border-radius:99px;background:var(--linha2);margin:0 auto 14px}
 #mais .mais-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
-  background:none;border:0;padding:15px 4px;color:var(--ink);font:600 15px var(--f-ui);cursor:pointer}
+  background:none;border:0;padding:var(--t-body) 4px;color:var(--ink);font:600 15px var(--f-ui);cursor:pointer}
 #mais .mais-item + .mais-item{border-top:1px solid var(--linha)}
 #mais .mais-item i{font-style:normal;font-size:19px;width:24px;text-align:center;color:var(--acc)}
-#mais .mais-item small{display:block;font:400 11.5px var(--f-ui);color:var(--ink3);margin-top:2px}
+#mais .mais-item small{display:block;font:400 var(--t-label) var(--f-ui);color:var(--ink3);margin-top:2px}
 /* o item que o board pede e o app ainda não tem. Não some da lista — some da
    lista seria esconder o que falta; fica visível, apagado e sem clique, e o
    subtítulo diz por quê. Laranja tracejado é a mesma marca da classe .casca. */
@@ -588,9 +666,9 @@ button,input,select{font:inherit;color:inherit}
 .mexeu .l{display:flex;align-items:center;gap:11px;padding:12px 13px}
 .mexeu .l+.l{border-top:1px solid var(--linha)}
 .mexeu .l .i{flex:1;min-width:0}
-.mexeu .l .t{font-size:12.5px;font-weight:650}
-.mexeu .l .d{font-size:10.5px;color:var(--ink3);margin-top:2px}
-.mexeu .l .v{font-family:var(--f-disp);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.mexeu .l .t{font-size:var(--t-label);font-weight:650}
+.mexeu .l .d{font-size:var(--t-caption);color:var(--ink3);margin-top:2px}
+.mexeu .l .v{font-family:var(--f-disp);font-size:var(--t-title-s);font-weight:700;font-variant-numeric:tabular-nums}
 
 .celebra{
   text-align:center;padding:30px 20px 22px;border-bottom:1px solid var(--linha);
@@ -600,9 +678,9 @@ button,input,select{font:inherit;color:inherit}
 .celebra .reacao{height:200px;width:auto;object-fit:contain;object-position:top;margin:-14px auto 0;display:block;
   -webkit-mask-image:radial-gradient(120% 92% at 50% 42%,#000 60%,transparent 92%);
           mask-image:radial-gradient(120% 92% at 50% 42%,#000 60%,transparent 92%)}
-.celebra h2{font-family:var(--f-disp);font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:8px}
-.celebra p{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.55}
-.celebra .big{font-family:var(--f-disp);font-size:52px;font-weight:700;color:var(--up);
+.celebra h2{font-family:var(--f-disp);font-size:var(--t-title-l);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:8px}
+.celebra p{font-size:var(--t-body);color:var(--ink2);margin-top:7px;line-height:1.55}
+.celebra .big{font-family:var(--f-disp);font-size:var(--t-display);font-weight:700;color:var(--up);
   line-height:1;margin-top:12px;font-variant-numeric:tabular-nums}
 
 /* toast */
@@ -674,7 +752,7 @@ button,input,select{font:inherit;color:inherit}
   box-shadow:0 10px 28px rgba(0,0,0,.5);
 }
 #instale[hidden]{display:none}
-#instale .tx{flex:1;min-width:0;font-size:12px;line-height:1.4;color:var(--ink2)}
+#instale .tx{flex:1;min-width:0;font-size:var(--t-caption);line-height:1.4;color:var(--ink2)}
 #instale .tx b{color:var(--ink);font-size:12.5px}
 #instale button{border-radius:10px;font:700 12px system-ui;cursor:pointer;padding:9px 12px;white-space:nowrap}
 #instale .sim{background:var(--marca);color:#0A1100;border:none}
@@ -694,78 +772,198 @@ button,input,select{font:inherit;color:inherit}
 #cenas .cx{width:100%;background:var(--sup);border-top:1px solid var(--linha2);
   border-radius:14px 14px 0 0;padding:18px 18px max(20px,env(safe-area-inset-bottom));
   max-height:82%;overflow-y:auto;-webkit-overflow-scrolling:touch}
-#cenas h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;font-weight:700}
-#cenas .sub{font-size:11.5px;color:var(--ink3);margin-bottom:14px}
+#cenas h3{font-size:var(--t-nav);letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;font-weight:700}
+#cenas .sub{font-size:var(--t-label);color:var(--ink3);margin-bottom:14px}
 .qgrade{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .qcard{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;padding:0;border:2px solid transparent;
   background:#0F0C09;aspect-ratio:16/10}
 .qcard img{width:100%;height:100%;object-fit:cover;display:block}
 .qcard span{position:absolute;left:0;right:0;bottom:0;padding:14px 9px 7px;text-align:left;
-  font:700 11.5px system-ui;color:#FBF6EE;background:linear-gradient(180deg,transparent,rgba(11,8,6,.9))}
+  font:700 var(--t-nav) system-ui;color:#FBF6EE;background:linear-gradient(180deg,transparent,rgba(11,8,6,.9))}
 .qcard.on{border-color:var(--acc)}
 .qcard.on span{color:var(--acc)}
 
-.vazio{text-align:center;padding:46px 24px;color:var(--ink3);font-size:12.5px;line-height:1.6}
+.vazio{text-align:center;padding:46px 24px;color:var(--ink3);font-size:var(--t-body);line-height:1.6}
 .vazio .ic{font-size:34px;opacity:.4;display:block;margin-bottom:10px}
 
 /* ===== RADAR (25/08 — telas novas: disponibilidade e oponentes) ===== */
-.rajuste{border:0;border-radius:var(--rp);background:var(--marca);color:#FFFEFD;font:600 11px var(--f-ui);padding:9px 13px;cursor:pointer;max-width:58%}
+.rajuste{border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font:600 11px var(--f-ui);padding:9px 13px;cursor:pointer;max-width:58%}
 .dcard{cursor:pointer}
 .dgrade{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 .dcol{background:var(--sup2);border-radius:10px;min-height:64px;padding:6px 3px;display:flex;flex-direction:column;align-items:center;gap:3px}
 .dcol.tem{background:rgba(131,224,0,.10);border:1px solid rgba(131,224,0,.4)}
-.dcol b{margin-top:auto;font-size:8.5px;letter-spacing:.08em;color:var(--ink3)}
+.dcol b{margin-top:auto;font-size:var(--t-nav);letter-spacing:.08em;color:var(--ink3)}
 .dcol.tem b{color:var(--up)}
 .dsl{background:var(--up);color:#0A1100;font-weight:800;font-size:9.5px;border-radius:6px;padding:2px 5px;white-space:nowrap}
-.doff{font-size:9px;color:var(--ink3);font-weight:700;margin:auto 0}
+.doff{font-size:var(--t-nav);color:var(--ink3);font-weight:700;margin:auto 0}
 .rtabs{flex:1;display:flex;gap:4px;background:var(--sup);border:1px solid var(--linha2);border-radius:var(--rp);padding:3px}
 .rtab{flex:1;border:0;border-radius:var(--rp);background:transparent;color:var(--ink2);font:600 12px var(--f-ui);padding:8px 4px;cursor:pointer;white-space:nowrap}
 .rtab.on{background:var(--acc);color:var(--acc-ink);font-weight:800}
 /* 29/08 (board, node 120:390) — "Sua disponibilidade de jogo hoje".
-   Três colunas de pílulas separadas por fio. No board há um boneco numa quarta
-   coluna à esquerda; em 390pt de aparelho, quatro colunas dariam menos de 100pt
-   cada e a pílula "Rápida" não caberia. O boneco saiu — ele já está na home,
-   grande, e aqui era decoração. */
-.dhoje{display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+   ⚠️ 01/09: O BONECO VOLTOU, e a decisão de 29/08 caiu por premissa errada.
+   Ela dizia: "no board há um boneco numa QUARTA COLUNA à esquerda; em 390pt,
+   quatro colunas dariam menos de 100pt cada e a pílula Rápida não caberia".
+   Só que no Figma ele não é uma coluna de largura igual — é uma faixa estreita,
+   perto de 10% do card, e as três colunas de pílulas dividem o resto. Com 14%
+   pra figura sobram ~28% pra cada coluna, que em 375px dá ~96px: "Rápida"
+   ocupa ~45px ali. Medido na tela, não estimado.
+   E ele não é decoração: é o mesmo boneco vestido do vestiário, na tela onde a
+   pessoa se oferece pros outros — é ela se vendo como os outros vão ver. */
+.dhoje{display:grid;grid-template-columns:15% repeat(3,1fr);gap:0;align-items:stretch;
   background:rgba(11,11,11,.82);border:1px solid var(--linha);border-radius:20px;padding:14px 4px}
+/* a figura acompanha a ALTURA das colunas — quem manda no tamanho do card são
+   as pílulas, não ela. Com `width` na imagem a altura vinha da proporção do
+   sprite e esticava o card, deixando um vão embaixo das pílulas. */
+.dhoje .dfig{position:relative;min-width:0;overflow:hidden}
+/* `contain` e não altura cheia: com `height:100%` a figura ficava mais larga
+   que a faixa e era cortada nas laterais — no Figma ela aparece inteira. */
+.dhoje .dfig img{position:absolute;inset:0;height:100%;width:100%;
+  object-fit:contain;object-position:bottom center;display:block;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.45))}
 .dhoje .col{padding:0 10px;min-width:0}
 .dhoje .col + .col{border-left:1px solid var(--linha)}
-.dhoje .cab{display:flex;align-items:center;gap:5px;margin-bottom:10px}
-.dhoje .cab i{font-style:normal;font-size:12px;color:var(--acc)}
-.dhoje .cab b{font:700 11px var(--f-ui);color:var(--ink);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
+/* 01/09: o rótulo do Figma é "Tipo de quadra" / "Tipo de Jogo" — inteiro, não
+   "Quadra"/"Jogo". Em 92px de coluna ele não cabe numa linha, então QUEBRA em
+   duas em vez de virar reticência: rótulo cortado ("Tipo de …") não diz do que
+   é a coluna, que é a única coisa que ele precisa fazer. As três colunas ficam
+   com a mesma altura de cabeçalho porque `min-height` reserva as duas linhas. */
+.dhoje .cab{display:flex;align-items:flex-start;gap:4px;margin-bottom:10px;min-height:30px}
+.dhoje .cab i{font-style:normal;font-size:12px;color:var(--acc);line-height:1.25}
+.dhoje .cab b{font:700 var(--t-nav)/1.25 var(--f-ui);color:var(--ink);min-width:0}
 .dhoje button{display:block;width:100%;margin-bottom:7px;padding:8px 4px;
   border-radius:99px;border:1px solid var(--ink3);background:transparent;
-  color:var(--ink3);font:400 11.5px var(--f-ui);cursor:pointer}
+  color:var(--ink3);font:400 var(--t-caption) var(--f-ui);cursor:pointer}
 .dhoje button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
-.rfiltro{border:1px solid var(--linha2);border-radius:var(--rp);background:var(--sup);color:var(--ink2);font:600 12px var(--f-ui);padding:9px 13px;cursor:pointer;white-space:nowrap}
-.oc .txt small{display:block;font-size:11px;color:var(--ink3);margin-top:3px}
+/* node 89:179 pelo código: 263x50, raio 30, fundo rgba(18,18,18,.6), SEM
+   borda, rótulo "Filtros" em bold #BCBCBC com um chevron SVG. O app tinha
+   pílula com borda #2A3430, fundo #0C1013 e o rótulo "Filtrar". */
+/* node 31:738: pílula de 717x53 (66% da largura do topo), raio 100, borda 1px
+   #BCBCBC, fundo transparente, lupa à esquerda e placeholder "Buscar". */
+/* node 58:1419 — o envelope dos filtros: #0B0B0B, raio 30 de 1080 (≈11px em
+   375), sem borda. E `.dhoje-f`: o mesmo painel de 3 colunas do radar, mas sem
+   a faixa do boneco, que ali não existe. */
+.filtro-folha{background:#0b0b0b;border-radius:11px;padding:16px 14px;margin-bottom:14px}
+.dhoje-f{grid-template-columns:repeat(3,1fr);background:transparent;border:1px solid #bcbcbc;
+  border-radius:20px}
+.dhoje-f .col + .col{border-left:1px solid rgba(188,188,188,.45)}
+.dhoje-f .chip{display:block;width:100%;margin-bottom:7px;padding:8px 4px;border-radius:99px;
+  border:1px solid var(--ink3);background:transparent;color:var(--ink3);
+  font:400 var(--t-nav) var(--f-ui);cursor:pointer;white-space:nowrap}
+.dhoje-f .chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+/* node 58:1600: LIMPAR FILTROS em caixa alta, cinza, na linha do título */
+.flimpar{border:0;background:transparent;cursor:pointer;color:#bcbcbc;
+  font:700 var(--t-nav) var(--f-ui);letter-spacing:.08em;text-transform:uppercase;padding:0}
+/* ⚠️ `display:flex` vence o atributo `hidden` — sem esta linha a pílula
+   aparecia em TODAS as telas, e ainda espremia o título até virar "FILTR…". */
+.topo-busca[hidden]{display:none}
+.topo-busca{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
+  height:38px;padding:0 14px;border-radius:100px;border:1px solid rgba(188,188,188,.55);
+  background:transparent}
+.topo-busca i{font-style:normal;color:#bcbcbc;font-size:15px;line-height:1}
+.topo-busca input{flex:1;min-width:0;border:0;background:transparent;outline:none;
+  color:var(--ink);font:400 var(--t-label) var(--f-ui)}
+.topo-busca input::placeholder{color:#bcbcbc}
+.topo-busca input::-webkit-search-cancel-button{filter:invert(.7)}
+.rfiltro{border:0;border-radius:11px;background:rgba(18,18,18,.6);color:#bcbcbc;
+  font:700 var(--t-label) var(--f-ui);padding:9px 14px;cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:7px;backdrop-filter:blur(6px)}
+.rfiltro i{font-style:normal;font-size:11px;opacity:.85;transform:translateY(1px)}
+.oc .txt small{display:block;font-size:var(--t-caption);color:var(--ink3);margin-top:3px}
 .odir{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:0 0 122px}
 .olivre{color:var(--up);font-size:10.5px;font-weight:700;text-align:right;white-space:nowrap}
-.oconv{border:0;border-radius:var(--rp);background:var(--marca);color:#FFFEFD;font:700 12.5px var(--f-ui);padding:10px 8px;cursor:pointer}
-.operf{border:1px solid var(--linha2);border-radius:var(--rp);background:transparent;color:var(--ink2);font:600 12px var(--f-ui);padding:9px 8px;cursor:pointer}
-.dpil{background:var(--up);color:#0A1100;font-weight:800;font-size:12px;border-radius:8px;padding:8px 10px;white-space:nowrap}
+/* node 28:149: os dois botões do card têm 228x55 e raio 10 — não são pílula.
+   Convidar em #FF6A00; Ver perfil com fundo #0B0B0B e borda #BCBCBC. */
+.oconv{border:0;border-radius:10px;background:#ff6a00;color:var(--marca-ink);font:700 var(--t-label) var(--f-ui);padding:11px 8px;cursor:pointer;min-height:44px}
+.operf{border:1px solid #bcbcbc;border-radius:10px;background:#0b0b0b;color:#bcbcbc;font:400 var(--t-label) var(--f-ui);padding:11px 8px;cursor:pointer;min-height:44px}
+.dpil{background:var(--up);color:#0A1100;font-weight:800;font-size:var(--t-caption);border-radius:8px;padding:8px 10px;white-space:nowrap}
 .dx{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--linha2);border-radius:50%;background:none;color:var(--ink2);font-size:15px;cursor:pointer}
 
 /* ===== INÍCIO — a home vitrine (organização Tennis Clash, sem loot) ===== */
+/* ===== ESCALA TIPOGRÁFICA DO APP (01/09) =====
+   Oito tokens, extraídos da especificação do Figma (figma/ESPECIFICACAO-VISUAL.md).
+   Vale para o app INTEIRO, não só a home — por isso vive no :root.
+
+   POR QUE NÃO SÃO OS VALORES DO FIGMA: a GEOMETRIA do arquivo é exata e é
+   copiada como está (1080x1920 ÷ 2,88 = 375x667, o iPhone SE ao pixel). A
+   TIPOGRAFIA não pode ser: os corpos foram digitados como se o frame fosse 1x,
+   então convertidos por 2,88 220 dos 226 textos ficariam abaixo de 11pt.
+   Pior: o arquivo tem o MESMO elemento em tamanhos diferentes entre telas — o
+   badge de nota é 14px no Radar e 30px no Ranking (2,14x), o sufixo "++" é
+   18,86 na Home e 35,77 no Ranking (1,90x, com a razão interna do componente
+   mudando de 2,93 para 2,60). Não há um "igual" a copiar ali.
+   O que estes tokens preservam é a HIERARQUIA do desenho: o que é maior no
+   Figma continua maior aqui, na mesma ordem.
+
+   ⚠️ 11px é PISO. Nada abaixo disso — o app tinha 50 regras entre 7 e 10,5px. */
+:root{
+  --t-display:28px;   /* letra de classe, número gráfico     (Figma 55,19) */
+  --t-title-l:22px;   /* nome próprio, título de tela        (Figma 30)    */
+  --t-title-m:20px;   /* número de pontos, título de seção   (Figma 30)    */
+  --t-title-s:17px;   /* CTA primário, título de card        (Figma 30)    */
+  --t-body:15px;      /* texto de leitura                    (Figma 20)    */
+  --t-label:13px;     /* rótulo de campo, metadado           (Figma 20)    */
+  --t-caption:12px;   /* legenda, nota                       (Figma 12/16) */
+  --t-nav:11px;       /* rótulo uppercase de navegação       (Figma 16)    */
+}
 .ini{position:relative;min-height:100%;display:flex;flex-direction:column}
-.ini .cena{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center top}
+/* 01/09 — O FUNDO DA HOME, PELAS CAMADAS DO FIGMA (frame 35:756).
+   São TRÊS, nesta ordem, e nenhuma delas era o que estava aqui:
+     35:771  a foto da quadra (app/fig/fundo-home.jpg, tirada do arquivo)
+     35:769  um gradiente RADIAL verde por cima dela — é ele que dá o tom da
+             tela inteira, e ele não existia: o app tinha um scrim linear PRETO,
+             que escurece em vez de esverdear. Era a diferença de cor.
+     35:772  uma faixa sólida #06090E de 422 de 1920 (22% da altura) no rodapé,
+             atrás da barra inferior.
+   O gradiente radial vem do próprio código do node, convertido de SVG para
+   CSS: mesmos quatro stops, mesmas opacidades. */
+.ini .cena{position:absolute;inset:0;z-index:0;
+  background-image:url('fig/fundo-home.jpg');
+  background-size:cover;background-position:center top}
+/* O FUNDO, corrigido duas vezes e agora conferido contra a foto.
+   1a tentativa: scrim linear PRETO (o que já existia) — escurecia, não era o
+      desenho.
+   2a: inventei um radial VERDE visível no meio. Errado por dois motivos.
+   O verde da tela vem da PRÓPRIA FOTO (quadra à noite, iluminada) — não de
+   overlay. E o radial do node 35:769 fica ATRÁS da foto: a foto o cobre, então
+   ele quase não participa do que se vê. Composto, o efeito dele é de 8 a 15
+   níveis em 255 (spec item 4).
+   O que resta, e é o que o Figma mostra: a foto, mais a faixa #06090E do node
+   35:772 fechando os 22% de baixo, atrás da barra. Nada de cor por cima. */
 .ini .scrim{position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(180deg,rgba(11,8,6,.55) 0%,rgba(11,8,6,.12) 24%,rgba(11,8,6,.08) 52%,rgba(11,8,6,.34) 82%,rgba(11,8,6,.62) 100%)}
+  background:linear-gradient(180deg,
+    rgba(6,9,14,.30) 0%, rgba(6,9,14,.10) 22%,
+    rgba(6,9,14,0) 46%, rgba(6,9,14,.55) 78%, #06090e 100%)}
 .ini .hud{position:relative;z-index:2;
   padding:max(8px,env(safe-area-inset-top)) var(--pad-lado) 0}
 .ini .linha1{display:flex;align-items:center;gap:10px}
-/* 25/08 (telas novas): o topo da home é logo + sino + avatar */
-.ini .logo{height:30px;width:auto;display:block;margin-right:auto;filter:drop-shadow(0 1px 6px rgba(0,0,0,.6))}
-.ini .av-topo{width:40px;height:40px;flex:0 0 40px;border-radius:50%;overflow:hidden;cursor:pointer;
-  border:2px solid var(--acc);background:var(--sup2);position:relative}
+/* node 35:836 pelo código: logo 179x52,6 de um frame de 1080 — 16,6% da
+   largura. Estava com 30px de altura, que dá ~102px de largura (27% da tela):
+   quase o dobro do desenho. Agora vai por largura relativa, que é como o Figma
+   define, e a altura sai da proporção do SVG. */
+.ini .logo{width:16.6%;max-width:74px;height:auto;display:block;margin-right:auto;
+  filter:drop-shadow(0 1px 6px rgba(0,0,0,.6))}
+/* 01/09: no Figma o aro do avatar do topo é LARANJA (a cor da marca), não lime
+   — conferido na HOME (35:756) e no radar (28:149), as duas telas que o
+   desenham. O lime é a cor de estado/ação no resto do app; aqui ele estava
+   dizendo "isto é uma ação", e o avatar é identidade. */
+/* node 30:657: o avatar tem 71x71 de 1080 (6,6%) e aro laranja. */
+.ini .av-topo{width:6.6%;min-width:38px;max-width:44px;aspect-ratio:1;flex:0 0 auto;
+  border-radius:50%;overflow:hidden;cursor:pointer;
+  border:2px solid var(--marca);background:var(--sup2);position:relative}
 .ini .av-topo .ro{position:absolute;inset:0;background-repeat:no-repeat}
 .ini .temp{flex:1;background:rgba(30,23,20,.72);border:1px solid var(--linha);border-radius:99px;
-  padding:7px 14px;font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px)}
+  padding:7px 14px;font-size:var(--t-caption);color:var(--ink2);display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px)}
 .ini .temp b{color:var(--ink);font-weight:700}
 .ini .temp .dot{width:6px;height:6px;border-radius:50%;background:var(--up)}
-.ini .ic{width:38px;height:38px;flex:0 0 38px;border-radius:50%;background:rgba(30,23,20,.72);border:1px solid var(--linha);
-  display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;backdrop-filter:blur(6px);cursor:pointer}
+/* node 120:114: o sino tem 53x53 de 1080 (4,9%) e é um SVG, não um emoji —
+   emoji muda de desenho a cada sistema, e este é ícone de marca.
+   ⚠️ O DESENHO tem o tamanho do Figma; a ÁREA DE TOQUE não: o alvo fica em
+   44px (o mínimo da Apple) por padding, invisível. Copiar 4,9% de 375px daria
+   18px de alvo, que é desenho fiel e botão que ninguém acerta. */
+.ini .ic{width:44px;height:44px;flex:0 0 44px;border-radius:50%;background:transparent;border:0;
+  display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer}
+.ini .ic > img{width:64%;height:64%;display:block;
+  filter:drop-shadow(0 1px 4px rgba(0,0,0,.55))}
 /* 09/08: o ◈ era o terceiro círculo idêntico e ninguém achava o trocador de
    cenário. Mesmo padrão do trilho do vestiário — o ícone PRÉ-VISUALIZA a
    escolha atual: o próprio cenário aparece dentro do botão, com o glifo por
@@ -806,9 +1004,9 @@ button,input,select{font:inherit;color:inherit}
 .tsel{background:rgba(11,11,11,.6);border:1px solid var(--linha);border-radius:14px;
   padding:10px 6px;text-align:center;cursor:pointer}
 .tsel img{width:100%;max-width:56px;height:auto;display:block;margin:0 auto 6px}
-.tsel b{display:block;font:700 9.5px var(--f-ui);color:var(--ink);
+.tsel b{display:block;font:700 var(--t-caption) var(--f-ui);color:var(--ink);
   letter-spacing:.03em;line-height:1.3}
-.tsel small{display:block;font:400 8.5px var(--f-ui);color:var(--ink3);margin-top:3px;line-height:1.3}
+.tsel small{display:block;font:400 var(--t-nav) var(--f-ui);color:var(--ink3);margin-top:3px;line-height:1.3}
 .tsel.tem{border-color:var(--acc)}
 .tsel.nao{opacity:.42}
 .tsel.nao img{filter:grayscale(1)}
@@ -824,12 +1022,12 @@ button,input,select{font:inherit;color:inherit}
 .hpart.v .pl{color:var(--up)}
 .hpart.d .pl{color:var(--dn)}
 .hpart .meio{flex:1;min-width:0}
-.hpart .meio div{font:400 11.5px var(--f-ui);color:var(--ink3);
+.hpart .meio div{font:400 var(--t-caption) var(--f-ui);color:var(--ink3);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hpart .meio i{font-style:normal;color:var(--ink3);margin-right:5px}
 .hpart .dir{flex:0 0 auto;text-align:right}
-.hpart .dir .dt{font:400 10.5px var(--f-ui);color:var(--ink3)}
-.hpart .dir .pts{font:700 17px var(--f-disp);margin-top:3px}
+.hpart .dir .dt{font:400 var(--t-caption) var(--f-ui);color:var(--ink3)}
+.hpart .dir .pts{font:700 var(--t-title-s) var(--f-disp);margin-top:3px}
 .hpart.v .dir .pts{color:var(--up)}
 .hpart.d .dir .pts{color:var(--dn)}
 /* o gráfico anual: 12 colunas, a do mês escolhido acesa */
@@ -846,45 +1044,85 @@ button,input,select{font:inherit;color:inherit}
 .hmes{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:14px}
 .hmes .cx{border:1px solid var(--linha);border-radius:14px;padding:13px}
 .hmes .cx b{font:700 19px var(--f-disp);color:var(--ink);margin-right:6px}
-.hmes .cx small{font:400 11.5px var(--f-ui);color:var(--ink3)}
+.hmes .cx small{font:400 var(--t-caption) var(--f-ui);color:var(--ink3)}
 
 .pcab{display:flex;gap:14px;align-items:flex-start;padding:16px var(--pad-lado) 0}
 .pcab .av.gg{flex:0 0 76px}
 .pcab .info{flex:1;min-width:0}
 .pcab .nm{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.pcab .nm b{font:700 19px var(--f-disp);color:var(--ink)}
-.pcab .nm .cl{font:700 17px var(--f-ui);color:var(--acc)}
-.pcab .bio{font:400 12px/1.5 var(--f-ui);color:var(--ink3);margin-top:7px}
-.pnums{display:flex;align-items:center;gap:18px;padding:14px var(--pad-lado) 0}
-.pnums .n{text-align:left}
+.pcab .nm b{font:700 var(--t-title-l) var(--f-disp);color:var(--ink)}
+.pcab .nm .cl{font:700 var(--t-title-s) var(--f-ui);color:var(--acc)}
+.pcab .bio{font:400 var(--t-body)/1.5 var(--f-ui);color:var(--ink3);margin-top:7px}
+/* 01/09: entraram Seguidores e Seguindo (mig 89), então a linha passou de um
+   número + botão para TRÊS + botão. O gap caiu e os números podem encolher —
+   em 375px a soma antiga estourava e empurrava o botão pra fora. */
+.pnums{display:flex;align-items:center;gap:12px;padding:14px var(--pad-lado) 0}
+.pnums .n{text-align:left;min-width:0}
 .pnums .n b{display:block;font:700 19px var(--f-disp);color:var(--ink)}
-.pnums .n small{font:400 11.5px var(--f-ui);color:var(--ink3)}
-.pnums .seguir{margin-left:auto;flex:0 0 auto;padding:10px 20px;border-radius:10px;
+.pnums .n small{font:400 var(--t-caption) var(--f-ui);color:var(--ink3)}
+.pnums .seguir{margin-left:auto;flex:0 0 auto;padding:10px 16px;border-radius:10px;
   border:1px solid var(--linha2);background:transparent;color:var(--ink2);
   font:400 12.5px var(--f-ui);cursor:pointer}
+/* seguindo é ESTADO, e estado precisa aparecer: sem isto o botão fica igual nos
+   dois casos e a pessoa clica de novo pra descobrir em qual está. */
+.pnums .seguir.on{background:var(--acc);color:var(--acc-ink);border-color:transparent;font-weight:700}
+.pnums .seguir:disabled{opacity:.5;cursor:default}
+/* 01/09 (migs 91 e 92) — a barra de foto do compositor e a foto no post.
+   `max-height` na imagem porque foto de celular é retrato e sem teto uma só
+   ocupa a tela inteira, empurrando o resto do feed pra fora da primeira dobra. */
+.postbar{display:flex;align-items:center;gap:10px;margin-top:8px}
+.foto-bt{display:inline-flex;align-items:center;cursor:pointer;padding:8px 14px;
+  border:1px solid var(--linha2);border-radius:10px;background:transparent;
+  color:var(--ink2);font:400 var(--t-label) var(--f-ui)}
+.foto-nome{color:var(--ink3);font:400 11.5px var(--f-ui);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.post-foto{display:block;width:100%;max-height:60vh;object-fit:cover;
+  border-radius:10px;margin-top:10px;background:var(--sup)}
+/* node 63:2050 — os três estilos como chips no mesmo card, o declarado em
+   destaque. Quem não declarou mostra os três apagados, que é o desenho: a
+   ausência aparece como opção não marcada, não como bloco de texto. */
+.echips{display:flex;gap:8px;flex-wrap:wrap}
+.echip{flex:1 1 auto;text-align:center;padding:10px 8px;border-radius:10px;
+  border:1px solid rgba(232,222,210,.18);background:transparent;
+  color:var(--ink3);font:600 var(--t-label) var(--f-ui);white-space:nowrap}
+.echip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 .pcta{padding:14px var(--pad-lado) 4px}
 .pcta button{width:100%;border:0;border-radius:var(--rp);padding:15px;
-  background:var(--marca);color:var(--marca-ink);font:700 14px var(--f-ui);cursor:pointer}
+  background:var(--marca);color:var(--marca-ink);font:700 var(--t-title-s) var(--f-ui);cursor:pointer}
 /* os três números de estatística, no formato do board */
 .pstats{display:flex;align-items:center;background:rgba(11,11,11,.6);
   border:1px solid var(--linha);border-radius:16px;padding:16px 6px;margin-bottom:14px}
 .pstats > div{flex:1;text-align:center;min-width:0}
 .pstats > div + div{border-left:1px solid var(--linha)}
-.pstats .v{font:700 21px var(--f-disp);color:var(--ink)}
+.pstats .v{font:700 var(--t-title-m) var(--f-disp);color:var(--ink)}
 .pstats .k{font:400 11px var(--f-ui);color:var(--ink3);margin-top:2px}
 .pstats .ic{font-style:normal;color:var(--acc);font-size:13px;margin-right:4px}
 
-.hcard{margin-top:11px;background:rgba(11,11,11,.82);border:1px solid var(--linha);
-  border-radius:20px;padding:14px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+/* 01/09 — VALORES DO CÓDIGO DO FIGMA (get_design_context no node 35:773), não
+   estimados por screenshot: fundo é GRADIENTE diagonal a 101,1deg de #0B0B0B
+   até transparente, não cor chapada; raio 20px; sem contorno. */
+/* o gradiente do node tem o 2o stop 4,5x além do fim da caixa: na borda oposta
+   percorre só 10,7% dele, indo de 100% a 91,2% de opacidade (spec item 4).
+   É quase chapado — e é assim que ele aparece de verdade. */
+.hcard{margin-top:11px;border:0;border-radius:20px;padding:14px 16px;
+  background:linear-gradient(101.1deg, rgba(11,11,11,1) 0%, rgba(11,11,11,.91) 100%);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .hcard .l1{display:flex;align-items:baseline;gap:8px}
-.hcard .cls{font:700 34px/1 var(--f-disp);color:var(--ink);letter-spacing:-.02em}
-.hcard .suf{font:600 14px var(--f-ui);color:var(--acc);margin-left:-4px}
-.hcard .pts{flex:1;text-align:right;font:700 17px var(--f-ui);color:var(--ink);white-space:nowrap}
-.hcard .prox{font:700 17px var(--f-ui);color:var(--ink3)}
-.hcard .faltam{text-align:right;font:600 11px var(--f-ui);color:var(--acc);margin-top:3px}
-.hcard .barra{height:6px;border-radius:99px;background:var(--acc-ink);margin:9px 0 8px;overflow:hidden}
-.hcard .barra i{display:block;height:100%;border-radius:99px;background:var(--acc)}
-.hcard .fim{font:400 12px/1.5 var(--f-ui);color:var(--ink3)}
+/* 01/09: a coluna direita tem 44% da tela (board 35:773), então os corpos
+   caem junto. `clamp` e não valor fixo: em 375px o card tem ~160px de largura
+   e em 430px tem ~185px — a mesma fonte não serve pros dois. */
+.hcard .cls{font:700 var(--t-display)/1 var(--f-disp);color:#fffefd;letter-spacing:-.02em}
+.hcard .suf{font:600 var(--t-nav) var(--f-ui);color:#83e000;margin-left:-3px}
+.hcard .pts{flex:1;text-align:right;font:600 var(--t-title-m) var(--f-ui);color:#fffefd;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hcard .prox{font:600 var(--t-title-m) var(--f-ui);color:#bcbcbc}
+.hcard .faltam{text-align:right;font:400 var(--t-caption) var(--f-ui);color:#83e000;margin-top:4px}
+/* cores exatas do Figma (nodes 120:89 e 120:90): trilho #0a1100, preenchimento
+   #83e000, 6px de altura, raio 100px. O trilho estava em var(--acc-ink), que é
+   quase a mesma coisa por acaso — agora é o valor, não a coincidência. */
+.hcard .barra{height:6px;border-radius:100px;background:#0a1100;margin:9px 0 8px;overflow:hidden}
+.hcard .barra i{display:block;height:100%;border-radius:100px;background:#83e000}
+/* node 35:778: Inter Regular, #bcbcbc */
+.hcard .fim{font:400 var(--t-label)/1.4 var(--f-ui);color:#bcbcbc;margin-top:6px}
 .hcard .fim b{color:var(--ink2)}
 
 /* O card "Let's Ranket" — o convite pra entrar no radar. É o único bloco da
@@ -892,13 +1130,27 @@ button,input,select{font:inherit;color:inherit}
    compete com o laranja de "Ver oponentes", está um degrau abaixo dele na
    hierarquia. Some quando a pessoa já tem disponibilidade marcada, senão
    viraria moldura pedindo o que já foi feito. */
-.hlets{margin-top:11px;background:rgba(11,11,11,.86);border:1px solid var(--linha);
-  border-radius:20px;padding:20px 18px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.hlets h3{font:700 30px/1.06 var(--f-disp);color:var(--ink);letter-spacing:-.02em}
-.hlets p{font:300 12.5px/1.5 var(--f-ui);color:var(--ink3);margin:10px 0 16px;max-width:30ch}
-.hlets button{width:100%;border:0;border-radius:var(--rp);padding:14px;
-  background:var(--acc);color:var(--acc-ink);font:700 11.5px var(--f-ui);
-  letter-spacing:.09em;text-transform:uppercase;cursor:pointer}
+/* 01/09 — node 89:192 do Figma, pelo código: gradiente a 94,4deg, raio 20px.
+   ⚠️ O "Let's Ranket" NÃO É TEXTO no Figma — é um LETTERING em SVG (223x125,
+   node 89:186). Estava escrito aqui como <h3> com a fonte do app, e por isso
+   nunca ia bater: desenho de letra não se reproduz com font-family. O arquivo
+   veio do próprio Figma e vive em app/fig/lets-ranket.svg.
+   O texto é Inter LIGHT 20px com entrelinha 30px em #bcbcbc; o botão tem
+   58px de altura, raio 100px, fundo #83e000 e rótulo Inter Bold em #0a1100. */
+.hlets{margin-top:11px;border:0;border-radius:20px;padding:20px 18px;
+  background:linear-gradient(94.4deg, rgba(11,11,11,1) 0%, rgba(11,11,11,.91) 100%);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hlets .lets{display:block;width:min(100%,152px);height:auto;margin-bottom:2px}
+/* Light 300 descartado (spec item 3): texto fino claro sobre quase-preto sofre
+   halation em OLED. Regular 400. */
+.hlets p{font:400 var(--t-label)/1.45 var(--f-ui);color:#bcbcbc;margin:10px 0 16px}
+/* ⚠️ ALVO DE TOQUE: no Figma este botão tem 58px de altura, que ÷2,88 dá
+   20pt — menos da metade do mínimo utilizável (44pt). Todos os controles do
+   arquivo reprovam nisso (spec item 2), porque foram dimensionados ao redor do
+   texto de 1x. A altura sobe pra 48; a forma e a cor são as do node. */
+.hlets button{width:100%;min-height:48px;border:0;border-radius:100px;padding:13px 10px;
+  background:#83e000;color:#0a1100;font:600 var(--t-nav) var(--f-ui);
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;line-height:1.2}
 
 .ini .degrau{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);
   display:flex;align-items:center;gap:13px}
@@ -908,13 +1160,13 @@ button,input,select{font:inherit;color:inherit}
 .ini .degrau .anel svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ini .degrau .anel .tri{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--f-disp);font-weight:800;font-size:19px}
-.ini .degrau .anel .tri small{font-size:11px;color:var(--up);font-weight:800;margin-left:1px}
+.ini .degrau .anel .tri small{font-size:var(--t-nav);color:var(--up);font-weight:800;margin-left:1px}
 .ini .degrau .dtx{flex:1;min-width:0}
-.ini .degrau .top{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--ink3)}
-.ini .degrau .top b{font-family:var(--f-disp);font-size:14px;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
+.ini .degrau .top{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--t-nav);color:var(--ink3)}
+.ini .degrau .top b{font-family:var(--f-disp);font-size:var(--t-body);color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
 .ini .degrau .bar{height:6px;border-radius:99px;background:var(--sup2);margin-top:8px;overflow:hidden}
 .ini .degrau .bar i{display:block;height:100%;background:var(--up);border-radius:99px}
-.ini .degrau .fim{font-size:10px;color:var(--ink3);margin-top:6px}
+.ini .degrau .fim{font-size:var(--t-caption);color:var(--ink3);margin-top:6px}
 /* 28/08: o painel do PROFESSOR ocupa o lugar do degrau — mesmo material
    (vidro escuro sobre a cena), conteúdo outro: ele não sobe de classe, ele
    tem turma. Três números e nada mais: alunos, aulas na semana e quem espera
@@ -924,32 +1176,64 @@ button,input,select{font:inherit;color:inherit}
   padding:11px 6px;backdrop-filter:blur(6px);display:grid;grid-template-columns:repeat(3,1fr)}
 .ini .painel .q{text-align:center;position:relative}
 .ini .painel .q+.q::before{content:'';position:absolute;left:0;top:12%;height:76%;width:1px;background:var(--linha)}
-.ini .painel .q b{display:block;font-family:var(--f-disp);font-size:20px;font-weight:700;line-height:1.1}
-.ini .painel .q small{display:block;font-size:9.5px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+.ini .painel .q b{display:block;font-family:var(--f-disp);font-size:var(--t-title-m);font-weight:700;line-height:1.1}
+.ini .painel .q small{display:block;font-size:var(--t-nav);color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
 .ini .painel .q.acende b{color:var(--up)}
-.ini .palco{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:220px;z-index:1;padding:0 18px}
+/* 01/09 (board 35:756) — A FAIXA DE DUAS COLUNAS.
+   Medidas tiradas do frame 1080x1920: boneco x 33→541 (47%), coluna de cards
+   x 550→1026 (44%), os dois na mesma faixa y 267→1029 (39% da altura).
+   `align-items:stretch` pra que o boneco acompanhe a altura dos cards em vez
+   de definir a sua — quem manda na altura da faixa é o conteúdo da direita,
+   que é texto e não pode ser cortado. */
+.ini .htopo{display:flex;align-items:stretch;gap:2%;margin-top:10px}
+.ini .hcol{flex:1 1 51%;min-width:0;display:flex;flex-direction:column;gap:10px;order:2}
+/* o boneco fica à ESQUERDA (order:1) e não encolhe abaixo de 44%: abaixo disso
+   a figura vira um risco e o uniforme, que é o ponto do vestiário, some. */
+.ini .htopo .palco{flex:0 0 45%;order:1;position:relative;display:flex;
+  flex-direction:column;align-items:center;justify-content:flex-end;
+  min-height:0;z-index:1;padding:0}
+.ini .palco-antigo{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:220px;z-index:1;padding:0 18px}
 .ini .sombra{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:170px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(11px);z-index:0}
 .ini .glow{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:230px;height:66px;border-radius:50%;
   background:radial-gradient(closest-side,var(--camisa),transparent);opacity:.30;filter:blur(6px)}
-.ini .boneco{position:relative;height:300px;max-height:44vh;max-height:44dvh;z-index:1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+/* 01/09: a altura passou a vir da FAIXA, não de um valor fixo. No board o
+   boneco tem 762 de 1920 (39,7% da altura) e termina junto com os cards da
+   direita — com 300px fixos ele estouraria pra fora da faixa em tela alta e
+   ficaria pequeno demais em tela baixa. */
+.ini .boneco{position:relative;height:min(40vh,40dvh);min-height:230px;z-index:1;
+  filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
 .ini .boneco img{height:100%;width:auto;display:block}
 /* 06/08: o boneco virou corpo inteiro e ficou mais alto — a placa no topo
    passou a cortar a cabeça. Desceu pro pé do palco, sobre a sombra. */
-.ini .placa{position:absolute;bottom:2px;left:0;right:0;z-index:2;
+/* 01/09 (board 35:794): a faixa do nome é largura total e vem DEPOIS da faixa
+   de duas colunas — não flutua sobre o boneco. Enquanto era `absolute` ela
+   cobria o card "Let's Ranket" da coluna direita, que agora ocupa a mesma
+   altura do boneco. */
+/* node 35:794 pelo código: 971x70 (raio 100px = pílula), contorno #83e000 e
+   SEM preenchimento — o retângulo de trás não tem fill. O app pintava
+   rgba(11,11,11,.55) por baixo, o que fechava a faixa contra a quadra em vez
+   de deixá-la vazada como no desenho. */
+.ini .placa{position:relative;z-index:2;margin-top:12px;
   display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin:0 14px;padding:12px 18px;border-radius:var(--rp);
-  border:1px solid var(--acc);background:rgba(11,11,11,.55);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.placa .pos{flex:0 0 auto;font:700 9.5px var(--f-ui);color:var(--ink);
-  letter-spacing:.11em;text-transform:uppercase}
-.ini .placa .nm{font:700 15px var(--f-ui);color:var(--ink);min-width:0;
+  padding:12px 22px;border-radius:100px;
+  border:1px solid #83e000;background:transparent}
+.placa .pos{flex:0 0 auto;font:700 var(--t-nav) var(--f-ui);color:#fffefd;
+  letter-spacing:.5px;text-transform:uppercase;text-align:right}
+/* nodes 35:796 e 35:797: os dois são Inter BOLD e brancos; o nome tem 30px e a
+   posição 20px — razão de 1,5. A posição estava em 9,5px contra 15px do nome
+   (razão 1,58) e, pior, com o corpo pequeno demais pra um rótulo que o desenho
+   trata como segunda informação da faixa, não como legenda. */
+.ini .placa .nm{font:700 var(--t-title-l) var(--f-ui);color:#fffefd;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.7)}
 .ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
-.ini .placa .meta b{font-family:var(--f-disp);font-size:14px;color:var(--ink)}
+.ini .placa .meta b{font-family:var(--f-disp);font-size:var(--t-label);color:var(--ink)}
 .ini .placa .meta .pil2{background:var(--up);color:#0A1100;font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
 .ini .acao{position:relative;z-index:2;padding:0 16px 8px}
 /* 25/08 (telas novas): a ação da home é a pílula LARANJA */
-.ini .acao .big{width:100%;border:0;border-radius:var(--rp);padding:16px;background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 8px 24px rgba(255,106,0,.25);cursor:pointer;font-family:var(--f-ui)}
+/* 01/09 (board 35:808): o botão tem 668 de 1080 — 62% da largura, centralizado.
+   Largura total fazia dele uma barra e não uma pílula, que é a forma do board. */
+.ini .acao .big{width:min(100%,62%);min-width:280px;margin:0 auto;display:block;
+  border:0;border-radius:100px;padding:16px;background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 8px 24px rgba(255,106,0,.25);cursor:pointer;font-family:var(--f-ui)}
 .ini .acao .big small{display:block;font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.62;margin-top:3px}
 .ini .acao .big.up{background:var(--up);box-shadow:0 8px 24px rgba(198,255,61,.18)}
 .ini .acao .big.marcado{background:rgba(30,23,20,.82);color:var(--ink);border:1px solid var(--linha2);box-shadow:none;backdrop-filter:blur(6px)}
@@ -958,13 +1242,22 @@ button,input,select{font:inherit;color:inherit}
 /* Ações secundárias sob o botão grande. Vidro escuro e texto discreto de
    propósito: elas precisam EXISTIR sem competir com o registro, que é o elo
    frágil do ciclo e a única ação que merece peso visual. */
-.acoes-sec{display:flex;gap:7px;margin-top:9px}
-.acoes-sec button{flex:1;padding:9px 4px;border-radius:10px;cursor:pointer;
-  background:rgba(30,23,20,.72);border:1px solid var(--linha);color:var(--ink2);
-  font:600 11px var(--f-ui);backdrop-filter:blur(6px);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
+/* 01/09 — O BOTÃO SECUNDÁRIO DO FIGMA. Ele existe: é o "Ver perfil" do card de
+   oponente (node 28:149), que fica embaixo do "Convidar" laranja. A regra de lá
+   é contorno claro sobre fundo transparente, texto claro e canto de 10px — e é
+   isso que estes quatro passam a ser, em vez do vidro marrom que tinham.
+   ⚠️ E viram GRADE 2x2: em fila de quatro numa tela de 375px cada um ficava com
+   ~85px e o rótulo era cortado ("Marcar j…", "Minha c…"). Botão que não diz o
+   que faz é enfeite — o Figma dá ao "Ver perfil" a largura do texto inteiro, e
+   é essa a regra que importa copiar, não o número de colunas. */
+.acoes-sec{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.acoes-sec button{min-height:44px;padding:11px 10px;border-radius:10px;cursor:pointer;
+  background:transparent;border:1px solid rgba(232,222,210,.22);color:var(--ink);
+  font:600 var(--t-label) var(--f-ui);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;transition:.16s}
+.acoes-sec button:hover{border-color:rgba(232,222,210,.38);background:rgba(232,222,210,.05)}
 .acoes-sec button:active{transform:scale(.97)}
-.ini .strip-rot{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
+.ini .strip-rot{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
 .ini .strip-rot a{color:var(--ink3);text-decoration:none;cursor:pointer}
 .ini .strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .ini .strip::-webkit-scrollbar{display:none}
@@ -982,7 +1275,14 @@ button,input,select{font:inherit;color:inherit}
    Duas cópias divergem na primeira correção que só uma receber — foi assim que
    a ficha do jogador virou duas em 26/08. */
 .ini .news-wrap,.noticias .news-wrap{position:relative;z-index:2;padding:0 16px 20px}
-.ini .news-rot,.noticias .news-rot{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);
+/* ⚠️ 01/09 — BUG DE CASCATA CORRIGIDO. Este seletor incluía `.noticias
+   .news-rot`, com a MESMA especificidade da regra de 15px lá em cima (linha
+   ~182) e vindo depois — então a anulava inteira. O comentário de lá dizia "no
+   escopo .noticias ela é o título da seção", e isso nunca chegou a acontecer:
+   o título saía como rótulo de 9px em caixa alta.
+   Agora esta regra vale só na home (.ini), que é onde o rótulo pequeno é o
+   certo, e a seção de notícias fica com o título que sempre foi pra ter. */
+.ini .news-rot{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);
   font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
 .ini .news,.noticias .news{display:flex;flex-direction:column;gap:8px}
 .ini .nitem,.noticias .nitem{display:flex;gap:10px;align-items:center;text-decoration:none;
@@ -992,10 +1292,10 @@ button,input,select{font:inherit;color:inherit}
 .ini .nthumb,.noticias .nthumb{flex:0 0 52px;width:52px;height:52px;border-radius:8px;object-fit:cover;
   background:var(--sup2);display:block}
 .ini .ntxt,.noticias .ntxt{flex:1;min-width:0}
-.ini .ntxt b,.noticias .ntxt b{display:block;font-size:12.5px;color:var(--ink);font-weight:700;line-height:1.32;
+.ini .ntxt b,.noticias .ntxt b{display:block;font-size:var(--t-label);color:var(--ink);font-weight:700;line-height:1.32;
   /* duas linhas e reticências: manchete longa não pode empurrar a nav pra fora */
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ini .ntxt small,.noticias .ntxt small{display:block;font-size:10.5px;color:var(--ink3);margin-top:3px}
+.ini .ntxt small,.noticias .ntxt small{display:block;font-size:var(--t-caption);color:var(--ink3);margin-top:3px}
 .ini .nseta,.noticias .nseta{color:var(--ink3);font-size:15px;flex:0 0 auto}
 /* a home é full-bleed e paga a margem lateral aqui dentro; a aba Feed vive numa
    .sec, que já a paga. Só o padding muda entre os dois escopos. */
@@ -1012,7 +1312,7 @@ button,input,select{font:inherit;color:inherit}
   background:linear-gradient(transparent,rgba(0,0,0,.85))}
 .heroi .nh-txt b{display:block;font:700 14.5px/1.25 var(--f-ui);color:var(--ink);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.heroi .nh-txt small{display:block;font:400 10.5px var(--f-ui);color:var(--ink3);margin-top:4px}
+.heroi .nh-txt small{display:block;font:400 var(--t-caption) var(--f-ui);color:var(--ink3);margin-top:4px}
 .heroi .nh-seta{position:absolute;right:11px;bottom:11px;width:24px;height:24px;border-radius:50%;
   border:1px solid rgba(255,254,253,.5);color:var(--ink);font-size:12px;
   display:flex;align-items:center;justify-content:center}
@@ -1024,7 +1324,7 @@ button,input,select{font:inherit;color:inherit}
    desce sozinho no meio da leitura no 4G da quadra. `--ads-prop` vem da
    campanha; o valor aqui é só o padrão de quem não declarou. */
 .ini .ads-wrap{position:relative;z-index:2;padding:0 16px 18px}
-.ini .ads-rot{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+.ini .ads-rot{font-size:var(--t-nav);letter-spacing:.16em;text-transform:uppercase;
   color:var(--ink3);font-weight:700;margin-bottom:6px;opacity:.75}
 .ini .ads{display:block;aspect-ratio:var(--ads-prop,1/1);border-radius:12px;
   overflow:hidden;border:1px solid var(--linha);background:var(--sup);
@@ -1038,8 +1338,8 @@ button,input,select{font:inherit;color:inherit}
 .ini .mcard .mic{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink2)}
 .ini .mcard .mtx{min-width:0}
 .ini .mcard .mtx b{font-size:11.5px;font-weight:650;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ini .mcard .mtx small{font-size:10px;color:var(--ink3)}
-.ini .mcard .mv{margin-left:auto;font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--up)}
+.ini .mcard .mtx small{font-size:var(--t-caption);color:var(--ink3)}
+.ini .mcard .mv{margin-left:auto;font-family:var(--f-disp);font-size:var(--t-body);font-weight:700;color:var(--up)}
 
 /* ===== AMBIENTE NOTURNO — a mesma quadra Saibro Noturno corre por baixo das telas internas ===== */
 #amb{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .25s;
@@ -1091,7 +1391,7 @@ button,input,select{font:inherit;color:inherit}
 .ini .boneco{cursor:pointer}
 .edit-hint{position:absolute;bottom:0;left:50%;transform:translateX(-50%);z-index:3;
   background:rgba(21,16,13,.74);border:1px solid var(--linha2);border-radius:99px;
-  padding:5px 12px;font-size:10px;letter-spacing:.06em;color:var(--ink2);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap}
+  padding:5px 12px;font-size:var(--t-nav);letter-spacing:.06em;color:var(--ink2);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap}
 /* 07/08: o vestiário virou coluna de altura fixa — palco em faixa que não sai do
    lugar, e o PAINEL é quem rola. Antes o palco era `sticky` e o painel passava
    POR BAIXO dele, tapando os controles.
@@ -1140,7 +1440,7 @@ button,input,select{font:inherit;color:inherit}
    ocupa a linha inteira (o flex:1 acima), que é o caso mais comum: escolher
    sem trocar nada e sair. */
 .vest-concluir-tray{display:block;width:100%;margin-top:12px;border:0;border-radius:12px;
-  padding:14px;cursor:pointer;background:var(--marca);color:#FFFEFD;
+  padding:14px;cursor:pointer;background:var(--marca);color:var(--marca-ink);
   font:800 13px system-ui;letter-spacing:.08em;text-transform:uppercase}
 .vest-concluir-tray:active{transform:scale(.985)}
 .vest-preview .vfig{position:relative;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center}
@@ -1161,8 +1461,13 @@ button,input,select{font:inherit;color:inherit}
    troca Nível, divisão, quadro e pontos de uma vez. Nada é convertido. */
 .esp-sw{display:flex;gap:4px;margin-top:9px;padding:3px;border-radius:999px;
   background:rgba(11,8,6,.5);border:1px solid rgba(232,222,210,.12);backdrop-filter:blur(8px);width:fit-content}
-.esp-sw button{border:0;cursor:pointer;padding:5px 15px;border-radius:999px;background:transparent;
-  color:var(--ink3);font:700 11px/1 system-ui;letter-spacing:.06em;text-transform:uppercase;transition:.18s}
+/* 01/09: dentro da coluna de 44% (board 35:799) o rótulo "BEACH TENNIS"
+   quebrava em duas linhas e a pílula virava um bloco de dois andares.
+   `nowrap` + espaçamento menor resolvem sem encolher a fonte a ponto de
+   sumir — o board tem as abas em 85% da coluna, e é o que isto entrega. */
+.esp-sw button{border:0;cursor:pointer;min-height:36px;padding:5px 14px;border-radius:999px;background:transparent;
+  color:var(--ink3);font:700 var(--t-nav)/1 var(--f-ui);letter-spacing:.04em;
+  text-transform:uppercase;transition:.18s;white-space:nowrap}
 .esp-sw button.on{background:var(--acc);color:#14100c}
 
 /* os dois esportes na ficha, lado a lado */
@@ -1191,7 +1496,7 @@ button,input,select{font:inherit;color:inherit}
 .wgt .w .wfig{flex:0 0 34px;height:42px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
 .wgt .w .wfig img{height:64px;width:auto;object-fit:contain;object-position:top}
 .wgt .w .wtx{min-width:0}
-.wgt .w .wtx b{display:block;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wgt .w .wtx b{display:block;font-size:var(--t-label);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wgt .w .wtx small{display:block;font-size:10px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wgt .w.vest{background:linear-gradient(135deg,rgba(198,255,61,.14),rgba(30,23,20,.86))}
 
@@ -1239,8 +1544,8 @@ button,input,select{font:inherit;color:inherit}
   padding:13px 16px max(15px,env(safe-area-inset-bottom));
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .vtray .tt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:11px}
-.vtray .tt b{font:700 10px system-ui;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
-.vtray .tt span{font-size:10.5px;color:var(--ink3);text-align:right}
+.vtray .tt b{font:700 var(--t-nav) system-ui;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+.vtray .tt span{font-size:var(--t-caption);color:var(--ink3);text-align:right}
 /* 6 colunas: com a 11ª cor (o preto), 5 colunas jogava a paleta pra TRÊS
    fileiras e a bandeja passava a rolar — e rolagem num provador é erro de
    conceito, faz perder o personagem de vista bem na hora de julgar a roupa.
@@ -1276,7 +1581,7 @@ button,input,select{font:inherit;color:inherit}
 /* rótulo em negrito ACIMA do campo, como o board faz em "Data de nascimento"
    e "Bio" — diferente do .rot, que é caixa-alta e menor */
 .onb-rot{font:700 14px var(--f-ui);color:var(--ink);margin:16px 0 8px}
-.onb-area{width:100%;min-height:86px;padding:15px;border-radius:16px;resize:vertical;
+.onb-area{width:100%;min-height:86px;padding:var(--t-body);border-radius:16px;resize:vertical;
   background:rgba(30,23,20,.72);border:1px solid rgba(255,254,253,.55);color:var(--ink);
   font:400 15px var(--f-ui);margin-bottom:4px}
 .onb-area:focus{outline:none;border-color:var(--acc)}
@@ -1294,7 +1599,7 @@ button,input,select{font:inherit;color:inherit}
 .onb-check span{flex:1;line-height:1.45}
 .onb-check u{text-underline-offset:2px}
 .seg2 button{flex:1;padding:12px 10px;border-radius:8px;background:rgba(30,23,20,.7);border:1px solid var(--linha2);
-  color:var(--ink2);font-size:13px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  color:var(--ink2);font-size:var(--t-label);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .seg2 button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 
 /* ===== CADASTRO / ONBOARDING ===== */
@@ -1320,11 +1625,11 @@ button,input,select{font:inherit;color:inherit}
    3,43:1 e travar num quadrado de 78px o deixaria com 23px de altura útil. */
 #onb .onb-mark{width:min(272px,74%);display:flex;align-items:center;justify-content:center}
 #onb .onb-mark img{width:100%;height:auto;display:block}
-#onb .onb-brand h1{font-family:var(--f-disp);font-size:29px;text-transform:uppercase;letter-spacing:.03em}
-#onb .onb-brand p{font-size:13px;color:var(--ink2);max-width:290px;line-height:1.5}
+#onb .onb-brand h1{font-family:var(--f-disp);font-size:var(--t-display);text-transform:uppercase;letter-spacing:.03em}
+#onb .onb-brand p{font-size:var(--t-label);color:var(--ink2);max-width:290px;line-height:1.5}
 #onb .onb-acts{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
-#onb .onb-fine{font-size:10.5px;color:var(--ink3);text-align:center;margin-top:8px;line-height:1.5}
-#onb .big{width:100%;padding:15px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:15px;cursor:pointer;font-family:var(--f-ui)}
+#onb .onb-fine{font-size:var(--t-caption);color:var(--ink3);text-align:center;margin-top:8px;line-height:1.5}
+#onb .big{width:100%;padding:var(--t-title-s);border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:15px;cursor:pointer;font-family:var(--f-ui)}
 #onb .big.alt{background:rgba(20,26,23,.72);color:var(--ink);border:1px solid var(--linha2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 /* 26/08 (telas do Figma) — o KICKER passa a vir ABAIXO do título.
    `column-reverse` em vez de mexer no markup: a ordem "kick, depois h2" se
@@ -1334,8 +1639,8 @@ button,input,select{font:inherit;color:inherit}
    A cor do kick já era `--up` (#83E000) — idêntica ao verde do desenho. */
 #onb .onb-head{margin:4px 0 16px;display:flex;flex-direction:column-reverse;align-items:flex-start}
 #onb .onb-head.center{text-align:center;align-items:center}
-#onb .onb-kick{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--up);font-weight:700;margin:6px 0 0}
-#onb .onb-head h2{font-family:var(--f-disp);font-size:24px;line-height:1.14;letter-spacing:.01em}
+#onb .onb-kick{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--up);font-weight:700;margin:6px 0 0}
+#onb .onb-head h2{font-family:var(--f-disp);font-size:var(--t-title-l);line-height:1.14;letter-spacing:.01em}
 /* o título ganha o ícone circular do desenho, quando a tela tiver um */
 #onb .onb-head .tt{display:flex;align-items:center;gap:10px}
 #onb .onb-head .tt .ico{flex:0 0 26px;width:26px;height:26px;border-radius:50%;
@@ -1369,12 +1674,12 @@ button,input,select{font:inherit;color:inherit}
 #onb .onb-card.on .dv{color:var(--acc-ink)}
 #onb .onb-card.on .tx small{color:rgba(10,17,0,.72)}
 #onb .onb-card .dv{font-family:var(--f-disp);font-size:26px;font-weight:700;width:38px;text-align:center;color:var(--acc);flex:0 0 38px}
-#onb .onb-card .tx b{font-size:14px;display:block}
-#onb .onb-card .tx small{font-size:11.5px;color:var(--ink3);display:block;margin-top:2px}
-#onb .onb-card>b{font-size:15px}
-#onb .onb-link{background:none;border:0;color:var(--ink2);text-decoration:underline;font-size:12.5px;margin-top:14px;cursor:pointer;align-self:center}
+#onb .onb-card .tx b{font-size:var(--t-title-s);display:block}
+#onb .onb-card .tx small{font-size:var(--t-caption);color:var(--ink3);display:block;margin-top:2px}
+#onb .onb-card>b{font-size:var(--t-title-s)}
+#onb .onb-link{background:none;border:0;color:var(--ink2);text-decoration:underline;font-size:var(--t-label);margin-top:14px;cursor:pointer;align-self:center}
 #onb .onb-nav{margin-top:auto;padding-top:18px}
-#onb .onb-prim{width:100%;padding:16px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:15px;letter-spacing:0;cursor:pointer;font-family:var(--f-ui)}
+#onb .onb-prim{width:100%;padding:16px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:var(--t-title-s);letter-spacing:0;cursor:pointer;font-family:var(--f-ui)}
 #onb .onb-prim:disabled{opacity:.4;cursor:default}
 /* 26/08: o secundário do desenho é BOTÃO de fundo escuro, não link sublinhado
    — mesma altura e mesmo raio do primário, e é isso que faz os dois lerem como
@@ -1399,8 +1704,8 @@ button,input,select{font:inherit;color:inherit}
   background:linear-gradient(180deg,rgba(10,8,6,.82) 0%,rgba(10,8,6,.28) 13%,rgba(10,8,6,0) 26%,rgba(10,8,6,0) 74%,rgba(10,8,6,.9) 100%)}
 #trofeus .tr-topo{position:absolute;top:0;left:0;right:0;z-index:4;padding:16px 54px 10px 18px;
   display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
-#trofeus .tr-topo h2{font:400 23px/1 var(--f-disp);margin:0;text-shadow:0 2px 12px rgba(0,0,0,.9)}
-#trofeus .tr-cnt{font:700 11px var(--f-ui);letter-spacing:.1em;color:var(--ink2);white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.9)}
+#trofeus .tr-topo h2{font:400 var(--t-title-l)/1 var(--f-disp);margin:0;text-shadow:0 2px 12px rgba(0,0,0,.9)}
+#trofeus .tr-cnt{font:700 var(--t-nav) var(--f-ui);letter-spacing:.1em;color:var(--ink2);white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.9)}
 #trofeus .tr-cnt b{color:var(--gold)}
 #trofeus .tr-abas{position:absolute;top:58px;left:0;right:0;z-index:4;display:flex;gap:8px;padding:0 18px}
 #trofeus .tr-aba{flex:0 0 auto;padding:7px 14px;border-radius:99px;border:1px solid var(--linha);
@@ -1430,8 +1735,8 @@ button,input,select{font:inherit;color:inherit}
 #trofeus .tr-peca.sel::after{content:"";position:absolute;inset:-6px -4px 12px;border:1px solid var(--gold);border-radius:8px}
 #trofeus .tr-det{position:absolute;left:0;right:0;bottom:0;z-index:5;border-top:1px solid var(--linha);
   background:rgba(12,9,8,.9);backdrop-filter:blur(10px);padding:14px 18px calc(16px + env(safe-area-inset-bottom))}
-#trofeus .tr-det b{font:600 14px var(--f-ui);display:flex;align-items:center}
-#trofeus .tr-det p{margin:5px 0 0;font-size:12px;color:var(--ink2)}
+#trofeus .tr-det b{font:600 var(--t-title-s) var(--f-ui);display:flex;align-items:center}
+#trofeus .tr-det p{margin:5px 0 0;font-size:var(--t-label);color:var(--ink2)}
 #trofeus .tr-pill{font:700 9px var(--f-ui);letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-left:8px}
 #trofeus .tr-pill.tem{background:var(--up-bg);color:var(--up)}
 #trofeus .tr-pill.nao{background:var(--sup2);color:var(--ink3)}
@@ -1443,19 +1748,19 @@ button,input,select{font:inherit;color:inherit}
 #vs .vs-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
   background:linear-gradient(180deg,rgba(11,8,6,.9) 0%,rgba(11,8,6,.28) 24%,rgba(11,8,6,.2) 52%,rgba(11,8,6,.88) 88%,rgba(11,8,6,.98) 100%)}
 #vs .vs-top{position:relative;z-index:3;padding:26px 20px 0;text-align:center}
-#vs .vs-kick{font:400 22px/1.15 var(--f-disp);color:var(--ink);text-shadow:0 2px 12px rgba(0,0,0,.9)}
+#vs .vs-kick{font:400 var(--t-title-l)/1.15 var(--f-disp);color:var(--ink);text-shadow:0 2px 12px rgba(0,0,0,.9)}
 #vs .vs-arena{position:relative;z-index:2;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px}
 #vs .vs-lado{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0}
 #vs .vs-lado .bfig{position:relative;height:250px;max-height:38vh;display:flex;align-items:flex-end;justify-content:center}
 #vs .vs-lado .bfig::after{content:"";position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:120px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(10px);z-index:-1}
 #vs .vs-lado img.bcv{height:250px;max-height:38vh;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
-#vs .vs-nome{margin-top:8px;font:700 13px var(--f-ui);color:var(--ink);text-shadow:0 2px 8px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#vs .vs-nome{margin-top:8px;font:700 var(--t-label) var(--f-ui);color:var(--ink);text-shadow:0 2px 8px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 #vs .vs-x{z-index:2;font:400 30px var(--f-disp);color:var(--acc);text-shadow:0 2px 14px rgba(0,0,0,.9);flex:0 0 auto;padding-bottom:34px}
 #vs .vs-card{position:relative;z-index:3;padding:16px 18px calc(18px + env(safe-area-inset-bottom));background:rgba(12,9,8,.72);backdrop-filter:blur(10px);border-top:1px solid var(--linha)}
 #vs .vs-adv{text-align:center;margin-bottom:14px}
-#vs .vs-adv b{font:600 17px var(--f-ui);color:var(--ink)}
-#vs .vs-id{font-size:12px;color:var(--ink3);font-weight:400}
-#vs .vs-meta{font-size:12.5px;color:var(--ink2);margin-top:3px}
+#vs .vs-adv b{font:600 var(--t-title-s) var(--f-ui);color:var(--ink)}
+#vs .vs-id{font-size:var(--t-caption);color:var(--ink3);font-weight:400}
+#vs .vs-meta{font-size:var(--t-caption);color:var(--ink2);margin-top:3px}
 #vs .vs-acoes{display:flex;gap:10px}
 #vs .vs-acoes button{flex:1;padding:15px;border-radius:13px;border:none;font:700 15px var(--f-ui);cursor:pointer}
 #vs .vs-no{background:#2a1a16;color:var(--ink);border:1px solid var(--linha2)}
@@ -1463,7 +1768,7 @@ button,input,select{font:inherit;color:inherit}
 
 /* botão Concluir do vestiário quando ele é aberto durante o cadastro */
 .vest-concluir{position:absolute;left:16px;right:16px;bottom:max(18px,env(safe-area-inset-bottom));z-index:30;
-  padding:16px;border:0;border-radius:var(--rp);background:var(--marca);color:#FFFEFD;
+  padding:16px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);
   font:800 15px var(--f-ui);cursor:pointer;box-shadow:0 8px 24px rgba(255,106,0,.35)}
 </style>
 </head>
@@ -1480,6 +1785,17 @@ button,input,select{font:inherit;color:inherit}
     <button class="voltar" id="voltar">‹</button>
     <div class="marca" id="marca"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
     <h1 id="titulo">Quadro</h1>
+    <!-- 01/09 (node 31:738) — A BUSCA DO RADAR. O Figma põe uma pílula de
+         busca de 717x53 (raio 100, borda #BCBCBC) ocupando o meio do topo,
+         entre o voltar e o avatar, e NÃO escreve título de tela nessa aba.
+         O app não tinha campo nenhum — a busca por nome só existia dentro de
+         _net.abrirBusca(). Aparece só no radar; nas outras telas o título
+         segue como está. -->
+    <form class="topo-busca" id="topoBusca" hidden onsubmit="return radarBuscar(event)">
+      <i aria-hidden="true">⌕</i>
+      <input type="search" id="topoBuscaInput" placeholder="Buscar"
+             autocomplete="off" enterkeyhint="search" aria-label="Buscar jogador">
+    </form>
     <div class="dir" id="dir"></div>
     <!-- 29/08 (board): sino e avatar sobem pro topo. É o que libera a barra de
          baixo pra caber em cinco com o + no meio: Notificações deixa de ser
@@ -1537,7 +1853,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788058979"></script>
+<script src="net.js?v=1788358927"></script>
 
 <script>
 /* =========================================================================
@@ -2129,6 +2445,9 @@ function categoriaDe(n, cl){
    `C1 > C2 > C3 > C4` exigia saber que menor é melhor; `C+++ > C++ > C+ > C`
    só admite uma leitura. É render: o dado continua sendo o número. */
 const CAT_SUFIXO = { 1:'+++', 2:'++', 3:'+', 4:'' };
+/* 01/09 (mig 90) — os tres rotulos de estilo, DECLARADOS pela pessoa.
+   A chave e o que o banco guarda; o texto e o que a tela mostra. */
+const ESTILO_ROTULO = { fundo:'Fundo de quadra', consistente:'Consistente', defensivo:'Defensivo' };
 const catNome = (cl, cat)=> cl + CAT_SUFIXO[cat];
 // 'C+' — a etiqueta que aparece na vitrine
 const classeDe = (j)=> catNome(divDe(j), categoriaDe(nivelDe(j), divDe(j)));
@@ -2287,15 +2606,24 @@ window.modoTrocar = modoTrocar;
      dedo") volta a valer pra TODO MUNDO, inclusive o aluno. */
 /* A folha do +. 29/08: os itens NÃO são escolha minha — estão desenhados no
    board, sobrepostos na HOME (node 120:329), coisa que a seção
-   "+ DA BARRA INFERIOR" não mostrava porque saiu com o corpo vazio. São
-   quatro, nesta ordem, e dois deles ainda não existem no app:
+   "+ DA BARRA INFERIOR" não mostrava porque saiu com o corpo vazio. O board
+   desenha quatro; o app leva TRÊS, nesta ordem — a divergência está explicada
+   item a item abaixo, e é a única do app inteiro em relação ao board:
 
      · Registrar placar ....... netAbrirMao, existe
      · Organizar nova partida . a aba radar, existe
-     · Registrar atividade .... NÃO EXISTE — nem tela, nem dado, nem regra.
-                                O board não diz o que é uma "atividade" que
-                                não é partida (treino? aula? só marcar que
-                                jogou?). Nasce em casca até alguém decidir.
+     · Registrar atividade .... SAIU (01/09). Único item do board que o app
+                                não desenha, e de propósito. Não havia decisão
+                                de produto por baixo: treino e aula já são
+                                `aulas`/`aulas_avulsas`, e "só marcar que
+                                jogou" é o Registrar placar uma linha acima.
+                                Um item que existe pra dizer "ainda não existe"
+                                custava 1 dos 4 lugares da folha mais usada do
+                                app. A regra da casa — mostrar o que não existe
+                                em vez de esconder — vale pra porta viva que
+                                ainda não abriu; esta nunca teve nada atrás.
+                                Se voltar, volta como treino solo contando pra
+                                frequência, nunca pro ranking nem pro Nível.
      · Novo post no feed ...... NÃO EXISTE — depende da tabela `posts`, que é
                                 a migração da Fase 2. Casca até lá.
 
@@ -2306,7 +2634,6 @@ function maisItens(){
   if(veProfessor()) eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()", false]);
   eu.push(['1-1','Registrar placar','Uma partida que já aconteceu', "_net.abrirMao()", false]);
   eu.push(['◎','Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
-  eu.push(['✚','Registrar atividade','Ainda não existe no app', "", true]);
   eu.push(['✎','Novo post no feed','Escrever pra comunidade', "irFeed()", false]);
   /* a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse; ela
      reaparece aqui — mesma superfície, um toque, outro lugar. */
@@ -2334,18 +2661,38 @@ function irFeed(){
     if(el){ el.focus(); el.scrollIntoView({block:'center'}) } }, 60);
 }
 
+/* 02/09 — OS ÍCONES DA BARRA, tirados do arquivo do Figma (barra inferior,
+   node 159:2423). São paths de TRAÇO, não de preenchimento: por isso
+   `stroke="currentColor"` e `fill="none"` — é o que deixa o mesmo desenho
+   servir aos dois estados sem virar dois arquivos.
+   Cada um mantém o viewBox original, então a proporção é a do arquivo e a
+   altura de 24px vale pros quatro sem esticar nenhum:
+     House_03  61,955 x 57,477   Compass  56,730 x 56,730
+     Vector    46,458 x 40,458   Chat     56,730 x 56,730
+   ⚠️ A espessura do traço vem do arquivo (2,9858 e 3,458 sobre viewBox de ~57
+   e ~46) e é o que faz os quatro parecerem da mesma família apesar de virem em
+   caixas diferentes. Normalizar isso pra um valor só engrossaria o de
+   COMUNIDADE, que é o menor dos quatro.
+   Os do professor (Turma, Aulas) continuam em emoji: o board não desenhou a
+   barra dele, e inventar dois ícones fora do arquivo é o oposto de paridade. */
+const NAVIC = {
+  home:`<svg viewBox="0 0 61.9553 57.4765" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10.4531 48.8409H10.4511M36.2658 48.8409H51.7546V28.37C51.7546 27.0904 51.7535 26.4502 51.5857 25.8547C51.4371 25.327 51.1931 24.8277 50.8629 24.3764C50.4903 23.8672 49.9722 23.4449 48.9342 22.6023L36.5431 12.5439C34.6158 10.9793 33.6521 10.1975 32.5676 9.89994C31.6119 9.63776 30.5933 9.63776 29.6377 9.89994C28.554 10.1973 27.5917 10.9784 25.6672 12.5405L13.2721 22.6023C12.234 23.4449 11.7162 23.8672 11.3436 24.3764C11.0134 24.8277 10.7675 25.327 10.6189 25.8547C10.4511 26.4502 10.4511 27.0904 10.4511 28.37V48.8409H25.94M25.94 48.8409H36.2658M25.94 48.8409V39.2615C25.94 36.6162 28.2515 34.4718 31.1029 34.4718C33.9543 34.4718 36.2658 36.6162 36.2658 39.2615V48.8409" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  radar:`<svg viewBox="0 0 56.7301 56.7301" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7.08978 28.366C7.08978 40.1152 16.6144 49.6398 28.3636 49.6398C40.1128 49.6398 49.6374 40.1152 49.6374 28.366C49.6374 16.6168 40.1128 7.09219 28.3636 7.09219C16.6144 7.09219 7.08978 16.6168 7.08978 28.366Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/><path d="M24.8179 24.8203L37.8186 18.911L31.9092 31.9116L18.9086 37.821L24.8179 24.8203Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  comunidade:`<svg viewBox="0 0 46.4584 40.4584" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M44.7292 38.729C44.7292 34.433 40.7407 30.7783 35.1737 29.4238M30.3959 38.7292C30.3959 33.28 23.9786 28.8626 16.0626 28.8626C8.14647 28.8626 1.72922 33.28 1.72922 38.7292M30.3959 21.4626C35.6733 21.4626 39.9514 17.0451 39.9514 11.5959C39.9514 6.14667 35.6733 1.72922 30.3959 1.72922M16.0626 21.4626C10.7852 21.4626 6.507 17.0451 6.507 11.5959C6.507 6.14667 10.7852 1.72922 16.0626 1.72922C21.3399 1.72922 25.6181 6.14667 25.6181 11.5959C25.6181 17.0451 21.3399 21.4626 16.0626 21.4626Z" stroke="currentColor" stroke-width="3.45844" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chat:`<svg viewBox="0 0 56.7301 56.7301" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.2349 47.0868L16.8372 44.205L16.8637 44.1847C17.6147 43.5839 17.9937 43.2807 18.4165 43.0647C18.7958 42.8709 19.2003 42.7298 19.6175 42.6441C20.0879 42.5476 20.5778 42.5476 21.5612 42.5476H42.081C44.7234 42.5476 46.0462 42.5476 47.0565 42.0328C47.946 41.5796 48.6697 40.8556 49.1229 39.9661C49.6377 38.9558 49.6377 37.6345 49.6377 34.992V17.0117C49.6377 14.3693 49.6377 13.0461 49.1229 12.0358C48.6697 11.1462 47.9446 10.4235 47.055 9.9703C46.0438 9.45504 44.7218 9.45504 42.0741 9.45504H14.6546C12.0069 9.45504 10.6821 9.45504 9.67084 9.9703C8.7813 10.4235 8.05861 11.1462 7.60537 12.0358C7.0901 13.047 7.0901 14.3719 7.0901 17.0195V44.1341C7.0901 46.6532 7.0901 47.9125 7.60648 48.5594C8.05557 49.122 8.73631 49.4493 9.45617 49.4485C10.2839 49.4476 11.2679 48.6605 13.2349 47.0868Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
 function navAbas(){
   const mais = {t:'__mais', i:'+', r:'', cta:true};
-  const chat = {t:'chat', i:'💬', r:'Chat'};
+  const chat = {t:'chat', i:NAVIC.chat, r:'Chat'};
   if(!ehProfessor() || modoJogador()) return [
-    {t:'inicio', i:'◈', r:'Home'}, {t:'radar', i:'◎', r:'Radar'},
+    {t:'inicio', i:NAVIC.home, r:'Home'}, {t:'radar', i:NAVIC.radar, r:'Radar'},
     mais,
-    {t:'comunidade', i:'▣', r:'Comunidade'}, chat,
+    {t:'comunidade', i:NAVIC.comunidade, r:'Comunidade'}, chat,
   ];
   /* o professor mantém Turma e Aulas, que são a vida dele. A Ficha — onde vive
      o switch "eu compito" da mig 72 — sobe pro avatar do topo, como todo mundo. */
   return [
-    {t:'inicio', i:'◈', r:'Home'}, {t:'turma', i:'👥', r:'Turma'},
+    {t:'inicio', i:NAVIC.home, r:'Home'}, {t:'turma', i:'👥', r:'Turma'},
     mais,
     {t:'aulas', i:'🗓', r:'Aulas'}, chat,
   ];
@@ -2551,7 +2898,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788058979"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788358927"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2683,7 +3030,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788058979"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788358927"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -2692,14 +3039,48 @@ async function noticiasCarregar(){
     NEWS = [];                               // sem notícia o app abre igual
     console.warn('[news] não carregou:', e.message);
   }
-  if(NEWS.length && !pilha.length && aba === 'inicio') render();
+  /* 02/09 — O REPINTE PRECISA COBRIR AS DUAS TELAS QUE USAM A LISTA.
+     A condição era `aba === 'inicio'`, escrita quando a notícia só existia na
+     home. Desde 29/08 ela também abre a aba Feed da Comunidade — e ali o
+     `fetch` termina DEPOIS do primeiro render, então quem entrasse direto na
+     Comunidade (ou trocasse pra ela antes do arquivo chegar) via a aba sem o
+     bloco "Notícias do tênis" e sem o cartão-herói, sem erro nenhum no
+     console. Não era código faltando na tela: era esta linha não chamando o
+     repinte pra ela. */
+  if(NEWS.length && !pilha.length && (aba === 'inicio' || aba === 'comunidade')) render();
 }
 
+/* a busca do topo do radar. NÃO cria mecanismo novo: entrega o termo pro
+   `_net.abrirBusca`, que já existe e já respeita a trava de ±1 classe e o
+   banido (mig 41). O campo é a superfície que faltava, não a regra. */
+function radarBuscar(ev){
+  ev.preventDefault();
+  const el = document.getElementById('topoBuscaInput');
+  const termo = (el && el.value || '').trim();
+  if(!termo) return false;
+  if(window._net && _net.abrirBusca) _net.abrirBusca(termo);
+  return false;
+}
 function render(){
   const atual = pilha.length ? pilha[pilha.length-1] : {rota:aba};
   const v = VISTAS[atual.rota](atual.params||{});
   $('#titulo').textContent = v.titulo;
   $('#dir').innerHTML = v.dir||'';
+  /* 01/09: no radar o topo troca o título pela pílula de busca, como no node
+     31:738. Nas outras telas ela some e o título volta.
+     02/09 — ERA SÓ O RADAR, E NO ARQUIVO É A REGRA. O mesmo cabeçalho
+     (node 159:2442: ‹ · pílula de busca · sino · avatar) se repete em 8 de 8
+     telas do board. Quem estava fora eram as três abas da Comunidade, o
+     ranking de uma classe e o feed do grupo — todas mostrando um título
+     "COMUNIDADE" que o desenho não tem, e sem a busca que ele tem.
+     ⚠️ Fica de FORA de propósito: a home (que abre imersiva, sem topo) e
+     qualquer rota empilhada — ali o ‹ e o título dizem de onde você veio, e
+     trocá-los pela busca tira a única pista de volta. */
+  const COM_BUSCA = {radar:1, comunidade:1};
+  const noRadar = COM_BUSCA[atual.rota] && !pilha.length;
+  const bq = $('#topoBusca');
+  if(bq){ bq.hidden = !noRadar; }
+  $('#titulo').style.display = noRadar ? 'none' : '';
   // a home abre imersiva: sem barra de topo (a HUD dela já faz esse papel)
   const naInicio = atual.rota==='inicio';
   const naVest = atual.rota==='vestiario';
@@ -2912,19 +3293,50 @@ function perfilCarregar(id){
   window.__perfCache = window.__perfCache || {};
   if(window.__perfCache[id] !== undefined) return;
   window.__perfCache[id] = null;                    // null = carregando
-  const vazio = {posts:[], avals:[], podeAvaliar:[], trofeus:[]};
+  const vazio = {posts:[], avals:[], podeAvaliar:[], trofeus:[],
+                 seg:{seguidores:0, seguindo:0, eu_sigo:false}};
   if(!(window._net && _net.feed)){ window.__perfCache[id] = vazio; return }
   Promise.all([ _net.feed({autor:id}), _net.avaliacoes(id), _net.partidasParaAvaliar(id),
                 /* os troféus DELE. `trofeus_sel` é `for select using (true)`
                    (mig 13) — troféu é fato público, quem ganhou ganhou —,
                    então não há o que decidir de acesso aqui. */
-                _net.trofeusDe(id) ])
-    .then(([posts, avals, podeAvaliar, trofeus])=>{
-      window.__perfCache[id] = {posts, avals, podeAvaliar, trofeus:trofeus||[]};
+                _net.trofeusDe(id),
+                /* 01/09 (mig 89) — entra NESTE Promise.all e não numa busca
+                   própria: o botão Seguir fica no cabeçalho, que aparece em
+                   todas as abas do perfil, então pedir à parte adiantaria
+                   nada e piscaria o contador depois da tela montada. */
+                _net.seguirNumeros(id) ])
+    .then(([posts, avals, podeAvaliar, trofeus, seg])=>{
+      window.__perfCache[id] = {posts, avals, podeAvaliar, trofeus:trofeus||[],
+                                seg: seg || vazio.seg};
       render();
     })
     .catch(()=>{ window.__perfCache[id] = vazio; render(); });
 }
+/* seguir / deixar de seguir (mig 89). Um botão só, dois sentidos.
+   Otimista de propósito NÃO: o contador muda depois da resposta do banco. A
+   trava de bloqueio mora no servidor, então adiantar o número na tela mostraria
+   "Seguindo" e +1 pra um laço que o banco recusou — e o número erraria até o
+   próximo carregamento. */
+async function seguirAlternar(alvo){
+  const d = (window.__perfCache||{})[alvo];
+  if(!d || !d.seg) return;
+  const r = d.seg.eu_sigo ? await _net.deixarDeSeguir(alvo) : await _net.seguir(alvo);
+  if(r.erro){ alert('Não deu: '+r.erro); return }
+  window.__perfCache[alvo] = undefined;             // força recarregar os números
+  perfilCarregar(alvo); render();
+}
+
+/* o estilo de jogo declarado (mig 90). `''` apaga — e apagar tem que existir,
+   senão a escolha vira permanente sem ninguém ter avisado. */
+async function estiloEscolher(v){
+  const r = await _net.estiloSalvar(v || null);
+  if(r.erro){ alert('Não deu pra salvar: '+r.erro); return }
+  if(S.jogadores[EU]) S.jogadores[EU].estilo = v || null;
+  toast(v ? 'Estilo atualizado.' : 'Estilo removido do seu perfil.');
+  render();
+}
+
 /* escrever uma avaliação. A policy exige partida CONFIRMADA contra a pessoa e
    uma por partida — a tela só mostra o campo quando existe partida elegível,
    senão ofereceria uma porta que o banco fecha. */
@@ -2995,12 +3407,15 @@ async function comuPostar(){
   const el = document.getElementById('post-txt');
   const t = el ? el.value : '';
   if(!t.trim()){ toast('Escreve alguma coisa antes de publicar.'); return }
-  const r = await _net.postar(t, null);
+  const inp = document.getElementById('post-foto');
+  const foto = inp && inp.files && inp.files[0];
+  const r = await _net.postar(t, null, foto);
   /* o teto de 20 posts por hora é trigger no banco e chega como exceção. A
      frase dele já diz o que fazer, então ela sobe inteira em vez de virar um
      "erro" genérico que não ensina nada. */
   if(r.erro){ alert('Não deu pra publicar: '+r.erro); return }
   if(el) el.value='';
+  if(inp){ inp.value=''; const n=document.getElementById('post-foto-nome'); if(n) n.textContent=''; }
   window.__comuFeed = undefined;              // força reler
   toast('Publicado.');
   comuFeedCarregar(); render();
@@ -3020,6 +3435,12 @@ async function comuApagarPost(id){
    `avatar()` estouram nesse caso e derrubam o render INTEIRO. É o mesmo defeito
    que a avaliação teve em 29/08, e cai no mesmo lugar: rótulo neutro em vez de
    identidade inventada. */
+/* 01/09: a URL da foto vai pra dentro de um ATRIBUTO, e o caminho que a gera
+   veio do banco. Quem escreve `posts.img` hoje é o app, mas a policy só exige
+   `autor_id = auth.uid()` — nada impede alguém de inserir pela API um caminho
+   com aspas e fechar o atributo no meio. Escapar custa uma função; confiar
+   custa um XSS numa tela que todo mundo abre. */
+function _attr(v){ return String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function postHtml(x){
   const meu = MEU_UID && x.autor_id===MEU_UID;
   const local = meu ? EU : x.autor_id;
@@ -3033,7 +3454,23 @@ function postHtml(x){
         ${meu?`<button class="men" onclick="comuApagarPost('${x.id}')" title="Apagar">⋮</button>`:''}
       </div>
       <div class="corpo">${(x.corpo||'').replace(/</g,'&lt;')}</div>
+      ${x.imgUrl ? `<img class="post-foto" src="${_attr(x.imgUrl)}" alt="" loading="lazy">` : ''}
     </div>`;
+}
+/* mostra o nome do arquivo escolhido e recusa o que o balde recusaria, ANTES de
+   subir: o teto de 2 MB é regra no balde (mig 91), e descobrir isso só depois
+   de esperar o upload no 4G da quadra é o pior lugar pra dar a notícia. */
+function fotoEscolhida(input, alvoId){
+  const el = document.getElementById(alvoId);
+  const f = input.files && input.files[0];
+  if(!el) return;
+  if(!f){ el.textContent=''; return }
+  if(f.size > 2*1024*1024){
+    input.value=''; el.textContent='';
+    alert('A foto passa de 2 MB. Tire uma menor ou reduza antes de subir.');
+    return;
+  }
+  el.textContent = f.name;
 }
 function comuFeed(){
   comuFeedCarregar();
@@ -3042,8 +3479,20 @@ function comuFeed(){
      e `.sec` tem `padding:18px var(--pad-lado) 0`. Aninhado, o padding lateral
      dobrava — medido: 46,8px no campo de escrever contra 23,4px nos posts logo
      abaixo, com o campo visivelmente mais estreito e fora da coluna. */
+  /* 01/09 (migs 91 e 92): a foto entra NO MESMO envio do texto, e não antes.
+     `posts` não tem policy de UPDATE de propósito (79), então não existe
+     "publica agora e anexa depois" — e subir antes deixaria arquivo órfão no
+     balde toda vez que alguém desistisse do post. */
   const escrever = `<textarea id="post-txt" class="onb-area" maxlength="1000"
         placeholder="Conta pra comunidade — um jogo, uma quadra, uma pergunta."></textarea>
+      <div class="postbar">
+        <label class="foto-bt">
+          <input type="file" id="post-foto" accept="image/jpeg,image/png,image/webp"
+                 onchange="fotoEscolhida(this,'post-foto-nome')" hidden>
+          <span>🖼 Foto</span>
+        </label>
+        <small id="post-foto-nome" class="foto-nome"></small>
+      </div>
       <button class="btn" style="margin-top:8px" onclick="comuPostar()">Publicar</button>`;
   const corpo = l === null
     ? `<div class="card"><p class="nota">Carregando o feed…</p></div>`
@@ -3167,18 +3616,27 @@ function comuRanking(){
       </div>
     </div>`;
 
-  return `<div class="sec">${podio}${hero}</div>
-    <div class="sec"><div class="rot tit">As classes</div>${classes}</div>${meus}`;
+  /* 02/09: os três blocos passam a viver DENTRO do envelope de borda lime
+     (node 173:1809), que no arquivo vai do topo do pódio até o último cartão
+     de classe. Antes eram duas `.sec` irmãs, e o desenho lia como dois
+     assuntos separados numa aba só.
+     ⚠️ "As classes" é rótulo do APP, não do arquivo — o board emenda os
+     cartões no hero sem separador. Fica porque a lista muda de assunto (sai
+     de "você" e entra em "a régua") e sem ele o primeiro cartão parece
+     continuação do seu progresso. É acréscimo, não divergência herdada. */
+  return `<div class="sec"><div class="rk-env">${podio}${hero}
+      <div class="rot tit" style="margin-top:16px">As classes</div>${classes}</div></div>${meus}`;
 }
 
 /* -- GRUPOS (tela 15 · node 177:2332) -------------------------------------
    `netMeusGrupos` já devolvia tudo o que o board pede — os meus, os abertos e a
    contagem de membros. O que muda é a forma: tira horizontal de cartões em vez
    de lista, e a folha de Comunidades deixa de ser o único caminho.
-   ⚠️ FOTO DE CAPA NÃO EXISTE. O board põe foto em todo cartão de grupo, e isso
-   é Storage — policy de BUCKET, superfície diferente da RLS de tabela, com
-   migração e decisão próprias. Enquanto não existir, o cartão traz a inicial
-   do nome sobre o gradiente da marca: placeholder declarado, não foto falsa. */
+   01/09 (migs 92 e 93): a FOTO DE CAPA existe. Balde `grupo-capa`, PÚBLICO —
+   e público de propósito: esta lista mostra os grupos ABERTOS pra quem ainda
+   não é membro, então capa em balde privado sumiria justo pra quem o cartão
+   existe pra convencer. Quem não pôs capa segue com a inicial sobre o
+   gradiente da marca: placeholder declarado, nunca foto falsa. */
 function gruposCarregar(){
   if(window.__gruposCache !== undefined) return;
   window.__gruposCache = null;
@@ -3192,8 +3650,14 @@ function gruposCarregar(){
 const ICO_MEMBROS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
 function gcard(g, cont){
   const n = cont[g.id]||0;
+  /* 01/09 (migs 92 e 93): a capa entrou. A inicial NÃO saiu — ela continua
+     sendo o fundo de quem não pôs capa, que é a maioria, e some só quando há
+     foto de verdade. Placeholder declarado, nunca foto falsa. */
+  const capa = (window._net && _net.grupoCapaUrl) ? _net.grupoCapaUrl(g.capa) : null;
   return `<div class="gcard" onclick="ir('grupo',{id:'${g.id}'})">
-      <div class="ini">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>
+      ${capa
+        ? `<img class="capa" src="${_attr(capa)}" alt="" loading="lazy">`
+        : `<div class="ini">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>`}
       <div class="pe"><b>${g.nome}</b><small>${ICO_MEMBROS}${n} ${n===1?'membro':'membros'}</small></div>
     </div>`;
 }
@@ -3203,9 +3667,10 @@ function gcard(g, cont){
    onde o botão de gerir aponta: ela tem os pedidos, os papéis e o link, e
    duplicar ato de gestão em duas superfícies é como as duas passam a discordar
    sobre quem pode o quê.
-   ⚠️ O board desenha CAPA e uma barra de curtir/comentar/compartilhar em cada
-   post. Capa é Storage; curtida e comentário são duas tabelas que não existem.
-   As duas coisas ficam de fora com o motivo escrito, e não em botão morto. */
+   A CAPA existe desde 01/09 (migs 92 e 93) e o gestor troca pelo botão do
+   cabeçalho. ⚠️ Continuam de fora a barra de curtir/comentar/compartilhar que
+   o board desenha: são duas tabelas que não existem. Ficam de fora com o
+   motivo escrito, e não em botão morto. */
 function grupoCarregar(id){
   window.__grupoCache = window.__grupoCache || {};
   if(window.__grupoCache[id] !== undefined) return;
@@ -3216,13 +3681,38 @@ function grupoCarregar(id){
     .then(([r, posts])=>{ window.__grupoCache[id] = Object.assign({posts:posts||[]}, r); render() })
     .catch(()=>{ window.__grupoCache[id] = vazio; render() });
 }
+/* trocar a capa (migs 92 e 93). Sobe e grava numa tacada — o `netGrupoCapaTrocar`
+   remove o arquivo se a linha não aceitar, senão sobraria capa no balde que
+   nenhuma tela mostra. O botão só aparece pra gestor, mas quem cobra isso de
+   verdade é a policy: tela que esconde botão não é fechadura. */
+async function grupoCapaEnviar(gid, input){
+  const f = input && input.files && input.files[0];
+  if(!f) return;
+  if(f.size > 2*1024*1024){
+    input.value='';
+    alert('A capa passa de 2 MB. Use uma imagem menor.');
+    return;
+  }
+  toast('Subindo a capa…');
+  const r = await _net.grupoCapaTrocar(gid, f);
+  input.value='';
+  if(r.erro){ alert('Não deu pra trocar a capa: '+r.erro); return }
+  window.__grupoCache[gid] = undefined;        // relê o grupo com a capa nova
+  window.__gruposCache = undefined;            // e a lista, que mostra o cartão
+  toast('Capa atualizada.');
+  grupoCarregar(gid); render();
+}
+
 async function grupoPostar(gid){
   const el = document.getElementById('gpost-txt');
   const t = el ? el.value : '';
   if(!t.trim()){ toast('Escreve alguma coisa antes de publicar.'); return }
-  const r = await _net.postar(t, gid);
+  const inp = document.getElementById('gpost-foto');
+  const foto = inp && inp.files && inp.files[0];
+  const r = await _net.postar(t, gid, foto);
   if(r.erro){ alert('Não deu pra publicar: '+r.erro); return }
   if(el) el.value='';
+  if(inp){ inp.value=''; const n=document.getElementById('gpost-foto-nome'); if(n) n.textContent=''; }
   if(window.__grupoCache) window.__grupoCache[gid] = undefined;
   toast('Publicado no grupo.');
   grupoCarregar(gid); render();
@@ -3906,7 +4396,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788058979"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788358927"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -4147,7 +4637,11 @@ inicio(){
 
   return {titulo:'Início', dir:'', html:`
     <div class="ini" style="--camisa:${eu.cor}">
-      <div class="cena" style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"></div>
+      <!-- a foto vem do CSS (app/fig/fundo-home.jpg, node 35:771): o Figma
+           tem UMA foto na home, não a cena escolhida no vestiário. O seletor
+           de cenário continua existindo e ainda muda o vestiário — só deixou
+           de mandar no fundo desta tela. -->
+      <div class="cena"></div>
       <div class="scrim"></div>
 
       <div class="hud">
@@ -4155,16 +4649,29 @@ inicio(){
              à direita. O sino é a antiga caixa ✉ (mesmo badge, mesma fonte);
              o avatar leva pra ficha. O seletor de cenário continua — é
              funcionalidade que as telas não desenham mas ninguém mandou matar. -->
+        <!-- node 35:836 pelo código do Figma: logo (179x52,6), sino (53x53) e
+             avatar (71x71). DOIS ícones à direita, não três — o seletor de
+             cenário saiu daqui. A porta do vestiário continua existindo pelo
+             próprio boneco (clicável) e pela ficha, que é o caminho que o mapa
+             do Figma descreve: "o Vestiário sai da barra e passa a ser
+             alcançado de dentro do perfil".
+             Logo e sino são os SVG do próprio arquivo (app/fig/). -->
         <div class="linha1">
-          <img class="logo" src="../marcas/ranket-horizontal.png" alt="Ranket">
-          <div class="ic" onclick="netAbrirInbox()">🔔${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
-          <div class="ic vitrine" onclick="abrirCena()" title="Trocar o cenário"
-               style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"><i>◈</i></div>
+          <img class="logo" src="fig/logo-ranket.svg" alt="Ranket">
+          <div class="ic" onclick="netAbrirInbox()"><img src="fig/sino.svg" alt="Notificações">${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
           <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
         </div>
         ${modoJogador()?`
         <!-- 28/08: a volta da lente — só o professor vendo o app como jogador -->
         <button onclick="modoTrocar('prof')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px system-ui;cursor:pointer;backdrop-filter:blur(6px)">👥 Sou professor</button>`:''}
+        <!-- 01/09 (board, node 35:756) — DUAS COLUNAS, e é o que fazia esta tela
+             parecer outra. No board o boneco e os cards dividem a MESMA faixa
+             vertical: boneco em x 33→541 (47% da largura) e a coluna de cards
+             em x 550→1026 (44%), os dois entre y 267 e 1029. O app empilhava
+             tudo em coluna única e punha o boneco depois — a paridade aqui não
+             é de estilo, é de arranjo. -->
+        <div class="htopo">
+        <div class="hcol">
         <div class="esp-sw">
           <button class="${S.esporte==='tenis'?'on':''}" onclick="trocarEsporte('tenis')">Tênis</button>
           <button class="${S.esporte==='beach'?'on':''}" onclick="trocarEsporte('beach')">Beach Tennis</button>
@@ -4176,8 +4683,15 @@ inicio(){
           </div>
           <div class="barra"><i style="width:${progCat}%"></i></div>
           <div class="faltam">${proxDegrau?'Faltam '+faltamCat+' pts':'topo da escada'}</div>
+          <!-- 01/09 (board 35:778): UMA linha. O board escreve "Você está no topo
+               da classe C. Rumo a classe B!" e nada mais. A frase longa que
+               estava aqui explicava que categoria é progressão e não
+               pareamento — verdade que continua valendo, mas que na coluna de
+               44% virava seis linhas e esticava o card pra fora da faixa. ⚠️ A
+               explicação saiu da home; se ela precisar existir, o lugar é o
+               Quadro, não este card. -->
           <div class="fim">${cat>1
-              ? `Sobe pra <b>${proxDegrau}</b> com mais ${faltamCat} de Nível. Você joga contra a classe <b>${divDe(eu)}</b> inteira — categoria é progressão, não pareamento.`
+              ? `Sobe pra <b>${proxDegrau}</b> com mais ${faltamCat} de Nível.`
               : (teto ? `Você está no topo da <b>${divDe(eu)}</b>. Rumo à classe <b>${acima}</b>!`
                       : 'Você está na Classe A1 — o topo da escada.')}</div>
         </div>
@@ -4186,17 +4700,20 @@ inicio(){
              moldura, não convite. -->
         ${(window.__disp||[]).some(d=>d.player_id===MEU_UID) ? '' : `
         <div class="hlets">
-          <h3>Let's<br>Ranket</h3>
+          <img class="lets" src="fig/lets-ranket.svg" alt="Let's Ranket">
           <p>Adicione sua disponibilidade para que os outros jogadores no radar vejam você.</p>
           <button onclick="trocarAba('radar'); ir('dispForm')">Adicionar disponibilidade</button>
         </div>`}
-      </div>
+        </div><!-- /hcol -->
 
-      <div class="palco">
-        <div class="sombra"></div>
-        <div class="glow"></div>
-        <!-- a home é a vitrine: escudo e patrocinador aparecem aqui também -->
-        <div class="boneco" onclick="trocarAba('vestiario')">${bonecoImg(eu, true)}<span class="edit-hint">❖ Vestiário</span></div>
+        <div class="palco">
+          <div class="sombra"></div>
+          <div class="glow"></div>
+          <!-- a home é a vitrine: escudo e patrocinador aparecem aqui também -->
+          <div class="boneco" onclick="trocarAba('vestiario')">${bonecoImg(eu, true)}<span class="edit-hint">❖ Vestiário</span></div>
+        </div>
+        </div><!-- /htopo -->
+
         <!-- 29/08 (board, node 35:794): a placa virou FAIXA de contorno lime,
              com o nome à esquerda e a posição à direita. Antes era um bloco
              centralizado com Nível e Classe embaixo do nome — mas os dois já
@@ -4208,10 +4725,14 @@ inicio(){
             ? `${pos.comunidade}º lugar na comunidade`
             : `Classe ${classeDe(eu)}`}</div>
         </div>
-      </div>
+      </div><!-- /hud -->
 
       <div class="acao">
-        <button class="big ${bt.cls}" onclick="${bt.go}">${bt.t}<small>${bt.s}</small></button>
+        <!-- node 35:808: texto ÚNICO centralizado, sem segunda linha. O
+             subtítulo ("Quem está livre na sua faixa, agora") não existe no
+             Figma. A home do PROFESSOR mantém o dela: é outra tela, que o
+             Figma não desenha. -->
+        <button class="big ${bt.cls}" onclick="${bt.go}">${bt.t}</button>
         ${secundarias}
       </div>
 
@@ -4647,16 +5168,17 @@ radar(){
       ${(()=>{ const d=window.__dispDraft = window.__dispDraft||{tipo:'simples', esporte:S.esporte||'tenis', quadra:'saibro', uf:'BA'};
         const pill=(k,v,n)=>`<button class="${d[k]===v?'on':''}" onclick="dispSet('${k}','${v}')">${n}</button>`;
         return `<div class="dhoje">
+          <div class="dfig">${bonecoImg(S.jogadores[EU], false)}</div>
           <div class="col">
             <div class="cab"><i>◔</i><b>Horário</b></div>
             ${pill('periodo','manha','Manhã')}${pill('periodo','tarde','Tarde')}${pill('periodo','noite','Noite')}
           </div>
           <div class="col">
-            <div class="cab"><i>▤</i><b>Quadra</b></div>
+            <div class="cab"><i>▤</i><b>Tipo de quadra</b></div>
             ${pill('quadra','saibro','Saibro')}${pill('quadra','dura','Dura')}${pill('quadra','rapida','Rápida')}
           </div>
           <div class="col">
-            <div class="cab"><i>◎</i><b>Jogo</b></div>
+            <div class="cab"><i>◎</i><b>Tipo de Jogo</b></div>
             ${pill('tipo','simples','Simples')}${pill('tipo','duplas','Duplas')}
           </div>
         </div>
@@ -4665,10 +5187,16 @@ radar(){
     </div>
 
     <div class="sec">
-      <div class="rot">Disponíveis no seu radar <span>classes ${permitidas.join(' · ')}</span></div>
+      <!-- node 89:179: no Figma o botão de filtros fica na MESMA LINHA do
+           título, alinhado à direita da margem. No app ele estava na linha de
+           baixo, ao lado das abas temporais. As abas continuam (são adição do
+           app, mantida) e passam a ter a linha só pra elas. -->
+      <div class="rot">Disponíveis no seu radar
+        <button class="rfiltro" onclick="ir('radarFiltros')">Filtros${nFiltros?` · ${nFiltros}`:''} <i>⌄</i></button>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
         <div class="rtabs">${abaBt('agora','Agora')}${abaBt('hoje','Hoje')}${abaBt('semana','Esta semana')}</div>
-        <button class="rfiltro" onclick="ir('radarFiltros')">Filtrar${nFiltros?` · ${nFiltros}`:''} ⌄</button>
+        <span style="margin-left:auto;font:400 var(--t-caption) var(--f-ui);color:var(--ink3);white-space:nowrap">classes ${permitidas.join(' · ')}</span>
       </div>
       ${lista.length ? lista.map(card).join('')
         : `<div class="card"><p class="nota">${
@@ -4756,8 +5284,18 @@ radarFiltros(){
   const chipNum=(k,v,n)=>`<button class="chip ${F[k]===v?'on':''}" onclick="radarF('${k}',${v})">${n}</button>`;
   const meu=window.__meusLocais||{};
   const tenhoLocal=!!meu.principal;
-  return {titulo:'Filtros', dir:`<a style="color:var(--marca);cursor:pointer" onclick="radarLimpar()">limpar</a>`, html:`
+  return {titulo:'Filtros', dir:'', html:`
     <div class="pad">
+      <!-- 01/09 (nodes 58:1419, 58:1436, 58:1600) — os filtros vivem DENTRO de
+           um card: retângulo #0B0B0B de 970x1489 com raio 30 no frame de 1080.
+           O app deixava os blocos soltos na página. E o título da tela mora
+           dentro do card ("Filtrar oponentes", branco, caixa normal), com o
+           LIMPAR FILTROS na mesma linha, à direita — no app ele era um "limpar"
+           laranja perdido no canto do topo. -->
+      <div class="filtro-folha">
+      <div class="rot" style="margin-bottom:16px">Filtrar oponentes
+        <button class="flimpar" onclick="radarLimpar()">Limpar filtros</button>
+      </div>
       <!-- 29/08 (board, node 58:1232): MODALIDADE e BUSCAR entram no filtro.
            As duas já existiam no app, mas fora daqui — o esporte era um switch
            global na home e o "jogadores ou professores" era o seletor no topo
@@ -4781,14 +5319,29 @@ radarFiltros(){
            o Nuno decidiu em 29/08 que o sistema que manda é Classe D/C/B/A.) -->
       <div class="rot">Classe <span>o pareamento continua ±1 — aqui só afunila</span></div>
       <div class="grade" style="margin-bottom:16px">${chip('classe',null,'Todas')}${permitidas.map(c=>chip('classe',c,'Classe '+c)).join('')}</div>
-      <div class="rot">Tipo de jogo</div>
-      <div class="grade" style="margin-bottom:16px">${chip('tipo',null,'Tanto faz')}${chip('tipo','simples','Simples')}${chip('tipo','duplas','Duplas')}</div>
-      <div class="rot">Quadra de preferência</div>
-      <div class="grade" style="margin-bottom:16px">${chip('quadra',null,'Tanto faz')}${chip('quadra','saibro','Saibro')}${chip('quadra','dura','Dura')}${chip('quadra','rapida','Rápida')}</div>
+      <!-- node 120:556: Horário, Tipo de quadra e Tipo de Jogo vivem num PAINEL
+           ÚNICO de três colunas com divisores, nessa ordem — não em três blocos
+           empilhados de largura cheia. É a mesma peça .dhoje que o radar já
+           usa; reusar em vez de criar outra. (Sem crase: comentário dentro de
+           template literal — o defeito de 11/08, que hoje eu repeti três vezes.) -->
+      <div class="dhoje dhoje-f" style="margin-bottom:16px">
+        <div class="col">
+          <div class="cab"><i>◔</i><b>Horário</b></div>
+          ${chip('per',null,'Todos')}${chip('per','m','Manhã')}${chip('per','t','Tarde')}${chip('per','n','Noite')}
+        </div>
+        <div class="col">
+          <div class="cab"><i>▤</i><b>Tipo de quadra</b></div>
+          ${chip('quadra',null,'Tanto faz')}${chip('quadra','saibro','Saibro')}${chip('quadra','dura','Dura')}${chip('quadra','rapida','Rápida')}
+        </div>
+        <div class="col">
+          <div class="cab"><i>◎</i><b>Tipo de Jogo</b></div>
+          ${chip('tipo',null,'Tanto faz')}${chip('tipo','simples','Simples')}${chip('tipo','duplas','Duplas')}
+        </div>
+      </div>
+      <!-- o filtro por DIA não existe no board; fica, como adição consciente,
+           abaixo do painel em vez de disputar uma quarta coluna. -->
       <div class="rot">Dia</div>
       <div class="grade" style="margin-bottom:16px">${chipNum('dia',null,'Todos')}${DIAS_PT.map((n,k)=>chipNum('dia',k,n)).join('')}</div>
-      <div class="rot">Período</div>
-      <div class="grade" style="margin-bottom:16px">${chip('per',null,'Todos')}${chip('per','m','Manhã')}${chip('per','t','Tarde')}${chip('per','n','Noite')}</div>
       ${tenhoLocal?`<div class="rot">Localidade</div>
       <div class="grade" style="margin-bottom:16px">${chip('lugar',null,'Todas')}${chip('lugar','clube','Meu clube')}${meu.regiaoId?chip('lugar','regiao',meu.regiao||'Minha região'):''}${chip('lugar','cidade',meu.cidade?meu.cidade.split('/')[0]:'Minha cidade')}</div>`:''}
       <!-- 29/08 (board): RAIO DE BUSCA. O board desenha um slider de km, e o
@@ -4803,6 +5356,7 @@ radarFiltros(){
         <div class="linha-item"><div class="txt"><b>Mostrar apenas jogadores livres agora</b></div>
         <span class="pil ${F.livresAgora?'up':'gh'}">${F.livresAgora?'ligado':'desligado'}</span></div>
       </div>
+      </div><!-- /filtro-folha -->
       <button class="btn" onclick="voltar()">Aplicar filtros</button>
     </div>`};
 },
@@ -5526,8 +6080,20 @@ grupo(p){
      "Outro jogador" na minha própria comunidade. */
   const chave = (uid)=> (typeof MEU_UID!=='undefined' && uid===MEU_UID) ? EU : uid;
 
+  /* 01/09 (migs 92 e 93) — a capa. Balde público próprio: ela aparece no
+     cartão da lista pra quem NÃO é membro, então guardá-la no `feed-grupo`,
+     que é privado, a esconderia de quem o cartão existe pra convencer.
+     Como no cartão, capa e inicial não convivem: as duas são `inset:0`. */
+  const capaUrl = (window._net && _net.grupoCapaUrl) ? _net.grupoCapaUrl(g.capa) : null;
   const hero = `<div class="ghero">
-      <div class="ini" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 62px var(--f-ui);color:var(--linha2)">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>
+      ${capaUrl
+        ? `<img class="capa" src="${_attr(capaUrl)}" alt="" loading="lazy">`
+        : `<div class="ini" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 62px var(--f-ui);color:var(--linha2)">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>`}
+      ${d.souGestor ? `<label class="capa-bt">
+          <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+                 onchange="grupoCapaEnviar('${id}', this)">
+          <span>${capaUrl?'Trocar capa':'Pôr capa'}</span>
+        </label>` : ''}
       <div class="dentro">
         <div class="l1"><h3>${g.nome}</h3><div class="mem">${n} ${n===1?'membro':'membros'}</div></div>
         ${g.regras ? `<p>${g.regras.replace(/</g,'&lt;')}</p>`
@@ -5565,6 +6131,14 @@ grupo(p){
     const posts = d.posts||[];
     // sem `.sec` própria: já vem dentro de uma. Ver a nota no `comuFeed`.
     const escrever = d.souMembro ? `<textarea id="gpost-txt" class="onb-area" maxlength="1000" placeholder="Escreve pro grupo."></textarea>
+        <div class="postbar">
+          <label class="foto-bt">
+            <input type="file" id="gpost-foto" accept="image/jpeg,image/png,image/webp"
+                   onchange="fotoEscolhida(this,'gpost-foto-nome')" hidden>
+            <span>🖼 Foto</span>
+          </label>
+          <small id="gpost-foto-nome" class="foto-nome"></small>
+        </div>
         <button class="btn" style="margin-top:8px" onclick="grupoPostar('${id}')">Publicar no grupo</button>`
       : `<p class="nota" style="margin-top:12px">Só quem é do grupo publica aqui — a policy da mig 79 cobra isso no banco, não só na tela.</p>`;
     const lista = posts.length ? posts.map(postHtml).join('')
@@ -5627,6 +6201,25 @@ ficha(){
         <div><div class="v">${jogadas.length}</div><div class="k">Jogos</div></div>
         <div><div class="v">${v}</div><div class="k">Vitórias</div></div>
         <div><div class="v">${jogadas.length?Math.round(v/jogadas.length*100):0}%</div><div class="k">Aprov.</div></div>
+      </div>
+    </div>
+
+    <!-- 01/09 (mig 90): o estilo de jogo, DECLARADO. Fica na ficha e não no
+         cadastro de propósito: o bug do cadastro interrompido (31/08) mostrou o
+         preço de alongar o onboarding, e ninguém precisa disto pra jogar.
+         O botão do estilo já escolhido desmarca — apagar tem que existir, senão
+         a escolha vira permanente sem ninguém ter avisado. -->
+    <div class="sec">
+      <div class="rot">Estilo de jogo</div>
+      <div class="card">
+        <div class="rtabs" style="margin-bottom:8px">
+          ${Object.keys(ESTILO_ROTULO).map(k=>`
+            <button class="rtab ${eu.estilo===k?'on':''}"
+                    onclick="estiloEscolher('${eu.estilo===k?'':k}')">${ESTILO_ROTULO[k]}</button>`).join('')}
+        </div>
+        <p class="nota">${eu.estilo
+          ? 'Aparece na sua ficha pra quem te olha. Toque de novo pra tirar.'
+          : 'Opcional. O app não deduz seu estilo pelo placar — se você não disser, ninguém vê nada aqui.'}</p>
       </div>
     </div>
 
@@ -5879,6 +6472,10 @@ jogador(p){
   perfilCarregar(p.id);
   const dados = (window.__perfCache||{})[p.id];
   const carregando = dados === null || dados === undefined;
+  /* zerado enquanto carrega, e o botão fica desabilitado nesse intervalo: o
+     estado "sigo ou não" só existe depois da resposta, e um botão que diz
+     "Seguir" pra quem já segue convida ao clique que o banco vai recusar. */
+  const seg = (dados && dados.seg) || {seguidores:0, seguindo:0, eu_sigo:false};
   const sub = abaDe('perfilFeed','posts');
 
   const corpo = aba==='feed' ? (carregando
@@ -5886,6 +6483,7 @@ jogador(p){
       : abasHtml('perfilFeed',[['posts','Postagens'],['fb','Feedbacks']],'pilula') + (sub==='posts'
         ? (dados.posts.length
             ? dados.posts.map(x=>`<div class="card" style="margin-top:10px"><p style="font:400 13px/1.55 var(--f-ui)">${(x.corpo||'').replace(/</g,'&lt;')}</p>
+                ${x.imgUrl ? `<img class="post-foto" src="${_attr(x.imgUrl)}" alt="" loading="lazy">` : ''}
                 <p class="nota" style="margin-top:6px">${new Date(x.criado_em).toLocaleDateString('pt-BR')}</p></div>`).join('')
             : `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">✎</i>${nome(p.id).split(' ')[0]} ainda não publicou nada.</div></div>`)
         : (()=>{
@@ -5947,14 +6545,27 @@ jogador(p){
         <div class="txt"><b>${x.venceu?'Você venceu':'Você perdeu'}</b><small>${x.placar} · ${x.quando}</small></div></div></div>`).join('')
         : '<div class="card"><p class="nota">Vocês ainda não se enfrentaram no app.</p></div>'}
 
-      <div class="card clic" style="margin-top:14px" onclick="ir('historico')">
-        <div class="linha-item"><div class="av">◔</div>
-        <div class="txt"><b>Ver histórico completo</b><small>Partidas do mês e a análise do ano</small></div>
-        <div class="seta">›</div></div>
+      <!-- node 61:2005: no Figma isto é um LINK de texto cinza alinhado à
+           direita, não um card com ícone e seta. Card dá a ele o mesmo peso
+           visual dos blocos de conteúdo, e ele é uma saída, não conteúdo. -->
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <a onclick="ir('historico')" style="cursor:pointer;color:#bcbcbc;
+           font:400 var(--t-label) var(--f-ui)">Ver histórico completo ›</a>
       </div>
 
+      <!-- node 63:2050: o Figma mostra os TRÊS estilos como chips no mesmo
+           card, com o declarado em destaque — e o título é plural. O app
+           mostrava só o escolhido, numa linha de texto. -->
       <div class="rot" style="margin-top:16px">Estilos de jogo</div>
-      ${cascaNota('O board mostra três estilos (fundo de quadra, consistente, defensivo). O app não pergunta nem deduz estilo de ninguém — não há de onde tirar, e três rótulos plausíveis seriam invenção sobre uma pessoa real.')}
+      <div class="card">
+        <div class="echips">
+          ${Object.keys(ESTILO_ROTULO).map(k=>`
+            <div class="echip${j.estilo===k?' on':''}">${ESTILO_ROTULO[k]}</div>`).join('')}
+        </div>
+        ${j.estilo
+          ? ''
+          : `<p class="nota" style="margin-top:10px">${nome(p.id).split(' ')[0]} não disse o estilo. O app não deduz: o placar não carrega essa informação.</p>`}
+      </div>
 
       <div class="rot">Disponibilidade da semana</div>
       ${cascaNota('O board mostra a grade de sete dias por três períodos. O app guarda disponibilidade como horários avulsos que expiram, não como agenda semanal — a grade precisa de um modelo de dado que ainda não existe.')}`;
@@ -5971,9 +6582,12 @@ jogador(p){
     </div>
     <div class="pnums">
       <div class="n"><b>${h.length}</b><small>Partidas com você</small></div>
-      <button class="seguir" disabled title="Seguir ainda não existe no app">Seguir</button>
+      <div class="n"><b>${seg.seguidores}</b><small>Seguidores</small></div>
+      <div class="n"><b>${seg.seguindo}</b><small>Seguindo</small></div>
+      ${carregando
+        ? '<button class="seguir" disabled>…</button>'
+        : `<button class="seguir${seg.eu_sigo?' on':''}" onclick="seguirAlternar('${p.id}')">${seg.eu_sigo?'Seguindo':'Seguir'}</button>`}
     </div>
-    ${casca('<p class="nota">O board tem <b>Seguidores</b> e <b>Seguindo</b> ao lado das partidas, e um botão Seguir. O app não tem sistema de seguir ninguém: é tabela, policies e contadores novos. O botão fica desligado até existir.</p>')}
     <div class="pcta"><button onclick="netDesafiar('${p.id}')">Convidar para jogar</button></div>
     ${abasHtml('perfil', [['stats','Estatísticas'],['feed','Feed'],['conq','Conquistas']], 'linha')}
     <div class="pad">${corpo}</div>`};
@@ -6710,6 +7324,14 @@ function _conviteDaURL(){
   }catch(e){ return ''; }
 }
 function abrirCadastro(){ onb={step:0, tela:null, perfil:null, joga:null, apresentacao:'', telaEsportiva:false, convite:'', conviteVal:null, conviteOk:false, conviteMsg:'', int:{nome:'',contato:'',cidade:'',via:'email'}, nome:'', email:'', senha:'', verSenha:false, esportes:['tenis'], mao:null, tempo:'', bon:'m1', cor:'#C9663C', div:null, quiz:false, qidx:0, qskor:{D:0,C:0,B:0,A:0}, contaCriada:false}; document.getElementById('onb').classList.add('on');
+  /* 31/08 — RETOMADA. Quando o netBoot manda pra cá alguém que já tem sessão
+     (conta em auth, cadastro interrompido antes da linha de `players`), as duas
+     etapas de porta já foram vencidas na primeira passagem e não podem ser
+     cobradas de novo: o signUp devolveria "e-mail já registrado" — a mesma
+     parede, com outra mensagem — e o convite pode já ter sido consumido lá
+     atrás, o que trancaria a pessoa na porteira com um código legítimo.
+     A conta existir É a prova de que ela passou pelas duas. */
+  if(typeof MEU_UID!=='undefined' && MEU_UID){ onb.retomada=true; onb.contaCriada=true; }
   const _c=_conviteDaURL();
   if(_c){ onb.convite=_c; onb.tela='porta'; }
   renderOnb() }
@@ -6858,6 +7480,14 @@ function onbErroConta(msg){
    uma porta que só se confere na entrada não é porta, é aviso. Devolve à
    porteira em vez de dar alerta seco — a pessoa pode ter só apagado o campo. */
 function onbTemConvite(){
+  /* 31/08: na RETOMADA (conta já existe em auth, cadastro interrompido antes da
+     linha de `players`) a porteira não se cobra de novo. O código pode já ter
+     sido consumido na primeira passagem, e nesse caso a pessoa ficaria presa na
+     porta com um convite legítimo. A conta existir é a prova de que ela passou.
+     Não forjo um `conviteVal`: ele é o código VALIDADO, e o fim do cadastro o
+     manda pro `netConviteConsumir` — inventar um faria o app tentar consumir
+     código que nunca existiu. */
+  if(onb.retomada) return true;
   if(onb.conviteOk && onb.conviteVal) return true;
   onb.tela='porta';
   onb.conviteMsg='Confirme o convite pra continuar — ele é a sua carteirinha aqui.';

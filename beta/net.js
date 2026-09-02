@@ -19,6 +19,11 @@ const sb = supabase.createClient(SB_URL, SB_KEY);
 
 // meu uid da sessão (= id do meu player). Preenchido no netEntrar().
 let MEU_UID = null;
+/* 31/08: o user INTEIRO da sessão, preenchido junto com o MEU_UID. O netEntrar
+   já pagava o getUser() e jogava fora tudo menos o id — e o `user_metadata` que
+   vinha junto é o que separa "conta morreu" de "cadastro nunca terminou" na
+   guarda do netBoot. Ver o comentário da guarda. */
+let MEU_USER = null;
 
 /* 1. Sessão atual (email+senha). Valida que a conta AINDA existe no servidor —
    se foi apagada (ex.: reset do banco), o crachá velho fica no aparelho e o app
@@ -30,19 +35,34 @@ async function netEntrar(){
   if(error || !user){
     await sb.auth.signOut();
     try{ localStorage.removeItem('appTenis'); }catch(e){}
-    MEU_UID=null;
+    MEU_UID=null; MEU_USER=null;
     location.reload();
     return null;
   }
   MEU_UID = user.id;
+  MEU_USER = user;
   return MEU_UID;
 }
 
 /* Criar conta com email + senha. Retorna {ok} ou {erro}. */
 async function netSignUp(email, senha){
-  const { data, error } = await sb.auth.signUp({ email:email.trim(), password:senha });
+  /* 31/08 — `cadastro_iniciado` no user_metadata. O signUp cria a conta em
+     auth.users e a linha de `players` só nasce no primeiro sync, lá no fim do
+     onboarding. Quem sai no meio (fecha o app, recarrega, 4G do clube) ficava
+     com conta em auth e nada em players — e a guarda de sessão órfã do netBoot
+     lia esse estado como "conta morta" e DESLOGAVA a cada login, pra sempre,
+     sem mensagem. O e-mail já estava tomado, então nem recomeçar dava.
+     A marca vive no SERVIDOR de propósito: o `onb` que protegia essa janela era
+     variável de memória da aba e sumia no primeiro reload — que é exatamente o
+     evento que criava o problema. Aqui sobrevive a fechar o app e a trocar de
+     aparelho. Quem a apaga é o sync, quando a linha de players enfim existe. */
+  const { data, error } = await sb.auth.signUp({
+    email:email.trim(), password:senha,
+    options:{ data:{ cadastro_iniciado:true } },
+  });
   if(error) return { erro: error.message };
   MEU_UID = data.user ? data.user.id : (data.session && data.session.user.id) || null;
+  MEU_USER = data.user || (data.session && data.session.user) || null;
   if(!MEU_UID){ return { erro:'Conta criada, mas sem sessão. Confirme se o "Confirm email" está desligado no Supabase.' }; }
   return { ok:true };
 }
@@ -111,6 +131,19 @@ async function netSyncJogador(eu){
   const { error } = await sb.from('players').upsert(row);
   if(error){ console.error('[net] sync falhou', error); throw error; }
 
+  /* 31/08 — a linha de `players` existe: o cadastro terminou, então a marca do
+     signUp sai. Só mexe no auth quando ela ainda está lá (é escrita de rede, e
+     este caminho roda em TODO boot). Falha aqui NÃO derruba nada — o pior caso
+     é a marca sobrar, e marca sobrando manda pro cadastro alguém que já tem
+     ficha, o que o próprio netBoot descarta antes de chegar na guarda. */
+  if(MEU_USER && MEU_USER.user_metadata && MEU_USER.user_metadata.cadastro_iniciado){
+    try{
+      const { error: em } = await sb.auth.updateUser({ data:{ cadastro_iniciado:false } });
+      if(em) console.error('[net] marca do cadastro nao saiu', em);
+      else if(MEU_USER.user_metadata) MEU_USER.user_metadata.cadastro_iniciado = false;
+    }catch(e){ console.error('[net] marca do cadastro nao saiu', e); }
+  }
+
   /* 28/08 (mig 74) — o contato mora fora de `players` desde a 74: a policy
      `players_select` é `using(true)` por desenho (lista de adversário e Elo),
      e o WhatsApp que a 62 pôs lá dentro ficava legível por toda conta logada.
@@ -172,7 +205,7 @@ async function netAdversarios(){
        nenhuma. O board pede "Online agora" no topo da conversa, e é ele que
        responde: não é presença de verdade (não há socket), é "esteve aqui
        agora há pouco" — que é o que a frase promete e o que o dado sustenta. */
-    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc, perfil, joga, bio, app_visto_em')
+    .select('id, nome, ap, nivel, nivelb, bon, cor, banido_em, livre_ate, escudo, patroc, perfil, joga, bio, estilo, app_visto_em')
     .neq('id', MEU_UID)
     .order('nome');
   if(error){ console.error('[net] lista falhou', error); return []; }
@@ -251,6 +284,22 @@ async function netBoot(eu){
     /* `!meuErr` é obrigatório: falha de REDE também devolve data nulo, e
        deslogar + limpar o aparelho por causa de 4G ruim seria pior que o bug.
        Ausência só é ausência quando a consulta respondeu. */
+    /* 31/08 — CADASTRO INTERROMPIDO ≠ CONTA MORTA. Os dois estados chegam aqui
+       idênticos (sessão boa, `players` vazia) e pedem o oposto um do outro:
+       órfã tem que deslogar, cadastro pela metade tem que VOLTAR pro cadastro.
+       O `onb` acima só cobria a janela enquanto a aba seguia aberta; bastava um
+       reload no meio do onboarding pra pessoa cair no ramo de baixo e ser
+       deslogada em todo login dali pra frente, sem conseguir recomeçar (o
+       e-mail já estava tomado em auth.users). Aconteceu com a
+       brenonuno.wtd@gmail.com e destravou na mão, pelo SQL Editor.
+       Quem separa os dois é a marca que o signUp deixa no user_metadata. */
+    const cadastroPelaMetade = !!(MEU_USER && MEU_USER.user_metadata
+                                  && MEU_USER.user_metadata.cadastro_iniciado);
+    if(!meuRow && !meuErr && !(typeof onb!=='undefined' && onb) && cadastroPelaMetade){
+      netBadge('on', 'termine o cadastro');
+      if(window.abrirCadastro) abrirCadastro();
+      return null;
+    }
     if(!meuRow && !meuErr && !(typeof onb!=='undefined' && onb)){
       netBadge('off', 'conta encerrada');
       try{ await sb.auth.signOut(); }catch(e){}
@@ -2139,10 +2188,29 @@ function netRenderInbox(){
         <button onclick="_net.aceitarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>
       </div>`).join('');
 
-  _sheet('net-inbox', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Suas partidas</div>
-      <button onclick="_net.fecharInbox()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
-    </div>${pedidosH}${linhas}${_fbSecao()}`);
+  /* 01/09 (node 64:360) — NOTIFICAÇÕES É TELA CHEIA, não folha de 82vh.
+     O Figma desenha a lista ocupando de y=245 a y=1500, com barra superior
+     própria e a barra de navegação visível embaixo. O app abria uma folha que
+     subia de baixo e cobria tudo.
+     A barra do topo segue o node: faixa #0a1100 com fio de 1px na base e a
+     SETA CIRCULAR de voltar à esquerda — o Figma não tem título escrito nem
+     botão ×, a saída é a seta. O rótulo fica como "Notificações", que é o nome
+     da tela no board (o app dizia "Suas partidas").
+     ⚠️ O modo `cheia` já existia, criado em 29/08 para as telas de CHATS, e é o
+     mesmo aqui — não precisou de mecanismo novo. */
+  const topo = `<div style="position:sticky;top:0;z-index:2;background:#0a1100;
+      border-bottom:1px solid rgba(255,254,253,.10);
+      display:flex;align-items:center;gap:12px;
+      padding:max(10px,env(safe-area-inset-top)) var(--pad-lado) 12px">
+      <button onclick="_net.fecharInbox()" aria-label="Voltar"
+        style="width:38px;height:38px;flex:0 0 38px;border-radius:50%;cursor:pointer;
+               border:1px solid rgba(188,188,188,.45);background:transparent;
+               color:#fffefd;font:400 18px var(--f-ui);line-height:1">‹</button>
+      <div style="font:700 var(--t-title-l) var(--f-ui);color:#fffefd">Notificações</div>
+    </div>`;
+  _sheet('net-inbox',
+    `${topo}<div style="padding:14px var(--pad-lado) 24px">${pedidosH}${linhas}${_fbSecao()}</div>`,
+    { cheia:true });
 }
 
 /* =========================================================================
@@ -2597,23 +2665,139 @@ let _gnew = null;
 
 /* POSTS (mig 79). `grupo_id is null` é o feed público; com id, é o do grupo.
    O feed do perfil é o mesmo público, filtrado por autor. */
+/* ===== FOTO NO FEED (migs 91 e 92) =====
+   O balde NÃO se guarda na linha: deduz-se do escopo, que já está lá. É a
+   mesma decisão da 92 — dois lugares dizendo a mesma coisa acabam discordando.
+   Público leva o caminho por DONO (`<uid>/…`) e o de grupo por GRUPO
+   (`<grupo_id>/…`), que é o primeiro nível que cada policy olha. */
+const FOTO_MAX = 2 * 1024 * 1024;                 // o mesmo teto do balde
+const FOTO_TIPOS = ['image/jpeg','image/png','image/webp'];
+function _fotoBalde(grupo){ return grupo ? 'feed-grupo' : 'feed-publico'; }
+
+/* ⚠️ COMPRIME ANTES DE SUBIR — e o motivo é a CONTA, não a estética.
+   O plano gratuito do Supabase dá 1 GB de arquivo e 5 GB de BANDA por mês, e a
+   banda é o gargalo: ela é gasta a cada VEZ que alguém vê a foto, não uma vez
+   quando ela sobe. Um feed com 30 fotos de 2 MB gasta 60 MB só pra abrir —
+   ~80 aberturas no mês inteiro, e quando a banda acaba as fotos param de
+   carregar PRA TODO MUNDO, não só pra quem subiu.
+   1600px e qualidade 0,82 derrubam foto de celular pra 200-300 KB sem
+   diferença visível num telefone. O teto de 2 MB segue no balde (mig 91) como
+   rede: aqui é o caminho normal, lá é o que impede o anormal.
+   Se qualquer passo falhar, devolve o arquivo ORIGINAL — foto grande é melhor
+   que post sem foto, e nenhum navegador vale perder a publicação da pessoa. */
+const FOTO_LADO_MAX = 1600;
+const FOTO_QUALIDADE = 0.82;
+async function _fotoComprimir(arquivo){
+  try{
+    if(!arquivo || !arquivo.type.startsWith('image/')) return arquivo;
+    /* navegador sem `createImageBitmap` ou sem DOM: devolve o original. Safari
+       iOS antigo é o caso real aqui, e o app nunca foi aberto nele — melhor
+       subir grande do que estourar e perder o post. */
+    if(typeof createImageBitmap !== 'function' || typeof document === 'undefined') return arquivo;
+    const bmp = await createImageBitmap(arquivo);
+    const maior = Math.max(bmp.width, bmp.height);
+    const escala = maior > FOTO_LADO_MAX ? FOTO_LADO_MAX / maior : 1;
+    /* já pequena E já leve: não reprocessa. Recomprimir JPEG de novo só perde
+       qualidade sem ganhar tamanho que importe. */
+    if(escala === 1 && arquivo.size <= 400*1024){ bmp.close && bmp.close(); return arquivo }
+    const w = Math.round(bmp.width * escala), h = Math.round(bmp.height * escala);
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+    const blob = await new Promise(r=> cv.toBlob(r, 'image/jpeg', FOTO_QUALIDADE));
+    if(!blob || blob.size >= arquivo.size) return arquivo;   // não piorou nada
+    /* vira JPEG sempre: PNG de screenshot fica maior que o original em foto, e
+       o nome precisa acompanhar a extensão senão o caminho mente sobre o tipo. */
+    const nome = (arquivo.name||'foto').replace(/\.[^.]+$/,'') + '.jpg';
+    return new File([blob], nome, { type:'image/jpeg' });
+  }catch(e){
+    console.error('[net] comprimir foto', e);
+    return arquivo;
+  }
+}
+
+/* Resolve o caminho guardado em URL de exibição. O balde público é servido pelo
+   CDN e a URL é síncrona; o de grupo é privado e exige URL ASSINADA, que é
+   assíncrona — por isso isto acontece aqui e não na hora de desenhar: a tela
+   pinta de uma vez, com as fotos já resolvidas, em vez de aparecer sem elas e
+   preencher depois. A assinatura vale 1h; quem deixar a tela aberta mais que
+   isso recarrega, e recarregar é o que o app já faz ao voltar. */
+async function _fotosResolver(posts, grupo){
+  const comFoto = (posts||[]).filter(x=>x.img);
+  if(!comFoto.length) return posts;
+  const balde = _fotoBalde(grupo);
+  if(!grupo){
+    comFoto.forEach(x=>{
+      const { data } = sb.storage.from(balde).getPublicUrl(x.img);
+      x.imgUrl = data ? data.publicUrl : null;
+    });
+    return posts;
+  }
+  const { data, error } = await sb.storage.from(balde)
+    .createSignedUrls(comFoto.map(x=>x.img), 3600);
+  if(error){ console.error('[net] assinar fotos', error); return posts; }
+  /* casa por CAMINHO e não por posição: `createSignedUrls` não promete devolver
+     na ordem em que foi pedido, e casar por índice trocaria a foto de um post
+     pela de outro — do tipo de defeito que passa despercebido até alguém ver a
+     própria foto no post do vizinho. */
+  const porCaminho = {};
+  (data||[]).forEach(r=>{ if(r && r.path) porCaminho[r.path] = r.signedUrl; });
+  comFoto.forEach(x=>{ x.imgUrl = porCaminho[x.img] || null; });
+  return posts;
+}
+
 async function netFeed({grupo=null, autor=null, limite=30}={}){
   let q = sb.from('posts').select('*').order('criado_em',{ascending:false}).limit(limite);
   q = grupo ? q.eq('grupo_id', grupo) : q.is('grupo_id', null);
   if(autor) q = q.eq('autor_id', autor);
   const { data, error } = await q;
   if(error){ console.error('[net] feed', error); return []; }
-  return data||[];
+  return await _fotosResolver(data||[], grupo);
 }
-async function netPostar(corpo, grupo){
+
+/* Sobe a foto e publica NUM PASSO. A ordem importa: o arquivo vai primeiro,
+   porque `posts` não tem policy de UPDATE (mig 79, de propósito) — não existe
+   "publica agora, anexa depois".
+   ⚠️ E se o insert falhar DEPOIS do upload, o arquivo é removido. Sem isso,
+   cada post recusado (o teto de 20/hora, por exemplo) deixaria um arquivo pago
+   e órfão no balde, sem nenhuma linha apontando pra ele — lixo que ninguém
+   descobre porque não aparece em tela nenhuma. */
+async function netPostar(corpo, grupo, arquivo){
   if(!MEU_UID) return {erro:'sem sessão'};
   const t = (corpo||'').trim();
   if(!t) return {erro:'escreva alguma coisa'};
-  const { error } = await sb.from('posts').insert({ autor_id:MEU_UID, grupo_id:grupo||null, corpo:t });
+
+  let caminho = null;
+  if(arquivo){
+    /* o teto e os tipos também estão no balde (mig 91) — ali é regra, aqui é
+       cortesia: falhar antes de subir 5 MB no 4G da quadra é melhor do que
+       subir e ouvir não. */
+    if(!FOTO_TIPOS.includes(arquivo.type)) return {erro:'a foto precisa ser JPG, PNG ou WEBP'};
+    if(arquivo.size > FOTO_MAX) return {erro:'a foto passa de 2 MB — tire uma menor ou reduza antes'};
+    const menor = await _fotoComprimir(arquivo);
+    const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+    const pasta = grupo ? grupo : MEU_UID;         // o 1o nível que a policy olha
+    caminho = `${pasta}/${MEU_UID}-${Date.now()}.${ext}`;
+    /* cache de 1 ano: o nome do arquivo é único (uid + carimbo de tempo), então
+       o que está naquele endereço NUNCA muda — cache longo aqui não corre risco
+       de servir foto velha, e cada visualização repetida deixa de gastar banda.
+       É o que segura o egress do plano gratuito quando o feed é reaberto. */
+    const { error: eUp } = await sb.storage.from(_fotoBalde(grupo))
+      .upload(caminho, menor, { contentType: menor.type, cacheControl: '31536000' });
+    if(eUp) return {erro:'não deu pra subir a foto: '+eUp.message};
+  }
+
+  const { error } = await sb.from('posts')
+    .insert({ autor_id:MEU_UID, grupo_id:grupo||null, corpo:t, img:caminho });
   /* o teto de 20/hora vem do trigger e chega como exceção do banco: repassar a
      frase dele é melhor do que traduzir pra um "erro" genérico, porque ela já
      diz o que fazer (esperar). */
-  return error ? {erro:error.message} : {ok:true};
+  if(error){
+    if(caminho) await sb.storage.from(_fotoBalde(grupo)).remove([caminho]);
+    return {erro:error.message};
+  }
+  return {ok:true};
 }
 async function netApagarPost(id){
   const { error } = await sb.from('posts').delete().eq('id', id);
@@ -2651,6 +2835,96 @@ async function netAvaliar(alvo, matchId, texto){
     .insert({ autor_id:MEU_UID, alvo_id:alvo, match_id:matchId, texto:t });
   return error ? {erro:error.message} : {ok:true};
 }
+/* ===== CAPA DO GRUPO (migs 92 e 93) =====
+   Balde PRÓPRIO e PÚBLICO (`grupo-capa`), e não o `feed-grupo`: a capa aparece
+   no cartão da lista de comunidades, que mostra grupos ABERTOS pra quem ainda
+   não é membro. No balde privado ela sumiria justamente pra quem o cartão
+   existe pra convencer. */
+function netGrupoCapaUrl(caminho){
+  if(!caminho) return null;
+  const { data } = sb.storage.from('grupo-capa').getPublicUrl(caminho);
+  return data ? data.publicUrl : null;
+}
+async function netGrupoCapaTrocar(gid, arquivo){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  if(!arquivo)  return {erro:'escolha uma imagem'};
+  if(!FOTO_TIPOS.includes(arquivo.type)) return {erro:'a capa precisa ser JPG, PNG ou WEBP'};
+  if(arquivo.size > FOTO_MAX) return {erro:'a capa passa de 2 MB — use uma menor'};
+  /* nome FIXO por grupo (`<gid>/capa.<ext>`) e `upsert`: capa é uma só, e sem
+     nome fixo cada troca deixaria a anterior no balde pra sempre — o grupo
+     acumularia capas velhas que ninguém vê e ninguém apaga. */
+  const menor = await _fotoComprimir(arquivo);
+  const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  const caminho = `${gid}/capa.${ext}`;
+  /* ⚠️ o nome é fixo POR TIPO, e o tipo pode mudar: um PNG que a compressão
+     converteu em JPEG troca `capa.png` por `capa.jpg`, e o `upsert` não
+     alcança o arquivo de nome antigo — ele ficaria no balde pra sempre, pago e
+     invisível. Então a capa anterior sai quando o caminho muda. */
+  const antiga = (await sb.from('grupos').select('capa').eq('id',gid).maybeSingle()).data;
+  /* ⚠️ a capa tem cache CURTO, ao contrário da foto de post: o nome dela é fixo
+     por grupo, então trocar a capa reescreve o MESMO endereço — com cache de um
+     ano, quem já viu a capa antiga continuaria vendo a antiga por um ano. Uma
+     hora é o bastante pra segurar as releituras do dia sem esconder a troca. */
+  const { error: eUp } = await sb.storage.from('grupo-capa')
+    .upload(caminho, menor, { contentType: menor.type, upsert: true, cacheControl: '3600' });
+  if(eUp) return {erro:'não deu pra subir a capa: '+eUp.message};
+  const { error } = await sb.from('grupos').update({ capa: caminho }).eq('id', gid);
+  /* a linha é a fonte da verdade: arquivo no balde sem linha apontando pra ele
+     é invisível, então se o update falhar o arquivo sai junto. */
+  if(error){
+    await sb.storage.from('grupo-capa').remove([caminho]);
+    return {erro:error.message};
+  }
+  if(antiga && antiga.capa && antiga.capa !== caminho){
+    await sb.storage.from('grupo-capa').remove([antiga.capa]);
+  }
+  return {ok:true, caminho};
+}
+
+/* ===== SEGUIR (mig 89) =====
+   Os NÚMEROS vêm de `seguir_numeros`, função `security definer`, e não de um
+   `count` na tabela: a `seg_sel` mostra a cada um só os laços em que ele está
+   de um dos lados, então contar daqui devolveria 0 pra qualquer perfil alheio —
+   e o perfil exibiria zero seguidores com toda a confiança do mundo.
+   A função devolve UMA linha com os dois contadores e o `eu_sigo`, pra que o
+   botão nasça no estado certo sem uma segunda ida ao banco. */
+async function netSeguirNumeros(id){
+  const vazio = {seguidores:0, seguindo:0, eu_sigo:false};
+  if(!MEU_UID) return vazio;
+  const { data, error } = await sb.rpc('seguir_numeros', { p_player:id });
+  if(error) return vazio;
+  /* a função devolve TABLE, então a ponte recebe array de uma linha. Sem o
+     [0] isto viraria `undefined.seguidores` na tela. */
+  return (Array.isArray(data) ? data[0] : data) || vazio;
+}
+async function netSeguir(id){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const { error } = await sb.from('seguidores')
+    .insert({ seguidor_id:MEU_UID, seguido_id:id });
+  /* o banco barra seguir quem bloqueou ou foi bloqueado (mig 89, via
+     ha_bloqueio). A mensagem crua do Postgres não diz isso a ninguém. */
+  if(error) return {erro: /row-level security|violates/i.test(error.message||'')
+                          ? 'não dá pra seguir esta pessoa' : error.message};
+  return {ok:true};
+}
+async function netDeixarDeSeguir(id){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const { error } = await sb.from('seguidores').delete()
+    .eq('seguidor_id',MEU_UID).eq('seguido_id',id);
+  return error ? {erro:error.message} : {ok:true};
+}
+
+/* ===== ESTILO DE JOGO (mig 90) =====
+   Declaração da própria pessoa, no perfil. `null` apaga — e apagar precisa
+   existir, senão a escolha vira permanente sem ninguém ter avisado. */
+async function netEstiloSalvar(valor){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const v = valor || null;
+  if(v && !['fundo','consistente','defensivo'].includes(v)) return {erro:'estilo inválido'};
+  const { error } = await sb.from('players').update({ estilo:v }).eq('id',MEU_UID);
+  return error ? {erro:error.message} : {ok:true};
+}
+
 /* as partidas confirmadas contra alguém que eu AINDA não avaliei — é o que a
    tela precisa pra saber se o botão de avaliar existe, e sobre qual jogo */
 async function netPartidasParaAvaliar(alvo){
@@ -3155,9 +3429,11 @@ async function _cinturaoTentarPassar(m){
    Três coisas que ele desenha e que esta folha responde de outro jeito, com o
    porquê à vista em vez de escondido:
 
-   · FOTO DE CAPA — é Storage, não tabela: policy de BUCKET, superfície própria,
-     migração e decisão próprias. Fica como casca declarada. Um seletor de
-     arquivo que não sobe nada seria pior do que não ter: o botão promete.
+   · FOTO DE CAPA — existe desde 01/09 (migs 92 e 93), mas NÃO aqui: põe-se
+     depois de criar, pelo botão do cabeçalho do grupo. O caminho do arquivo é
+     `<grupo_id>/capa.<ext>`, e o grupo só ganha id ao nascer — pedir a capa
+     neste formulário seria subir arquivo pra uma pasta que ainda não tem nome.
+     É o mesmo motivo do link de convite logo abaixo.
 
    · LINK DE CONVITE — o board o mostra PREENCHIDO num formulário de criação, e
      isso não pode existir: o link carrega o id do grupo, e o grupo ainda não
@@ -3272,7 +3548,13 @@ async function netGrupoResumo(gid){
     try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){}
   }
   const pts = await netRanking('grupo:'+gid, g.esporte||'tenis');
-  return { g, membros, pts, souMembro: membros.some(m=>m.player_id===MEU_UID) };
+  /* 01/09: quem MANDA no grupo, calculado com a mesma regra do `eh_gestor`
+     (mig 6) — dono ou papel dono/admin. Serve pra tela saber se mostra o
+     botão de trocar a capa; quem cobra de verdade é a policy do balde. */
+  const meu = membros.find(m=>m.player_id===MEU_UID);
+  const souGestor = (g.dono_id===MEU_UID) || !!(meu && ['dono','admin'].includes(meu.papel));
+  return { g, membros, pts, souGestor,
+           souMembro: membros.some(m=>m.player_id===MEU_UID) };
 }
 
 // -- detalhe do grupo: membros, pedidos (gestor), papéis, link --
@@ -6635,7 +6917,14 @@ window.netAbrirAdm = netAbrirAdm;
 
 // exposto pro app e pros onclick
 window.netAbrirTorneios = netAbrirTorneios;
+/* 02/09 — `meuUser` é acessório de LEITURA, e existe pra que a guarda de
+   cadastro interrompido possa ser observada de fora. O `MEU_USER` é um `let`
+   de escopo de script: o console lê um binding global que PARECE o mesmo e não
+   dá pra provar que é. Sem este acessor, qualquer teste da guarda mede a
+   própria cópia em vez do que o `netBoot` enxerga — que é exatamente o erro
+   contra o qual o aprendizado de 01/09 avisa. Só lê; nada escreve por aqui. */
 window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>MEU_UID,
+  meuUser:()=>MEU_USER,
   desafiar:netDesafiar, confirmarDesafio:_onConfirmarDesafio, aceitar:netAceitar, recusar:netRecusar,
   /* mig 45/46 — duplas. Mesma advertência do bloco abaixo: o `onclick` só
      enxerga o que está neste mapa. */
@@ -6737,6 +7026,9 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   rankingGeral:(esporte)=>netRanking('geral', esporte||'tenis'),
   grupoResumo:netGrupoResumo,
   meusBloqueios:netMeusBloqueios, bloquear:netBloquear, desbloquear:netDesbloquear,
-  avaliacoes:netAvaliacoes, avaliar:netAvaliar, partidasParaAvaliar:netPartidasParaAvaliar };
+  avaliacoes:netAvaliacoes, avaliar:netAvaliar, partidasParaAvaliar:netPartidasParaAvaliar,
+  seguirNumeros:netSeguirNumeros, seguir:netSeguir, deixarDeSeguir:netDeixarDeSeguir,
+  estiloSalvar:netEstiloSalvar,
+  grupoCapaUrl:netGrupoCapaUrl, grupoCapaTrocar:netGrupoCapaTrocar };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;
