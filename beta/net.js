@@ -971,30 +971,48 @@ async function _carregarConquistas(id){
 function netFecharPerfil(){ const el=document.getElementById('net-perfil'); if(el) el.remove(); }
 window.netVerJogador = netVerJogador;
 
+/* 02/09 — O CONSTRUTOR DA PROPOSTA, um só para todas as portas.
+   Havia DUAS portas para a mesma folha e elas montavam estados diferentes:
+   `netDesafiar` (radar e perfil) preenchia quinze campos, `netDesafiarUid`
+   (a busca) preenchia três. Quem propunha pela busca perdia, em silêncio:
+     · o 📍 nascendo com o MEU local principal — decisão de 11/08, escrita e
+       aplicada só numa das portas
+     · a trava que exclui um principal que a regra já não aceita (quadra
+       particular de outro), e que existe justamente pra a proposta não morrer
+       no envio
+     · `dupla`, `piso` e os parceiros nascendo EXPLICITAMENTE nulos em vez de
+       `undefined` — o insert sobrevivia por sorte (`!!undefined` é false), e a
+       folha lia `undefined` onde esperava um valor decidido
+   É o aprendizado de sempre nesta base: superfície nova não herda as travas
+   das antigas. E o motivo de consertar AGORA é a decisão de 02/09 — a
+   proposta passa a existir também dentro da conversa, o que seria uma
+   TERCEIRA porta. Três portas sobre dois construtores é como elas começam a
+   discordar sobre o que a proposta é.
+   O que fica em cada porta é só o que ela realmente sabe: o radar e o perfil
+   têm a ficha inteira do adversário (inclusive os níveis de duplas); a busca
+   tem o que a busca devolve. Por isso o `adv` chega pronto de fora. */
+function _onNovo(adv){
+  const meu = window.__meusLocais || {};
+  const princ = meu.principal && _locaisMarcaveis().some(l=>l.id===meu.principal)
+    ? meu.principal : null;
+  return { step:'desafio', advId:adv.id, adv,
+           localId: princ, quadra: null, quando: null,
+           quadraPor: null, bolaPor: null,
+           piso: null,
+           dupla: false, parCri: null, parAdv: null };
+}
+
 function netDesafiar(id){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
   const j = S.jogadores && S.jogadores[id];
   if(!j){ alert('Jogador não encontrado.'); return; }
   // o 📍 nasce preenchido com o MEU local principal — quem marca sabe onde
   // joga; trocar é exceção, não formulário (decisão de 11/08)
-  const meu = window.__meusLocais || {};
-  /* o principal só entra se AINDA for marcável: quem já tinha a quadra
-     particular de outro salvada como principal (a lista de "Onde você joga"
-     oferecia isso) nasceria com um local que a trava (0) recusa, e o desafio
-     morreria no envio. Esconder da lista conserta daqui pra frente; isto
-     conserta quem já escolheu. */
-  const princ = meu.principal && _locaisMarcaveis().some(l=>l.id===meu.principal)
-    ? meu.principal : null;
-  _on = { step:'desafio', advId:id, adv:{id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB,
-            nivel_duplas:j.nivel_duplas, nivelb_duplas:j.nivelb_duplas},
-          localId: princ, quadra: null, quando: null,
-          quadraPor: null, bolaPor: null,
-          // (83) tipo de quadra: saibro | dura | rapida. Nasce VAZIO — quem
-          // marca "sábado, a gente vê onde" não deve ser obrigado a decidir o
-          // piso, e um default seria o app respondendo no lugar da pessoa.
-          piso: null,
-          // (45) nasce simples: duplas é escolha explícita, nunca default
-          dupla: false, parCri: null, parAdv: null };
+  /* o comentário do principal marcável, do `piso` que nasce vazio e do
+     `dupla` que nasce simples mudou de lugar: agora vive no `_onNovo`, que é
+     quem monta o estado pra todas as portas. */
+  _on = _onNovo({id, nome:j.nome, nivel:j.nivel, nivelb:j.nivelB,
+                 nivel_duplas:j.nivel_duplas, nivelb_duplas:j.nivelb_duplas});
   _farmContar(id);   // 5ª do mês contra ele? o aviso chega antes do Desafiar
   netRenderOnline();
 }
@@ -2642,9 +2660,15 @@ async function netConvidarAmigo(){
 }
 
 // desafiar alguém achado na busca (pode não estar no elenco local / outra divisão)
+/* a porta da BUSCA. Passa pelo mesmo `_onNovo` que o radar e o perfil — era
+   aqui que os doze campos se perdiam.
+   ⚠️ O que continua diferente é o que a busca SABE: ela devolve nível de
+   simples, não os de duplas. Então a proposta em duplas por esta porta calcula
+   sobre o nível de simples do adversário. Isso é limite da consulta da busca,
+   não do construtor, e fica anotado em vez de mascarado. */
 function netDesafiarUid(id, nome, nivel, nivelb){
   netFecharBusca();
-  _on = { step:'desafio', advId:id, adv:{id, nome, nivel, nivelb} };
+  _on = _onNovo({id, nome, nivel, nivelb});
   _farmContar(id);
   netRenderOnline();
 }
