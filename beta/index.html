@@ -1605,8 +1605,20 @@ button,input,select{font:inherit;color:inherit}
 /* ===== CADASTRO / ONBOARDING ===== */
 #onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:#060A00;overflow:hidden}
 #onb.on{display:flex}
-#onb .onb-bg{position:absolute;inset:0;z-index:0;background:var(--cena-url,url('../quadras/saibro-noite.jpg')) center/cover}
-#onb .onb-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,8,6,.74),rgba(11,8,6,.88) 52%,rgba(11,8,6,.97))}
+/* 02/09 — O FUNDO DO CADASTRO SAI DA FOTO E VAI PRO DO ARQUIVO.
+   Era a quadra em `--cena-url` com um scrim escuro por cima. Nas 7 telas de
+   entrada do board não há foto nenhuma: é #0B0B0B com o MESMO brilho radial
+   lime das outras telas — o node 28:211 do CADASTRE-SE traz exatamente a
+   matriz que a `--brilho` já reproduz desde 29/08.
+   O que forçou a troca foi o campo. No arquivo o campo não tem preenchimento:
+   quem o desenha é a borda, sobre o fundo da tela. Com a foto atrás, o
+   telhado e as luzes do prédio apareciam DENTRO do campo de e-mail — o
+   marrom translúcido de antes escondia isso, e por isso ninguém tinha visto.
+   Ou o campo é chapado, ou o fundo é; o arquivo escolheu o fundo.
+   ⚠️ A foto continua sendo o fundo do app DEPOIS do cadastro (o `#fone`
+   noturno). O que muda é só a porta de entrada. */
+#onb .onb-bg{position:absolute;inset:0;z-index:0;background:#0B0B0B}
+#onb .onb-bg::after{content:"";position:absolute;inset:0;background:var(--brilho)}
 #onb .onb-wrap{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding:18px 22px max(24px,env(safe-area-inset-bottom));overflow-y:auto}
 #onb .onb-wrap::-webkit-scrollbar{width:0}
 #onb .onb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;min-height:30px}
@@ -1688,6 +1700,88 @@ button,input,select{font:inherit;color:inherit}
   color:var(--ink2);font-weight:600;font-size:15px;cursor:pointer;font-family:var(--f-ui);margin-top:12px}
 #onb .onb-prim.lime{background:var(--marca)}   /* 25/08: telas novas — o fechamento também é laranja */
 #onb .nota.center{text-align:center}
+
+/* =========================================================================
+   02/09 — AS TELAS DE ENTRADA PELO CÓDIGO DOS NODES
+   CADASTRE-SE (28:204) e FICHA ESPORTIVA (29:355), as duas que faltavam da
+   fileira 1 — e as duas estão marcadas "Ready for development" no arquivo,
+   então o desenho não deve mais mudar debaixo disto.
+
+   O QUE ESTAVA ERRADO ERA A SUPERFÍCIE, NÃO A ESTRUTURA. Os campos, os chips
+   e os cartões do onboarding ainda carregavam `rgba(30,23,20,.72)` — um
+   marrom translúcido da paleta ANTERIOR à Ranket (11/08), que sobreviveu à
+   troca porque ninguém reabriu o cadastro depois dela. No arquivo não existe
+   preenchimento nenhum: o que desenha o campo é a BORDA, sobre o fundo da
+   tela. Era essa a diferença que fazia as telas de entrada parecerem de
+   outro app que o resto.
+
+   ⚠️ Tudo aqui é escopado em `#onb` de propósito. `.seg2`, `.onb-input` e
+   `.onb-card` vazam pra fora do cadastro — `.seg2` sozinho aparece em 18
+   lugares, incluindo desafio, aula e filtros. Mexer neles sem escopo
+   repintaria meia dúzia de telas que ninguém pediu. */
+
+/* o campo: sem preenchimento, borda branca sólida, raio médio.
+   (era fundo marrom, borda #FFFEFD a 55% e raio 16 — o dobro do desenho) */
+#onb .onb-input, #onb .onb-area{
+  background:transparent;
+  border:1px solid var(--ink);
+  border-radius:8px;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+#onb .onb-input::placeholder, #onb .onb-area::placeholder{color:var(--ink)}
+
+/* o chip de escolha: parado é CONTORNO LIME sobre nada, escolhido é lime
+   cheio com texto escuro. O contorno lime no estado parado é do arquivo e é o
+   que diz "isto aqui é escolhível" — a borda `--linha2` de antes (#2A3430)
+   não se via sobre o fundo quase preto, e os chips liam como texto solto. */
+#onb .seg2 button, #onb .seg3 button{
+  background:transparent;
+  border:1px solid var(--acc);
+  border-radius:8px;
+  color:var(--ink3);
+  min-height:44px;               /* R2: nenhum controle abaixo de 44 */
+}
+#onb .seg2 button.on, #onb .seg3 button.on{
+  background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700;
+}
+
+/* o cartão de opção segue a mesma regra do chip — no arquivo os dois são a
+   mesma peça em dois tamanhos (405x87 e 858x94), não duas peças. */
+#onb .onb-card{
+  background:transparent;
+  border:1px solid var(--acc);
+  border-radius:8px;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+
+/* O CABEÇALHO COM SINAL. Nas duas telas o título vem precedido de um
+   desenho — o "R" da marca no Criar Conta (node 28:227) e a bola de tênis na
+   Ficha Esportiva (node 29:385) —, com o passo em lime logo abaixo do título.
+   O `column-reverse` do `.onb-head` já punha o passo embaixo; o que faltava
+   era o sinal à esquerda. Por isso o bloco vira uma linha de duas colunas. */
+#onb .onb-head.comsinal{flex-direction:row;align-items:center;gap:14px}
+#onb .onb-head.comsinal .sinal{flex:0 0 auto;display:flex;align-items:center}
+#onb .onb-head.comsinal .sinal img{display:block;height:30px;width:auto}
+#onb .onb-head.comsinal .sinal.bola img{height:24px}
+#onb .onb-head.comsinal .txt{display:flex;flex-direction:column-reverse;align-items:flex-start;min-width:0}
+
+/* A PERGUNTA DA SEÇÃO. Na Ficha Esportiva cada bloco abre com um título em
+   branco (30px no arquivo) e uma linha de ajuda em cinza embaixo (20px) —
+   duas linhas, duas hierarquias. O app dizia as duas coisas numa frase só,
+   dentro de uma `.nota`: "Quais esportes você pratica? Selecione uma ou duas
+   modalidades." Lia como observação de rodapé, e não como a pergunta que a
+   tela está fazendo. */
+#onb .onb-pergunta{margin:20px 0 10px}
+#onb .onb-pergunta b{display:block;font:700 var(--t-title-s) var(--f-ui);color:var(--ink)}
+#onb .onb-pergunta small{display:block;font:400 var(--t-label) var(--f-ui);color:var(--ink3);margin-top:3px}
+
+/* o olho do campo de senha: o desenho do arquivo (node 37:122), não os
+   glifos ◉/◎. Traço em currentColor pra acompanhar o estado. */
+#onb .onb-olho{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  border:0;background:none;color:var(--ink3);cursor:pointer;padding:0}
+#onb .onb-olho svg{width:22px;height:auto;display:block}
+#onb .onb-olho.on{color:var(--acc)}
 /* 26/08: a porta pra quadra particular. Tracejada e sem preenchimento de
    propósito — é "acrescentar à lista", não uma opção da lista: se parecesse um
    .onb-card viraria um clube a mais entre os clubes. */
@@ -1853,7 +1947,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788359107"></script>
+<script src="net.js?v=1788366823"></script>
 
 <script>
 /* =========================================================================
@@ -2898,7 +2992,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788359107"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788366823"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3030,7 +3124,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788359107"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788366823"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4396,7 +4490,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788359107"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788366823"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -7652,6 +7746,12 @@ function completarCadastro(){
     : 'Bem-vindo, '+eu.nome.split(' ')[0]+'! Monte sua <b>turma</b> e marque as aulas — é por aí que o app trabalha pra você.');
 }
 
+/* 02/09 — o olho do campo de senha, pelo node 37:122 do CADASTRE-SE. Dois
+   traços (a amêndoa e a íris) em currentColor, pra que revelar a senha mude a
+   cor do ícone em vez de trocar o desenho por outro. Antes eram os glifos
+   ◉ e ◎, que mudavam de forma entre sistemas e não eram os do arquivo. */
+const ICO_OLHO = `<svg viewBox="0 0 35 23" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2.64868 14.613C5.78982 17.7088 11.2679 22 17.5004 22C23.7328 22 29.2099 17.7088 32.351 14.613C33.1794 13.7966 33.5951 13.3869 33.8588 12.5853C34.0471 12.0133 34.0471 10.9869 33.8588 10.4149C33.5951 9.61323 33.1795 9.20354 32.351 8.38699C29.2099 5.29117 23.7328 1 17.5004 1C11.2679 1 5.78982 5.29118 2.64868 8.38699C1.81961 9.2041 1.40504 9.61294 1.14116 10.4149C0.952948 10.9869 0.952948 12.0133 1.14116 12.5853C1.40504 13.3872 1.81961 13.7959 2.64868 14.613Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.9696 11.5001C13.9696 13.4331 15.5502 15.0001 17.5001 15.0001C19.4499 15.0001 21.0305 13.4331 21.0305 11.5001C21.0305 9.56706 19.4499 8.00005 17.5001 8.00005C15.5502 8.00005 13.9696 9.56706 13.9696 11.5001Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 function renderOnb(){
   const el=document.getElementById('onb');
   const dots=(n)=>`<div class="onb-dots">${[0,1,2,3,4,5].map(i=>`<span class="${i===n?'on':''}"></span>`).join('')}</div>`;
@@ -7720,11 +7820,12 @@ function renderOnb(){
       </div>`;
   } else if(onb.step===1){
     body=`
-      <div class="onb-head"><div class="onb-kick">Passo 1 de 4</div><h2>Criar Conta</h2></div>
+      <div class="onb-head comsinal"><div class="sinal"><img src="fig/onb-marca.svg" alt=""></div>
+        <div class="txt"><div class="onb-kick">Passo 1 de 4</div><h2>Criar Conta</h2></div></div>
       <input id="onb-email" class="onb-input" type="email" placeholder="E-mail" value="${(onb.email||'').replace(/"/g,'&quot;')}" oninput="onbEmail(this.value)" autocomplete="email" inputmode="email">
       <div style="position:relative">
-        <input id="onb-senha" class="onb-input" type="${onb.verSenha?'text':'password'}" placeholder="Criar senha" value="${(onb.senha||'').replace(/"/g,'&quot;')}" oninput="onbSenha(this.value)" autocomplete="new-password" style="padding-right:52px">
-        <button onclick="onbVerSenha()" aria-label="mostrar senha" style="position:absolute;right:8px;top:8px;width:38px;height:38px;border:0;background:none;color:var(--ink3);font-size:17px;cursor:pointer">${onb.verSenha?'◉':'◎'}</button>
+        <input id="onb-senha" class="onb-input" type="${onb.verSenha?'text':'password'}" placeholder="Criar senha" value="${(onb.senha||'').replace(/"/g,'&quot;')}" oninput="onbSenha(this.value)" autocomplete="new-password" style="padding-right:58px">
+        <button class="onb-olho${onb.verSenha?' on':''}" onclick="onbVerSenha()" aria-label="mostrar senha">${ICO_OLHO}</button>
       </div>
       <!-- 27/08 (QA do Nuno): repetir a senha. O olho é UM só e revela as duas
            — dois olhos independentes deixariam uma visível e a outra não, e a
@@ -7825,20 +7926,25 @@ function renderOnb(){
       const niveisDesc = NIVEIS.slice().reverse();   // telas novas: Nível alto no topo
       const podeAvancar = onb.div && onb.mao && (onb.locais===null || !ls.length || onb.locSel.length);
       body=`
-        <div class="onb-head"><div class="onb-kick">${onb.perfil==='professor'?'Você também joga':'Passo 3 de 4'}</div><h2>Ficha Esportiva</h2></div>
-        <p class="nota" style="margin-bottom:6px"><b>Quais esportes você pratica?</b> Selecione uma ou duas modalidades.</p>
-        <div class="seg2" style="margin-bottom:14px">
+        <div class="onb-head comsinal"><div class="sinal bola"><img src="fig/onb-bola.svg" alt=""></div>
+          <div class="txt"><div class="onb-kick">${onb.perfil==='professor'?'Você também joga':'Passo 3 de 4'}</div><h2>Ficha Esportiva</h2></div></div>
+        <p class="onb-pergunta"><b>Quais esportes você pratica?</b><small>Selecione uma ou duas modalidades</small></p>
+        <div class="seg2">
           <button class="${esporteOn('tenis')?'on':''}" onclick="onbEsporteToggle('tenis')">Tênis</button>
           <button class="${esporteOn('beach')?'on':''}" onclick="onbEsporteToggle('beach')">Beach Tennis</button>
         </div>
-        <p class="nota" style="margin-bottom:6px"><b>Qual a sua mão dominante no jogo?</b></p>
-        <div class="seg2" style="margin-bottom:14px">
+        <p class="onb-pergunta"><b>Qual a sua mão dominante no jogo?</b><small>Selecione uma das opções</small></p>
+        <div class="seg2">
           <button class="${onb.mao==='E'?'on':''}" onclick="onbSet('mao','E')">Esquerda</button>
           <button class="${onb.mao==='D'?'on':''}" onclick="onbSet('mao','D')">Direita</button>
         </div>
-        <p class="nota" style="margin-bottom:6px"><b>Há quanto tempo você pratica o esporte?</b></p>
+        <p class="onb-pergunta"><b>Há quanto tempo você pratica o esporte?</b></p>
         <input id="onb-tempo" class="onb-input" placeholder="Ex.: 2 anos" value="${(onb.tempo||'').replace(/"/g,'&quot;')}" oninput="onbTempo(this.value)" maxlength="24">
-        <p class="nota" style="margin:2px 0 6px"><b>Qual o seu nível de jogo?</b> Você se declara e já entra jogando — as 8 primeiras partidas ajustam de verdade.</p>
+        <!-- 02/09: o arquivo escreve só "Selecione uma das opções" aqui. A
+             segunda linha do app fica: ela é a que evita a pergunta que este
+             passo mais gera ("e se eu errar meu nível?"), e o board não a
+             contradiz — ele desenha um estado, não a explicação dele. -->
+        <p class="onb-pergunta"><b>Qual o seu nível de jogo?</b><small>Você se declara e já entra jogando — as 8 primeiras partidas ajustam de verdade.</small></p>
         <div class="onb-cards">${niveisDesc.map(n=>`<button class="onb-card ${onb.div===n.d?'on':''}" onclick="onbSet('div','${n.d}')"><div class="dv">${n.d}</div><div class="tx"><b>${n.t}</b><small>${n.s}</small></div></button>`).join('')}</div>
         <button class="onb-link" onclick="onbAbrirQuiz()">Não sei meu nível — me ajuda a escolher</button>
         <p class="nota" style="margin:14px 0 6px"><b>Onde você joga?</b> Não precisa ser sócio — é onde você costuma jogar. O primeiro vira o principal.</p>
