@@ -1031,20 +1031,69 @@ button,input,select{font:inherit;color:inherit}
 .hpart.v .dir .pts{color:var(--up)}
 .hpart.d .dir .pts{color:var(--dn)}
 /* o gráfico anual: 12 colunas, a do mês escolhido acesa */
-.hano{background:rgba(11,11,11,.6);border:1px solid var(--linha);border-radius:16px;padding:16px 12px}
-.hbarras{display:flex;align-items:flex-end;gap:4px;height:150px;margin-bottom:8px}
+/* 02/09 — A ANALISE ANUAL PELO NODE 169:728.
+   A tela ja existia com o grafico certo (barras por mes, e so o mes ESCOLHIDO
+   ganha cor) — o arquivo concorda com isso, entao a semantica nao mudou. O que
+   mudou foi a superficie e duas coisas que faltavam.
+   ⚠️ As barras do arquivo vem ACHATADAS num vetor unico (Group 259), entao os
+   fills delas nao chegam no payload do codigo — e o R13 da especificacao. O que
+   define a cor aqui e o app, nao o arquivo: lime vence, vermelho perde. */
+.hano{background:rgba(11,11,11,.8);border:0;border-radius:8px;padding:16px 8px}
+.hano-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:10px}
+/* a pilula do ano (node 169:1098): 108x39, raio 100, borda lime, rotulo #BCBCBC.
+   `S.histAno` existia desde sempre e NENHUMA tela deixava troca-lo — o ano
+   ficava preso no atual. So aparece como botao quando ha mais de um ano com
+   partida; com um ano so, um seletor de uma opcao e um controle que mente. */
+.hano-ano{border:1px solid var(--acc);border-radius:999px;background:transparent;
+  color:var(--ink3);font:700 var(--t-nav) var(--f-ui);padding:8px 15px;cursor:pointer;
+  min-height:36px;font-variant-numeric:tabular-nums}
+.hano-ano[disabled]{cursor:default;opacity:1}
+/* gap de 2: com 12 colunas em 375px, os 4px de antes comiam 44px da largura e
+   os rotulos encostavam ("MARABR"). */
+.hbarras{display:flex;align-items:flex-end;gap:2px;height:150px;margin-bottom:8px}
 .hbarras .m{flex:1;display:flex;flex-direction:column;justify-content:flex-end;
   align-items:center;gap:2px;height:100%;cursor:pointer;min-width:0}
 .hbarras .m .bs{display:flex;align-items:flex-end;gap:2px;height:100%;width:100%;justify-content:center}
 .hbarras .m .bs i{display:block;width:4px;border-radius:2px;background:var(--linha2);min-height:2px}
 .hbarras .m.on .bs i.v{background:var(--up)}
 .hbarras .m.on .bs i.d{background:var(--dn)}
-.hbarras .m .rot{font:700 8.5px var(--f-ui);color:var(--ink3);letter-spacing:.04em}
+/* o rotulo do mes estava em 8,5px — o menor texto do app inteiro, e abaixo do
+   piso de 11 da especificacao. O arquivo usa 15,4 sobre 1080, que da 11pt. */
+/* o tracking sai: em 11px com 12 colunas ele e a diferenca entre caber e
+   colidir, e num rotulo de tres letras nao acrescenta legibilidade nenhuma. */
+.hbarras .m .rot{font:700 var(--t-nav) var(--f-ui);color:var(--ink3);letter-spacing:0;
+  text-align:center;overflow:hidden}
 .hbarras .m.on .rot{color:var(--ink)}
-.hmes{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:14px}
-.hmes .cx{border:1px solid var(--linha);border-radius:14px;padding:13px}
-.hmes .cx b{font:700 19px var(--f-disp);color:var(--ink);margin-right:6px}
-.hmes .cx small{font:400 var(--t-caption) var(--f-ui);color:var(--ink3)}
+/* O TRILHO DOS MESES (node 169:1052): doze retangulos sob o eixo, #1E1E1E, e o
+   do mes escolhido em #FFFEFD. Nao e enfeite — e o que diz qual coluna esta
+   selecionada quando o mes nao tem partida nenhuma e as duas barras tem altura
+   zero. Sem ele, mes vazio escolhido e mes vazio qualquer sao identicos. */
+.hbarras .m .trilho{display:block;height:4px;border-radius:2px;background:#1E1E1E;margin:5px 0 4px}
+.hbarras .m.on .trilho{background:var(--ink)}
+/* A LEGENDA. Sao duas series e a unica coisa que as separa era a cor — quem nao
+   distingue vermelho de verde lia duas barras iguais. O ponto colorido carrega
+   a identidade e o texto fica em cor de texto, nunca na cor da serie. */
+.hleg{display:flex;gap:16px;justify-content:center;margin:2px 0 12px}
+.hleg span{display:inline-flex;align-items:center;gap:6px;font:400 var(--t-caption) var(--f-ui);color:var(--ink3)}
+.hleg i{width:8px;height:8px;border-radius:2px;display:block}
+.hleg i.v{background:var(--up)} .hleg i.d{background:var(--dn)}
+/* O BLOCO "DADOS DO MES" (nodes 169:1111 e 169:1112/1148): nao e uma grade
+   plana de caixas — sao DOIS paineis contornados. O da esquerda junta o que se
+   conta (vitorias, derrotas, partidas) em duas colunas; o da direita empilha o
+   que se deriva (aproveitamento e pontos), um por linha, com o numero grande a
+   esquerda e o rotulo a direita.
+   A borda e #BCBCBC no arquivo, bem mais viva que a --linha de antes: aqui ela
+   e divisoria estrutural, nao contorno discreto de cartao. */
+.hmes{display:grid;grid-template-columns:1fr;gap:9px;margin-top:12px}
+@media(min-width:390px){.hmes{grid-template-columns:1.35fr 1fr}}
+.hpainel{border:1px solid var(--ink3);border-radius:8px;padding:13px}
+.hpainel.contas{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
+.hpainel .cx b{font:700 var(--t-title-m) var(--f-disp);color:var(--ink);margin-right:7px;
+  font-variant-numeric:tabular-nums}
+.hpainel .cx small{font:400 var(--t-label) var(--f-ui);color:var(--ink3)}
+.hlado{display:flex;flex-direction:column;gap:9px}
+.hlado .hpainel{display:flex;align-items:center;gap:9px}
+.hlado .seta{color:var(--acc);font-size:15px;line-height:1;flex:0 0 auto}
 
 .pcab{display:flex;gap:14px;align-items:flex-start;padding:16px var(--pad-lado) 0}
 .pcab .av.gg{flex:0 0 76px}
@@ -1999,7 +2048,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788367873"></script>
+<script src="net.js?v=1788369248"></script>
 
 <script>
 /* =========================================================================
@@ -3044,7 +3093,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788367873"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788369248"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3176,7 +3225,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788367873"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788369248"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3954,6 +4003,22 @@ function dispClasse(slots, j){
 function radarSub(v){ S.radarSub=v; salvar(); render(); }
 // 29/08: o mês escolhido no gráfico anual do histórico
 function histMes(k){ S.histMes=k; salvar(); render(); }
+/* 02/09: a troca de ano do node 169:1098. Cicla entre os anos que TEM partida
+   (o próprio botão só aparece quando são mais de um) e volta o mês pro atual —
+   manter dezembro selecionado ao pular pra um ano que só tem março mostraria
+   um mês vazio como se fosse a resposta. */
+function histAnoTrocar(){
+  const uid = (window._net && _net.uid && _net.uid()) || null;
+  const todas = ((window.__minhasPartidas)||[]).filter(m=>m.status==='confirmada' && m.confirmed_at);
+  const agora = new Date();
+  const anos = [...new Set(todas.map(m=>new Date(m.confirmed_at).getFullYear())
+                           .concat([agora.getFullYear()]))].sort((x,y)=>y-x);
+  if(anos.length<2) return;
+  const i = anos.indexOf(S.histAno || agora.getFullYear());
+  S.histAno = anos[(i+1) % anos.length];
+  S.histMes = agora.getMonth();
+  salvar(); render();
+}
 
 /* 29/08 (board, node 159:1604) — o menu do ⋮ no perfil do oponente:
    COMPARTILHAR e BLOQUEAR. */
@@ -4542,7 +4607,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788367873"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788369248"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -6559,22 +6624,42 @@ historico(){
     const teto = Math.max(1, ...porMes.map(b=>b.v+b.d));
     const MES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
     const b = porMes[mesSel];
+    /* 02/09 — os ANOS que existem de verdade, tirados das partidas. O seletor do
+       board (node 169:1098) sugere troca de ano, e `S.histAno` sempre existiu
+       sem nenhuma tela que o mudasse. A lista sai do dado: ano sem partida
+       nenhuma não entra, e o atual entra sempre pra que a tela abra no lugar
+       certo mesmo antes da primeira partida do ano. */
+    const anos = [...new Set(todas.map(m=>new Date(m.confirmed_at).getFullYear())
+                             .concat([agora.getFullYear()]))].sort((x,y)=>y-x);
+    const aprov = b.v+b.d ? Math.round(b.v/(b.v+b.d)*100) : 0;
     return `<div class="hano">
+      <div class="hano-top">${anos.length>1
+        ? `<button class="hano-ano" onclick="histAnoTrocar()">${ano} ⌄</button>`
+        /* um seletor de uma opção só é um controle que mente: parece que dá pra
+           trocar e não dá. Com um ano só, o ano é rótulo. */
+        : `<button class="hano-ano" disabled>${ano}</button>`}</div>
       <div class="hbarras">${porMes.map((x,k)=>`
-        <div class="m ${k===mesSel?'on':''}" onclick="histMes(${k})">
+        <div class="m ${k===mesSel?'on':''}" onclick="histMes(${k})"
+             role="button" tabindex="0" aria-label="${MES[k]}: ${x.v} ${x.v===1?'vitória':'vitórias'}, ${x.d} ${x.d===1?'derrota':'derrotas'}">
           <div class="bs">
             <i class="d" style="height:${Math.round(x.d/teto*100)}%"></i>
             <i class="v" style="height:${Math.round(x.v/teto*100)}%"></i>
           </div>
+          <u class="trilho"></u>
           <div class="rot">${MES[k]}</div>
         </div>`).join('')}</div>
-      <div class="rot" style="margin-top:6px">Dados de ${MES[mesSel].toLowerCase()} de ${ano}</div>
+      <div class="hleg"><span><i class="v"></i>Vitórias</span><span><i class="d"></i>Derrotas</span></div>
+      <div class="rot tit">Dados de ${MES[mesSel].toLowerCase()}</div>
       <div class="hmes">
-        <div class="cx"><b>${b.v}</b><small>Vitórias</small></div>
-        <div class="cx"><b>${b.d}</b><small>Derrotas</small></div>
-        <div class="cx"><b>${b.v+b.d}</b><small>Partidas</small></div>
-        <div class="cx"><b>${b.v+b.d?Math.round(b.v/(b.v+b.d)*100):0}%</b><small>Aproveitamento</small></div>
-        <div class="cx" style="grid-column:1/-1"><b style="color:${b.pts>=0?'var(--up)':'var(--dn)'}">${b.pts>0?'+':''}${b.pts} pts</b><small>no mês</small></div>
+        <div class="hpainel contas">
+          <div class="cx"><b>${b.v}</b><small>Vitórias</small></div>
+          <div class="cx"><b>${b.d}</b><small>Derrotas</small></div>
+          <div class="cx"><b>${b.v+b.d}</b><small>Partidas</small></div>
+        </div>
+        <div class="hlado">
+          <div class="hpainel"><span class="seta">↗</span><div class="cx"><b>${aprov}%</b><small>Aproveitamento</small></div></div>
+          <div class="hpainel"><div class="cx"><b style="color:${b.pts>=0?'var(--up)':'var(--dn)'}">${b.pts>0?'+':''}${b.pts} pts</b><small>Ganhos no mês</small></div></div>
+        </div>
       </div>
     </div>`;
   })() : (doMes.length ? doMes.map(m=>{
