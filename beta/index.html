@@ -1131,6 +1131,35 @@ button,input,select{font:inherit;color:inherit}
 .fbl p{font:400 var(--t-body)/1.5 var(--f-ui);color:var(--ink3);margin:5px 0 0;
   white-space:pre-wrap;word-break:break-word}
 
+/* 02/09 — A LISTA DE CONVERSAS (node 64:569, "CHAT GERAL").
+   Era uma pilha de `.card` com seta; no arquivo e uma LISTA com regua, no
+   mesmo material da lista de feedbacks. O que muda de verdade em relacao aos
+   cartoes: o avatar e a foto da pessoa (126 no arquivo → 44pt, que e tambem o
+   minimo de toque), o nome divide a linha com a hora, e o nao-lido deixa de
+   ser pilula de texto pra ser DISCO lime com o numero dentro. */
+.convl{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid var(--linha4);
+  cursor:pointer;width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
+.convl:last-child{border-bottom:0}
+.convl .av{flex:0 0 44px;width:44px;height:44px}
+.convl .txt{flex:1;min-width:0}
+.convl .txt b{display:block;font:700 var(--t-title-s) var(--f-ui);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.convl .txt small{display:block;font:400 var(--t-label) var(--f-ui);color:var(--ink3);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.convl .dir{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+/* o disco do nao-lido: 38 no arquivo (→13pt) e pequeno demais pra caber
+   numero legivel, entao vai a 20px com o texto no piso de 11. */
+.convl .naolido{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--acc);
+  color:var(--acc-ink);font:700 var(--t-nav) var(--f-ui);display:flex;align-items:center;
+  justify-content:center;font-variant-numeric:tabular-nums}
+/* os filtros do topo (nodes 299:1135/1139/1142): pilula de 172x49, contorno
+   #BCBCBC, rotulo #BCBCBC. O arquivo desenha os tres APAGADOS — nao ha estado
+   escolhido desenhado —, entao o aceso segue a convencao do app: lime cheio. */
+.convf{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.convf button{border:1px solid var(--ink3);border-radius:999px;background:transparent;
+  color:var(--ink3);font:400 var(--t-label) var(--f-ui);padding:9px 18px;cursor:pointer;min-height:36px}
+.convf button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+
 /* 02/09 — A GRADE DE POSTAGENS (node 150:1044).
    Duas colunas, celulas de altura variavel com a legenda por cima da foto.
    O raio e o `r-md` do arquivo (20 → 8pt), o mesmo dos cartoes de lista. */
@@ -2066,7 +2095,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788370210"></script>
+<script src="net.js?v=1788373270"></script>
 
 <script>
 /* =========================================================================
@@ -3111,7 +3140,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788370210"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788373270"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3243,7 +3272,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788370210"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788373270"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4021,6 +4050,7 @@ function dispClasse(slots, j){
 function radarSub(v){ S.radarSub=v; salvar(); render(); }
 // 29/08: o mês escolhido no gráfico anual do histórico
 function histMes(k){ S.histMes=k; salvar(); render(); }
+function chatFiltro(v){ S.chatFiltro=v; salvar(); render(); }
 /* 02/09: a troca de ano do node 169:1098. Cicla entre os anos que TEM partida
    (o próprio botão só aparece quando são mais de um) e volta o mês pro atual —
    manter dezembro selecionado ao pular pra um ano que só tem março mostraria
@@ -4625,7 +4655,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788370210"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788373270"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -5985,21 +6015,44 @@ chat(){
   }
   const h = hub || {grupos:[],partidas:[]};
   const rec = (t,id)=> (window.netRecadosDe ? netRecadosDe(t,id) : 0);
-  const cardG = h.grupos.map(g=>`
-    <div class="card clic" onclick="_net.abrirChat('${g.id}')">
-      <div class="linha-item"><div class="av">💬</div>
-        <div class="txt"><b>${g.nome}</b><small>Conversa da comunidade</small></div>
-        ${rec('grupo',g.id)?`<span class="pil up">${rec('grupo',g.id)} nova${rec('grupo',g.id)===1?'':'s'}</span>`:''}
-        <div class="seta">›</div></div></div>`).join('');
-  const cardP = h.partidas.map(pt=>`
-    <div class="card clic" onclick="_net.abrirChatPartida('${pt.id}')">
-      <div class="linha-item"><div class="av">🎾</div>
-        <div class="txt"><b>${pt.nome}</b><small>Conversa da partida</small></div>
-        ${rec('partida',pt.id)?`<span class="pil up">${rec('partida',pt.id)}</span>`:''}
-        <div class="seta">›</div></div></div>`).join('');
+  /* 02/09 (node 64:569) — os FILTROS do topo. Dois dos três do arquivo saem do
+     dado que já existe: "Não lidas" pelo contador de recados, "Grupos" pela
+     origem da conversa.
+     ⚠️ O terceiro — "Favoritas" — NÃO entra: favoritar conversa não existe no
+     banco (nem coluna nem tabela), e um filtro que não filtra nada é pior que
+     um filtro ausente. Fica registrado como o que falta, não como botão morto. */
+  const filtro = (S.chatFiltro = S.chatFiltro || 'todas');
+  const naoLidas = (t,id)=> rec(t,id) > 0;
+  const grupos   = h.grupos.filter(g=> filtro==='grupos' ? true : (filtro==='naolidas' ? naoLidas('grupo',g.id) : true));
+  const partidas = h.partidas.filter(pt=> filtro==='grupos' ? false : (filtro==='naolidas' ? naoLidas('partida',pt.id) : true));
+
+  /* a linha: avatar, nome com a hora do lado, subtítulo e o disco do não-lido.
+     ⚠️ SEM a hora e SEM a última mensagem, que o arquivo mostra e o app não
+     tem: o `netChatHub` devolve só `{id, nome}` por conversa. Trazer a última
+     mensagem exige uma view ou RPC sobre `grupo_mensagens`/`partida_mensagens`
+     (uma consulta por conversa numa lista seria N consultas), e isso é
+     migração. Deixar o slot vazio faria a linha parecer quebrada; o subtítulo
+     que já existe ocupa o lugar dele com informação verdadeira. */
+  const linha = (nome, sub, n, acao, ico)=>`
+    <button class="convl" onclick="${acao}">
+      <div class="av">${ico}</div>
+      <div class="txt"><b>${nome}</b><small>${sub}</small></div>
+      <div class="dir">${n?`<span class="naolido">${n>99?'99+':n}</span>`:''}</div>
+    </button>`;
+  const cardG = grupos.map(g=> linha(g.nome, 'Conversa da comunidade', rec('grupo',g.id),
+                                     `_net.abrirChat('${g.id}')`, '💬')).join('');
+  const cardP = partidas.map(pt=> linha(pt.nome, 'Conversa da partida', rec('partida',pt.id),
+                                        `_net.abrirChatPartida('${pt.id}')`, '🎾')).join('');
+  const vazioFiltrado = filtro!=='todas' && !(cardG+cardP);
   return {titulo:'Chat', html:`
-    <div class="sec"><div class="rot">Suas conversas</div>
+    <div class="sec">
+      <div class="convf">
+        <button class="${filtro==='todas'?'on':''}" onclick="chatFiltro('todas')">Todas</button>
+        <button class="${filtro==='naolidas'?'on':''}" onclick="chatFiltro('naolidas')">Não lidas</button>
+        <button class="${filtro==='grupos'?'on':''}" onclick="chatFiltro('grupos')">Grupos</button>
+      </div>
       ${hub===null ? '<div class="card"><p class="nota">Carregando…</p></div>'
+        : vazioFiltrado ? `<div class="card"><p class="nota">Nenhuma conversa ${filtro==='naolidas'?'não lida':'de comunidade'} agora.</p></div>`
         : ((cardG+cardP) || `<div class="card"><p class="nota">Sem conversas ainda. A conversa nasce junto com a comunidade e com a partida marcada — marque um jogo pelo Radar.</p></div>`)}
     </div>
     <div class="sec">
