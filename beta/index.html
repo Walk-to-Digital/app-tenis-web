@@ -1052,7 +1052,59 @@ button,input,select{font:inherit;color:inherit}
 .pcab .nm{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .pcab .nm b{font:700 var(--t-title-l) var(--f-disp);color:var(--ink)}
 .pcab .nm .cl{font:700 var(--t-title-s) var(--f-ui);color:var(--acc)}
+/* 02/09 — A PÍLULA DO ESTILO DE JOGO (node 169:277, no perfil do oponente).
+   A mig 90 criou a coluna `estilo` em 01/09 e o elenco já a traz no `select`
+   desde então (net.js:208) — o dado estava na memória do app e nenhuma tela o
+   mostrava. Era o caso do `matches.cantada`, em menor escala: coluna com
+   valor e nenhuma superfície.
+   Do arquivo: pílula de 203x41 (r=66, que satura em redondo), fundo
+   rgba(18,18,18,.5), borda #83E000 e rótulo #83E000.
+   ⚠️ A borda do arquivo é 0,664 — sub-pixel, invisível. Vira 1px, que é o
+   `hairline` da especificação. */
+.pcab .nm .estilo{font:600 var(--t-caption) var(--f-ui);color:var(--acc);
+  background:rgba(18,18,18,.5);border:1px solid var(--acc);border-radius:999px;
+  padding:4px 11px;white-space:nowrap}
 .pcab .bio{font:400 var(--t-body)/1.5 var(--f-ui);color:var(--ink3);margin-top:7px}
+/* 02/09 — A LISTA DE FEEDBACKS (node 169:387/508/536, aba Feed > Feedbacks).
+   Linha, nao cartao: sem fundo e sem contorno, separadas por uma regua de 1px.
+   O nome divide a primeira linha com a data, que encosta na direita.
+   A regua usa --linha4, que e a das linhas de uma MESMA lista (as duas reguas
+   do board, medidas em 29/08) — nao a --linha3, que separa secoes. */
+.fbl{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--linha4)}
+.fbl:last-child{border-bottom:0}
+.fbl .av{flex:0 0 40px;width:40px;height:40px}
+.fbl .txt{flex:1;min-width:0}
+.fbl .l1{display:flex;align-items:baseline;gap:10px}
+.fbl .l1 b{font:700 var(--t-label) var(--f-ui);color:var(--ink);flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbl .l1 .dt{font:400 var(--t-caption) var(--f-ui);color:var(--ink3);flex:0 0 auto;
+  font-variant-numeric:tabular-nums}
+.fbl p{font:400 var(--t-body)/1.5 var(--f-ui);color:var(--ink3);margin:5px 0 0;
+  white-space:pre-wrap;word-break:break-word}
+
+/* 02/09 — A GRADE DE POSTAGENS (node 150:1044).
+   Duas colunas, celulas de altura variavel com a legenda por cima da foto.
+   O raio e o `r-md` do arquivo (20 → 8pt), o mesmo dos cartoes de lista. */
+.pgrade{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pcel{position:relative;border-radius:8px;overflow:hidden;background:rgba(11,11,11,.8);
+  border:1px solid var(--linha4);min-height:150px;display:flex;align-items:flex-end}
+/* com foto a celula e a IMAGEM: a borda sai (o recorte ja a define) e a
+   legenda desce sobre um veu, que e o que da contraste sem escurecer a foto
+   inteira. Sem foto nao ha o que velar, e a celula fica sendo cartao. */
+.pcel.comfoto{border:0;background:#000}
+.pcel.comfoto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pcel.comfoto .leg{position:relative;width:100%;
+  background:linear-gradient(180deg,transparent,rgba(0,0,0,.82) 62%);padding:26px 10px 9px}
+.pcel .leg{padding:11px 10px;width:100%}
+.pcel .leg p{font:400 var(--t-caption)/1.45 var(--f-ui);color:var(--ink);margin:0;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+  word-break:break-word}
+.pcel .leg span{display:block;margin-top:5px;font:400 10.5px var(--f-ui);color:var(--ink3);
+  font-variant-numeric:tabular-nums}
+.pcel.comfoto .leg p{color:#FFFEFD}
+/* a celula com foto precisa de altura propria: sem conteudo em fluxo atras da
+   imagem absoluta, ela colapsaria na altura da legenda. */
+.pcel.comfoto{min-height:200px}
 /* 01/09: entraram Seguidores e Seguindo (mig 89), então a linha passou de um
    número + botão para TRÊS + botão. O gap caiu e os números podem encolher —
    em 375px a soma antiga estourava e empurrava o botão pra fora. */
@@ -1947,7 +1999,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788366823"></script>
+<script src="net.js?v=1788367873"></script>
 
 <script>
 /* =========================================================================
@@ -2992,7 +3044,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788366823"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788367873"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3124,7 +3176,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788366823"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788367873"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4490,7 +4542,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788366823"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788367873"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -6576,9 +6628,26 @@ jogador(p){
       ? '<div class="card"><p class="nota">Carregando…</p></div>'
       : abasHtml('perfilFeed',[['posts','Postagens'],['fb','Feedbacks']],'pilula') + (sub==='posts'
         ? (dados.posts.length
-            ? dados.posts.map(x=>`<div class="card" style="margin-top:10px"><p style="font:400 13px/1.55 var(--f-ui)">${(x.corpo||'').replace(/</g,'&lt;')}</p>
-                ${x.imgUrl ? `<img class="post-foto" src="${_attr(x.imgUrl)}" alt="" loading="lazy">` : ''}
-                <p class="nota" style="margin-top:6px">${new Date(x.criado_em).toLocaleDateString('pt-BR')}</p></div>`).join('')
+            /* 02/09 (node 150:1044) — a aba Postagens é GRADE de duas colunas,
+               com a legenda POR CIMA da foto. Era lista vertical de cartões de
+               texto.
+               ⚠️ O board desenha a grade só com post COM FOTO — as seis células
+               dele são todas imagem. O app aceita post só de texto desde muito
+               antes da foto existir (a foto chegou na mig 91, em 01/09), e uma
+               célula de imagem vazia com um texto dentro seria um buraco na
+               grade. Por isso a célula tem duas formas: com foto, a legenda
+               entra sobre um véu na base; sem foto, a célula é a própria
+               superfície de cartão com o texto legível dentro. A grade não
+               muda — o que muda é o que preenche a célula. */
+            ? `<div class="pgrade">${dados.posts.map(x=>{
+                const txt = (x.corpo||'').replace(/</g,'&lt;');
+                const dt = new Date(x.criado_em);
+                const dd = String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0');
+                return x.imgUrl
+                  ? `<div class="pcel comfoto"><img src="${_attr(x.imgUrl)}" alt="" loading="lazy">
+                       <div class="leg"><p>${txt}</p><span>${dd}</span></div></div>`
+                  : `<div class="pcel"><div class="leg"><p>${txt}</p><span>${dd}</span></div></div>`;
+              }).join('')}</div>`
             : `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">✎</i>${nome(p.id).split(' ')[0]} ainda não publicou nada.</div></div>`)
         : (()=>{
             /* o campo de escrever só aparece com partida elegível: a policy da
@@ -6603,11 +6672,17 @@ jogador(p){
                   const conhecido = !!S.jogadores[x.autor_id];
                   const quem = conhecido ? nome(x.autor_id) : 'Outro jogador';
                   const face = conhecido ? avatar(x.autor_id,'') : '<div class="av">◈</div>';
-                  return `<div class="card" style="margin-top:10px">
-                  <div class="linha-item" style="align-items:flex-start">${face}
-                  <div class="txt"><b>${quem}</b>
-                  <small style="color:var(--ink2);line-height:1.5">${(x.texto||'').replace(/</g,'&lt;')}</small></div>
-                  <div class="nota">${new Date(x.criado_em).toLocaleDateString('pt-BR')}</div></div></div>`;
+                  /* 02/09 (node 169:387) — o feedback é LINHA, não cartão.
+                     No arquivo os itens não têm fundo nem contorno: o que os
+                     separa é uma régua de 1px, e o nome divide a linha com a
+                     data, que fica encostada na direita. Em cartão cada
+                     feedback lia como um bloco fechado, e três seguidos
+                     viravam três caixas empilhadas em vez de uma conversa. */
+                  const dt = new Date(x.criado_em);
+                  const dd = String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0');
+                  return `<div class="fbl">${face}
+                    <div class="txt"><div class="l1"><b>${quem}</b><span class="dt">${dd}</span></div>
+                    <p>${(x.texto||'').replace(/</g,'&lt;')}</p></div></div>`;
                 }).join('')
               : `<div class="card" style="margin-top:10px"><div class="vazio"><i class="ic">♦</i>Ninguém escreveu sobre ${nome(p.id).split(' ')[0]} ainda.</div></div>`;
             return escrever + lista;
@@ -6670,7 +6745,12 @@ jogador(p){
     <div class="pcab">
       ${avatar(p.id,'gg')}
       <div class="info">
-        <div class="nm"><b>${j.nome}</b><span class="cl">${divDe(j)}${CAT_SUFIXO[cat]||''}</span></div>
+        <div class="nm"><b>${j.nome}</b><span class="cl">${divDe(j)}${CAT_SUFIXO[cat]||''}</span>${
+          /* 02/09: a pílula só existe pra quem DECLAROU o estilo. Sem declaração
+             não há pílula vazia nem "não informado" — o board desenha o estado
+             preenchido, e um rótulo dizendo que a pessoa não respondeu é ruído
+             sobre a ficha dela. */
+          j.estilo && ESTILO_ROTULO[j.estilo] ? `<span class="estilo">${ESTILO_ROTULO[j.estilo]}</span>` : ''}</div>
         ${j.bio?`<div class="bio">${(j.bio+'').replace(/</g,'&lt;')}</div>`:''}
       </div>
     </div>
