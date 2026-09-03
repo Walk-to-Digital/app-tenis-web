@@ -2322,7 +2322,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788462787"></script>
+<script src="net.js?v=1788465976"></script>
 
 <script>
 /* =========================================================================
@@ -9352,7 +9352,16 @@ if(!window.netBoot) requestAnimationFrame(sairSplash);
    sessão que já tem conta). Copia tudo e marca cadastro feito — sem recriar nada. */
 function hidratarJogador(row){
   const eu = S.jogadores[EU];
-  eu.nome=row.nome; eu.ap=row.ap||eu.ap; eu.email=row.email||eu.email;
+  eu.nome=row.nome; eu.ap=row.ap||eu.ap;
+  /* 03/09: o e-mail nao vem mais da linha de `players` — a coluna foi
+     congelada e revogada na mig 98 porque `players_select` e using(true) e
+     ela vazava a base inteira. O e-mail do DONO vem da sessao, que sempre foi
+     a fonte de verdade dele: `auth.users`, via MEU_USER.
+     (`MEU_USER` e `let` no topo do net.js: fica no escopo global de script,
+     mas NAO em `window` — por isso `typeof`, o mesmo cuidado que net.js:2300
+     ja toma. `window.MEU_USER` seria undefined sempre, e o e-mail do dono
+     sumiria em silencio da ficha.) */
+  eu.email = ((typeof MEU_USER !== 'undefined' && MEU_USER && MEU_USER.email) || eu.email);
   eu.clube=row.clube||''; eu.nivel=row.nivel??1200; eu.nivelB=row.nivelb??1200;
   // (mig 46) a ladder de duplas hidrata junto — sem isto o meu próprio número
   // de duplas ficaria preso no default e a prévia usaria o trilho errado

@@ -83,7 +83,11 @@ async function netSyncJogador(eu){
   if(!MEU_UID) return;
   const row = {
     id: MEU_UID,
-    nome: eu.nome, ap: eu.ap ?? null, email: eu.email ?? null,
+    /* 03/09: `email` saiu do upsert de players. A coluna continua lá, mas
+       congelada e sem privilégio de leitura (mig 98) — o e-mail vivo mora em
+       `players_contato`, e o do DONO já vem da sessão (`auth.users`), que é a
+       fonte de verdade dele desde sempre. */
+    nome: eu.nome, ap: eu.ap ?? null,
     clube: eu.clube ?? null,
     /* 16/08: estas quatro viajam por compatibilidade, mas o banco DESCARTA
        (mig 31): quem move o Nível agora é o servidor, na confirmação da
@@ -270,7 +274,13 @@ async function netBoot(eu){
     // CONTA: busca meu jogador no banco. Se já existe (conta real), HIDRATA o
     // app a partir dele e pula o cadastro — em qualquer aparelho. Só sobe o
     // local quando é a primeira vez (não sobrescreve conta real com o default).
-    const { data: meuRow, error: meuErr } = await sb.from('players').select('*').eq('id',uid).maybeSingle();
+    /* 03/09: era `select('*')`. Com o `revoke select (email)` da mig 98, o
+       asterisco passaria a incluir uma coluna sem privilégio e a consulta
+       inteira falharia — derrubando o BOOT, não só o e-mail. Lista explícita
+       é o que torna a revogação segura. */
+    const { data: meuRow, error: meuErr } = await sb.from('players')
+      .select('id,nome,ap,clube,nivel,nivelb,nivel_duplas,nivelb_duplas,calibrando,cal,bon,roupa,cor,cena,escudo,patroc,vestiario,bio,nascimento,maior_de_18,idade_declarada_em,mao,tempo_pratica,estilo,perfil,joga,livre_ate,banido_em,genero,uf,cidade,foto,created_at,updated_at')
+      .eq('id',uid).maybeSingle();
     /* 27/08 — SESSÃO ÓRFÃ. O JWT continua válido no aparelho depois que a conta
        morre no banco (wipe de teste hoje; LGPD ou banimento com purge amanhã).
        Sem esta guarda, `contaReal` sai false, mas o gate do cadastro lê o
@@ -598,19 +608,41 @@ async function netCarregarPedidosAmizade(force){
 window.netCarregarPedidosAmizade = netCarregarPedidosAmizade;
 window.netPedidosAmizade = ()=> _pedidosAmizade || [];
 
-// busca por nome, email ou ID (prefixo hex do uid). Client-side (base pequena).
+/* Busca por nome, e-mail ou ID (prefixo hex do uid).
+   03/09 — O E-MAIL SAIU DAQUI, e era o vazamento mais sério do app.
+   Esta função pedia `email` de TODOS os jogadores a cada busca e filtrava por
+   SUBSTRING no cliente. Duas coisas erradas de uma vez: a base de e-mails
+   inteira descia pro aparelho de qualquer um, e o filtro por pedaço permitia
+   varrer (digitar "@gmail" e receber todo mundo). Como a chave anon vive no
+   cliente, nem era preciso usar o app pra isso.
+   Agora: nome e ID continuam client-side (nome é público, e o prefixo do id é
+   o que o app mostra na tela). E-mail vai pela RPC `buscar_por_email` (mig
+   98), que só responde a e-mail INTEIRO e devolve no máximo uma linha, sem
+   nunca devolver o e-mail de volta. Quem já sabe o e-mail de alguém não
+   descobre nada novo; quem não sabe não tem o que varrer. */
 async function netBuscar(termo){
   termo=(termo||'').trim().toLowerCase();
   if(!termo) return [];
-  const { data } = await sb.from('players').select('id,nome,ap,email,nivel,nivelb,nivel_duplas,nivelb_duplas,bon,cor,banido_em,perfil,joga').neq('id',MEU_UID);
+  const { data } = await sb.from('players').select('id,nome,ap,nivel,nivelb,nivel_duplas,nivelb_duplas,bon,cor,banido_em,perfil,joga').neq('id',MEU_UID);
   const idHex = termo.replace(/[^a-f0-9]/g,'');
   // 18/08 (mig 41): banido não é achável. Nem por ID exato — buscar é o
   // caminho pra pedir amizade e desafiar, e nenhum dos dois pode chegar nele.
-  return (data||[]).filter(p=> !_banido(p)).filter(p=>
+  const vivos = (data||[]).filter(p=> !_banido(p));
+  const achados = vivos.filter(p=>
     (p.nome||'').toLowerCase().includes(termo) ||
-    (p.email||'').toLowerCase().includes(termo) ||
     (idHex.length>=2 && p.id.replace(/-/g,'').toLowerCase().startsWith(idHex))
   );
+  /* só vale a pena perguntar ao servidor quando o termo É um e-mail: sem o @ e
+     sem ponto depois dele, a RPC responderia zero de qualquer jeito. */
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(termo) && !achados.length){
+    const { data: porEmail } = await sb.rpc('buscar_por_email', { p_email: termo });
+    const achado = (porEmail||[])[0];
+    if(achado && achado.id !== MEU_UID){
+      const p = vivos.find(x=>x.id===achado.id);
+      if(p) achados.push(p);
+    }
+  }
+  return achados;
 }
 window.netBuscar = netBuscar;
 
