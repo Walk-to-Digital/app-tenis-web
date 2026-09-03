@@ -37,32 +37,33 @@
   ],
   "noticias": [
     {
-      "titulo": "João Fonseca e Bia Haddad já têm adversários definidos para a estreia no US Open",
-      "esporte": "tenis",
-      "fonte": "ESPN",
-      "link": "https://www.espn.com.br/tenis/artigo/_/id/15573673/joao-fonseca-adversario-definido-estreia-us-open",
-      "ate": "2026-08-29"
-    },
-    {
-      "titulo": "Fonseca e Bia caem no ranking às vésperas da estreia em Nova York",
+      "titulo": "Fora do US Open, João Fonseca é confirmado no ATP 500 de Tóquio",
+      "link": "https://www.cnnbrasil.com.br/esportes/tenis/fora-do-us-open-joao-fonseca-e-confirmado-no-atp-500-de-toquio/",
       "esporte": "tenis",
       "fonte": "CNN Brasil",
-      "link": "https://www.cnnbrasil.com.br/esportes/tenis/joao-fonseca-e-bia-haddad-caem-no-ranking-antes-de-estreia-no-us-open/",
-      "ate": "2026-08-29"
+      "data": "01/09",
+      "ate": "2026-09-30"
     },
     {
-      "titulo": "O que Fonseca precisa somar em Montreal e Cincinnati para entrar como cabeça de chave",
+      "titulo": "Sem US Open, João Fonseca ainda terá dois Masters 1000 e defesa de título",
+      "link": "https://www.cnnbrasil.com.br/esportes/tenis/sem-us-open-joao-fonseca-ainda-tera-dois-masters-1000-e-defesa-de-titulo/",
       "esporte": "tenis",
-      "fonte": "Tenis News",
-      "link": "https://www.tenisnews.com.br/joao-fonseca-no-us-open-2026-os-pontos-para-seguir-cabeca-de-chave/",
-      "ate": "2026-08-29"
+      "fonte": "CNN Brasil",
+      "data": "24/08"
     },
     {
-      "titulo": "Fonseca e Bia estão confirmados na chave principal do US Open",
+      "titulo": "João Fonseca desiste e está fora do US Open; veja o motivo",
+      "link": "https://www.cnnbrasil.com.br/esportes/tenis/joao-fonseca-desiste-e-esta-fora-do-us-open-veja-o-motivo-e-o-comunicado/",
       "esporte": "tenis",
-      "fonte": "Terra",
-      "link": "https://www.terra.com.br/esportes/tenis/joao-fonseca-e-bia-haddad-sao-confirmados-no-us-open,f4fb3140d5529c08aa7911f7ccf0e15a7mkapi0k.html",
-      "ate": "2026-08-29"
+      "fonte": "CNN Brasil",
+      "data": "24/08"
+    },
+    {
+      "titulo": "João Fonseca revela o calendário até o fim do ano; veja as datas",
+      "link": "https://www.cnnbrasil.com.br/esportes/tenis/tenis-joao-fonseca-revela-calendario-ate-o-fim-do-ano-veja-datas/",
+      "esporte": "tenis",
+      "fonte": "CNN Brasil",
+      "data": "15/07"
     },
     {
       "titulo": "Cascavel recebe etapa internacional com cerca de 250 atletas de seis países, de 24 a 30/08",

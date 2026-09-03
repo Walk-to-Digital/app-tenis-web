@@ -2887,10 +2887,14 @@ async function netAtividadesResumo(playerId){
 window.netAtividadeCriar = netAtividadeCriar;
 window.netAtividadesResumo = netAtividadesResumo;
 
-async function netPostar(corpo, grupo, arquivo){
+async function netPostar(corpo, grupo, arquivo, local){
   if(!MEU_UID) return {erro:'sem sessão'};
   const t = (corpo||'').trim();
   if(!t) return {erro:'escreva alguma coisa'};
+  /* 03/09 (mig 96): o lugar. Cortado em 80 aqui também — o check do banco
+     recusa acima disso, e ouvir o "não" do servidor por um campo opcional
+     depois de já ter subido a foto seria o pior momento possível. */
+  const lug = (local||'').trim().slice(0,80) || null;
 
   let caminho = null;
   if(arquivo){
@@ -2913,7 +2917,7 @@ async function netPostar(corpo, grupo, arquivo){
   }
 
   const { error } = await sb.from('posts')
-    .insert({ autor_id:MEU_UID, grupo_id:grupo||null, corpo:t, img:caminho });
+    .insert({ autor_id:MEU_UID, grupo_id:grupo||null, corpo:t, img:caminho, local:lug });
   /* o teto de 20/hora vem do trigger e chega como exceção do banco: repassar a
      frase dele é melhor do que traduzir pra um "erro" genérico, porque ela já
      diz o que fazer (esperar). */
