@@ -4264,91 +4264,45 @@ async function netElogiar(pid, estrelas, texto){
   return { erro: error ? error.message : null };
 }
 let _vpEstrelas = 0;
-async function netVerProfessor(pid){
+/* 03/09 — A FICHA DO PROFESSOR VIRA ROTA, como a do jogador virou em 29/08.
+   Era a ultima folha `_sheet` de perfil que sobrava: markup proprio de 27/08,
+   estilos inline, sem cabecalho, sem avatar e sem aba nenhuma — enquanto a
+   ficha do jogador ja tinha `.pcab`, `.pnums` e abas vindas do arquivo do
+   Figma. Duas fichas de pessoa no mesmo app, com duas linguagens diferentes.
+
+   O arquivo do Figma NAO desenha o professor (as 41 telas nao tem nenhuma
+   dele), entao aqui nao ha o que copiar: o padrao e DERIVADO da ficha do
+   oponente, que passou pelo arquivo. Foi o combinado com o Nuno em 03/09.
+
+   Diferenca em relacao a migracao do jogador: aquela folha nao consultava
+   nada (lia `S.jogadores`, que o boot hidrata). Esta faz QUATRO consultas —
+   professor, aulas, elogios e o placar de vagas de cada aula. Por isso a
+   consulta fica aqui, separada do desenho, e o cache mora no index como o
+   `__perfCache` do jogador. */
+async function netProfDados(pid){
   const [pr, aulas, elogios] = await Promise.all([
     sb.from('professores').select('*').eq('player_id', pid).maybeSingle().then(r=>r.data),
     sb.from('aulas').select('*').eq('professor_id', pid).eq('ativa', true)
       .order('dia_semana').then(r=>r.data||[]).catch(()=>[]),
     netElogiosDe(pid),
   ]);
-  if(!pr){ toast && toast('Não achei esse professor.'); return; }
-  const nome = _nomeDe(pid);
-  const sou = MEU_UID === pid;
-  const DIAS = window.DIAS_LONGO || ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-  const media = (elogios && elogios.length)
-    ? (elogios.reduce((t,e)=>t+e.estrelas,0)/elogios.length) : null;
-  const meuElogio = (elogios||[]) .find(e=>e.autor_id===MEU_UID);
-  _vpEstrelas = meuElogio ? meuElogio.estrelas : 0;
-  const estr = (n)=> '★'.repeat(Math.round(n)) + '☆'.repeat(5-Math.round(n));
-  const vagas = (a)=>{
-    if(!a.max_alunos) return '';
-    const n = (a.aula_alunos||[]).length;   // pode não vir no select simples
-    return ` · até ${a.max_alunos} aluno${a.max_alunos>1?'s':''}`;
-  };
-  const faixa = (a)=> (a.idade_min||a.idade_max)
-    ? ` · ${a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos'}` : '';
-  const tel = pr.contato ? pr.contato.replace(/[^0-9]/g,'') : null;
+  if(!pr) return null;
   /* (70) o placar de vagas vem do definer `aula_vagas` — de fora das policies,
-     só números. Falhou a chamada? A turma aparece sem placar, nunca some. */
-  const vg = {};
-  await Promise.all(aulas.map(a =>
+     so numeros. Falhou a chamada? A turma aparece sem placar, nunca some. */
+  const vagas = {};
+  await Promise.all((aulas||[]).map(a =>
     sb.rpc('aula_vagas', { p_aula: a.id })
-      .then(r=>{ vg[a.id] = (r.data && r.data[0]) || null; }).catch(()=>{})));
-  const hoje = new Date().toISOString().slice(0,10);
-  _sheet('net-vprof', `
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <b style="font-family:var(--f-disp);font-size:17px">${_admEsc(nome)}</b>
-      <button onclick="document.getElementById('net-vprof').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button>
-    </div>
-    ${media!==null ? `<div style="margin-top:2px;color:var(--acc);font-size:15px">${estr(media)} <span style="color:var(--ink3);font-size:12px">${media.toFixed(1)} · ${elogios.length} elogio${elogios.length>1?'s':''}</span></div>`:''}
-    <div style="margin-top:8px">${profAceitando && profAceitando(pr) ? '<span class="pil up">Pegando aluno</span>' : '<span class="pil gh">Turma fechada agora</span>'}</div>
-    ${pr.apresentacao?`<p style="margin-top:10px">${_admEsc(pr.apresentacao)}</p>`:''}
-    ${pr.atuacao?`<p class="nota" style="margin-top:6px">◎ Atua em: ${_admEsc(pr.atuacao)}</p>`:''}
-    ${pr.especialidades?`<p class="nota" style="margin-top:4px">🎯 ${_admEsc(pr.especialidades)}</p>`:''}
-    <div class="rot" style="margin-top:14px">Turmas</div>
-    ${aulas.length ? aulas.map(a=>{
-      const v = vg[a.id];
-      const cheia = !!(v && v.maximo && v.ocupados >= v.maximo);
-      const placar = v && v.maximo ? ` · ${v.ocupados}/${v.maximo} aluno${v.maximo>1?'s':''}` : '';
-      const filaTx = cheia && v.fila ? ` · ${v.fila} na fila` : '';
-      return `<div class="card" style="margin-top:6px">
-        <b style="font-size:14px">${DIAS[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
-        <small style="display:block;color:var(--ink3)">${(h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2))} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+_admEsc(a.local_txt):''}${placar}${filaTx}${faixa(a)}</small>
-        ${!sou ? `<button class="${cheia?'operf':'oconv'}" style="margin-top:8px;width:100%"
-            onclick="_net.pedirVaga('${pid}','${a.id}')">${cheia?'Entrar na fila de espera':'Pedir vaga nesta turma'}</button>`:''}
-      </div>`; }).join('') : '<p class="nota">Nenhuma turma aberta agora.</p>'}
-    ${!sou ? `<div class="card" style="margin-top:10px">
-      <div class="rot">Aula avulsa · experimental</div>
-      <p class="nota" style="margin:2px 0 8px">Uma aula só, no dia que vocês combinarem — boa pra experimentar.</p>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input id="av-data" type="date" min="${hoje}" class="onb-input" style="margin:0;flex:1">
-        <input id="av-hora" type="time" class="onb-input" style="margin:0;flex:1">
-      </div>
-      <input id="av-msg" class="onb-input" maxlength="280" placeholder="Mensagem (opcional) — ex.: nunca joguei, quero experimentar">
-      <button class="btn" style="margin-top:8px" onclick="_net.avulsaEnviar('${pid}')">Pedir aula avulsa</button>
-    </div>`:''}
-    ${!sou ? `<div style="display:flex;gap:8px;margin-top:14px">
-      ${profAceitando && profAceitando(pr) ? `<button class="btn" style="flex:1" onclick="profPedir('${pid}');document.getElementById('net-vprof').remove()">Quero ser aluno</button>`:''}
-      ${(tel && tel.length>=8) ? `<a class="btn sec" style="flex:1;text-align:center;text-decoration:none" href="https://wa.me/55${tel}" target="_blank" rel="noopener">Falar</a>`:''}
-    </div>`:''}
-    ${elogios===null ? '' : `
-    <div class="rot" style="margin-top:16px">Elogios</div>
-    ${(elogios||[]).slice(0,5).map(e=>`<div class="card" style="margin-top:6px">
-        <span style="color:var(--acc)">${estr(e.estrelas)}</span>
-        ${e.texto?`<p style="margin:4px 0 0">${_admEsc(e.texto)}</p>`:''}
-        <small style="color:var(--ink3)">${_admEsc(_nomeDe(e.autor_id))}</small>
-      </div>`).join('') || '<p class="nota">Ninguém elogiou ainda.</p>'}
-    ${!sou ? `<div class="card" style="margin-top:10px">
-      <div class="rot">${meuElogio?'Seu elogio':'Elogiar'}</div>
-      <div id="vp-estrelas" style="font-size:24px;letter-spacing:4px;cursor:pointer;margin:4px 0">
-        ${[1,2,3,4,5].map(n=>`<span onclick="_net.vpEstrela(${n},'${pid}')" style="color:${n<=_vpEstrelas?'var(--acc)':'var(--ink3)'}">★</span>`).join('')}
-      </div>
-      <textarea id="vp-texto" class="onb-input" maxlength="280" rows="2"
-        placeholder="Conta como é treinar com ${_admEsc(nome.split(' ')[0])} (opcional)">${meuElogio&&meuElogio.texto?_admEsc(meuElogio.texto):''}</textarea>
-      <button class="btn" style="margin-top:8px" onclick="_net.enviarElogio('${pid}')">${meuElogio?'Atualizar elogio':'Enviar elogio'}</button>
-    </div>`:''}`}
-  `);
+      .then(r=>{ vagas[a.id] = (r.data && r.data[0]) || null; }).catch(()=>{})));
+  return { pr, aulas: aulas||[], elogios: elogios||[], vagas };
 }
+window.netProfDados = netProfDados;
+
+function netVerProfessor(pid){
+  if(!pid) return;
+  if(typeof _fecharFolhas === 'function') _fecharFolhas();
+  ir('professor', {pid});
+}
+
 function _vpEstrela(n, pid){
   _vpEstrelas = n;
   const el = document.getElementById('vp-estrelas');
@@ -4360,8 +4314,10 @@ async function _vpEnviar(pid){
   const r = await netElogiar(pid, _vpEstrelas, t ? t.value : '');
   if(r.erro){ alert('Não deu: '+r.erro); return; }
   toast('Elogio registrado.');
-  const el=document.getElementById('net-vprof'); if(el) el.remove();
-  netVerProfessor(pid);
+  /* 03/09: era `remove()` na folha + netVerProfessor() pra redesenhar. Sem
+     folha, o que recarrega e invalidar o cache e repintar a rota. */
+  if(window.__profCache) delete window.__profCache[pid];
+  if(window.render) render();
 }
 async function netMeuProfessor(){
   if(!MEU_UID) return null;
@@ -5635,7 +5591,10 @@ async function netLocais(force){
       // 25/08 (mig 59): `locacao` — o lugar aluga pra quem não é sócio? É o
       // que a categoria Lugares do Encontrar mostra, e o que responde ao
       // pedido do Rege de "botar o cara na cara do gol".
-      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,telefone,locacao,locais_endereco(endereco)')
+            // 03/09 (mig 95): `piso`. O select aqui e EXPLICITO — coluna nova que
+      // nao entra nesta linha simplesmente nunca chega no cliente, sem erro
+      // nenhum, e a capa da quadra nasceria neutra pra sempre.
+      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,telefone,locacao,piso,locais_endereco(endereco)')
       .eq('ativo',true).order('nome'),
     sb.from('cidades').select('id,nome,uf'),
     sb.from('regioes').select('id,nome,cidade_id'),
@@ -5828,6 +5787,26 @@ function netRenderMeusLocais(){
    O endereço só aparece pra quem a policy `locais_endereco_sel` deixou ver —
    quando não veio, a folha DIZ que não veio em vez de fingir que não existe.
    ========================================================================= */
+/* 03/09 (mig 95) — A CAPA DA QUADRA.
+   As oito imagens existem no repo desde agosto e ja sao usadas no VS, no Match
+   Game e no vestiario; o que faltava era o LOCAL saber dizer o piso dele.
+   `misto` e nulo caem na neutra de proposito: escolher uma das quatro pra
+   representar "varios" ou pra tapar um buraco mostraria como fato o piso que a
+   quadra talvez nem tenha, e quem procura quadra procura exatamente por isso. */
+const PISO_ROTULO = { saibro:'Saibro', cimento:'Cimento', grama:'Grama', areia:'Areia', misto:'Mais de um piso' };
+function _capaLocal(piso){
+  const img = (piso && piso !== 'misto') ? `../quadras/${piso}-dia.jpg` : null;
+  const rot = piso ? (PISO_ROTULO[piso] || '') : '';
+  return `<div style="position:relative;height:132px;border-radius:var(--r);overflow:hidden;margin-bottom:14px;
+      background:${img ? `url('${img}') center/cover` : 'var(--sup2)'}">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.15),rgba(11,11,11,.85))"></div>
+    ${rot ? `<span style="position:absolute;left:12px;bottom:10px;padding:5px 11px;border-radius:var(--rp);
+        background:rgba(18,18,18,.72);border:1px solid var(--acc);color:var(--acc);
+        font:700 11px var(--f-ui)">${rot}</span>`
+          : `<span style="position:absolute;left:12px;bottom:10px;color:var(--ink3);font:600 11px var(--f-ui)">Piso não informado</span>`}
+  </div>`;
+}
+
 function netVerLocal(id){
   const l = _locDe(id);
   if(!l){ alert('Local não encontrado.'); return; }
@@ -5840,7 +5819,8 @@ function netVerLocal(id){
      celular é pedir pra pessoa decorar e digitar em outro app. */
   const tel = (l.telefone||'').trim();
   const telLink = tel ? `<a href="tel:${_admEsc(tel.replace(/[^\d+]/g,''))}" style="color:var(--lime);text-decoration:none">${_admEsc(tel)}</a>` : '';
-  _sheet('net-local', `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+  _sheet('net-local', `${_capaLocal(l.piso)}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div style="min-width:0">
         <div style="font:700 17px var(--f-ui)">${_admEsc(l.nome)}</div>
         <div style="font-size:12px;color:var(--ink2);margin-top:2px">${TIPO[l.tipo]||'Quadra'}${l.cidade?' · '+_admEsc(l.cidade):''}${l.regiao?' · '+_admEsc(l.regiao):''}</div>
@@ -5855,6 +5835,8 @@ function netVerLocal(id){
             ? linha('📍', 'O endereço aparece pra você quando o desafio chegar.', 'var(--ink3)')
             : linha('📍', 'Sem endereço cadastrado ainda.', 'var(--ink3)'))}
       ${tel ? linha('📞', telLink) : linha('📞', 'Sem telefone cadastrado.', 'var(--ink3)')}
+      ${l.piso ? linha('▤', PISO_ROTULO[l.piso] || _admEsc(l.piso))
+               : linha('▤', 'Piso não informado' + (meu ? ' — toque em Editar pra dizer qual é.' : '.'), 'var(--ink3)')}
     </div>
 
     ${l.origem==='jogador'
@@ -5885,7 +5867,7 @@ function netFecharLocal(){ const el=document.getElementById('net-local'); if(el)
 let _qnova = null;
 function netCriarQuadra(){
   const meu = window.__meusLocais || {};
-  _qnova = { id:null, nome:'', tipo:'condominio', quadras:1, endereco:'',
+  _qnova = { id:null, nome:'', tipo:'condominio', quadras:1, endereco:'', piso:null,
              cidade_id: meu.cidadeId || (_cidades[0]||{}).id || null };
   netRenderCriarQuadra();
 }
@@ -5912,7 +5894,7 @@ function netEditarQuadra(id){
   if(!l){ alert('Quadra não encontrada.'); return; }
   if(l.dono_id !== MEU_UID){ alert('Essa quadra não é sua.'); return; }
   _qnova = { id:l.id, nome:l.nome||'', tipo:l.tipo||'condominio',
-             quadras:l.quadras||1, endereco:l.endereco||'',
+             quadras:l.quadras||1, endereco:l.endereco||'', piso:l.piso||null,
              cidade_id:l.cidade_id||null,
              /* guardados pra comparar na hora de gravar: `cidade0` decide se a
                 região tem que ser zerada (região pertence a uma cidade, e nada
@@ -5942,6 +5924,12 @@ function netRenderCriarQuadra(){
   const TIPOS=[['condominio','Condomínio'],['clube','Clube'],['publico','Pública'],['academia','Academia'],['outro','Outra']];
   const pronto = q.nome.trim() && q.endereco.trim() && q.cidade_id;
   const seg = TIPOS.map(([v,n])=>`<button onclick="_net.qset('tipo','${v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px var(--f-ui);cursor:pointer;background:${q.tipo===v?'var(--acc)':'var(--sup2)'};color:${q.tipo===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
+  /* 03/09 (mig 95): o PISO. Mesmo molde do Tipo, com uma diferenca — tocar no
+     que ja esta escolhido DESMARCA. Piso e opcional no banco (null e resposta
+     valida) e um chip que so liga transformaria "nao sei" em escolha errada
+     permanente, que e pior que campo vazio pra quem procura quadra por piso. */
+  const PISOS=[['saibro','Saibro'],['cimento','Cimento'],['grama','Grama'],['areia','Areia'],['misto','Vários']];
+  const segPiso = PISOS.map(([v,n])=>`<button onclick="_net.qset('piso','${q.piso===v?'':v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px var(--f-ui);cursor:pointer;background:${q.piso===v?'var(--acc)':'var(--sup2)'};color:${q.piso===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
   _sheet('net-qnova', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px var(--f-ui)">${q.id?'Editar minha quadra':'Cadastrar minha quadra'}</div>
       <button onclick="_net.fecharQnova()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
@@ -5955,6 +5943,10 @@ function netRenderCriarQuadra(){
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Tipo</div>
     <div style="display:flex;gap:6px">${seg}</div>
+
+    <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Piso <span style="color:var(--ink3)">— opcional, escolhe a foto da quadra</span></div>
+    <div style="display:flex;gap:6px">${segPiso}</div>
+    ${q.piso ? `<div style="margin-top:10px">${_capaLocal(q.piso)}</div>` : ''}
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Endereço <span style="color:var(--dn)">— obrigatório</span></div>
     <input id="q-endereco" value="${_admEsc(q.endereco)}" oninput="_net.qset('endereco',this.value,this.selectionStart)" placeholder="Rua, número e bairro" maxlength="160"
@@ -6039,7 +6031,7 @@ async function _qsalvarInterno(){
        outro lugar — e o chip de região do radar casaria a pessoa com jogadores
        da cidade errada. Zera só quando a cidade muda: zerar sempre apagaria a
        classificação do ADM a cada correção de nome, que é estrago de outro tipo. */
-    const campos = { nome, tipo:q.tipo, quadras:q.quadras, cidade_id:q.cidade_id };
+    const campos = { nome, tipo:q.tipo, quadras:q.quadras, cidade_id:q.cidade_id, piso:q.piso||null };
     if(q.cidade0 && q.cidade_id !== q.cidade0) campos.regiao_id = null;
 
     const upd = await sb.from('locais').update(campos).eq('id', q.id).select('id');
@@ -6070,7 +6062,7 @@ async function _qsalvarInterno(){
   }
 
   const novo = await sb.from('locais').insert({
-    nome, cidade_id:q.cidade_id, tipo:q.tipo, quadras:q.quadras,
+    nome, cidade_id:q.cidade_id, tipo:q.tipo, quadras:q.quadras, piso:q.piso||null,
     origem:'jogador', dono_id:MEU_UID,
   }).select('id').single();
   if(novo.error){ alert('Não deu pra cadastrar: '+novo.error.message); return; }
@@ -7127,6 +7119,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
   atividadeCriar:netAtividadeCriar, atividadesResumo:netAtividadesResumo,
   desfazerAmizade:netDesfazerAmizade, partidaCom:netPartidaCom,
+  profDados:netProfDados,
   /* (30/08) `trofeusDe` já existia desde 18/08, escrita com este uso em mente
      — o comentário dela diz "a ficha do outro jogador precisa dos troféus
      dele". Ficou fora da ponte, e por isso a aba Conquistas do oponente passou

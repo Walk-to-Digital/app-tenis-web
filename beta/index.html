@@ -2322,7 +2322,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788459723"></script>
+<script src="net.js?v=1788461833"></script>
 
 <script>
 /* =========================================================================
@@ -3780,6 +3780,19 @@ const DIAS_PT=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 /* 03/09: desfazer amizade PERGUNTA antes, e a pergunta diz o que muda em vez
    de um "tem certeza?" que nao informa nada: ser amigo libera desafio em
    qualquer classe, e desfazer devolve os dois a janela de uma classe. */
+/* 03/09: o cache da ficha do professor, no molde do `perfilCarregar` do
+   jogador. A ficha e aberta de varios lugares (Encontrar, aulas, turma) e o
+   boot nao hidrata nada dela, entao a consulta e por demanda e guardada.
+   `null` = carregando; objeto = pronto. */
+function profCarregar(pid){
+  window.__profCache = window.__profCache || {};
+  if(window.__profCache[pid] !== undefined) return;
+  window.__profCache[pid] = null;
+  if(!(window._net && _net.profDados)){ window.__profCache[pid] = false; return; }
+  _net.profDados(pid)
+    .then(d=>{ window.__profCache[pid] = d || false; render(); })
+    .catch(()=>{ window.__profCache[pid] = false; render(); });
+}
 function amigoDesfazer(uid){
   const n = (typeof _nomeDe === 'function' ? _nomeDe(uid) : null) || 'essa pessoa';
   const primeiro = String(n).split(' ')[0];
@@ -7105,6 +7118,123 @@ amigos(){
         </div>
       </div>` : ''}
     </div>`};
+},
+
+/* =========================================================================
+   FICHA DO PROFESSOR (03/09) — rota, nao mais folha.
+
+   Era a ultima folha `_sheet` de perfil do app: markup de 27/08, estilos
+   inline, sem cabecalho, sem avatar, sem aba. A ficha do jogador ja tinha
+   `.pcab`, `.pnums` e abas vindas do arquivo do Figma desde 02/09 — o app
+   tinha duas fichas de pessoa com duas linguagens diferentes.
+
+   ⚠️ O arquivo do Figma NAO desenha o professor: nenhuma das 41 telas e dele.
+   Entao nao ha o que copiar, e o padrao aqui e DERIVADO da ficha do oponente,
+   que passou pelo arquivo. Combinado com o Nuno em 03/09. Se um dia o
+   professor for desenhado, esta tela e que se ajusta — nao o contrario.
+
+   O professor nao tem foto no banco (a tabela `professores` da mig 62 nao tem
+   coluna de imagem), entao o avatar e o BONECO dele como jogador: todo
+   professor tem linha em `players`, e era justamente isso que a folha antiga
+   nao mostrava.
+   ========================================================================= */
+professor(p){
+  profCarregar(p.pid);
+  const d = (window.__profCache||{})[p.pid];
+  const nomeP = (typeof _nomeDe === 'function' ? _nomeDe(p.pid) : null) || 'Professor';
+  const esc = (t)=> String(t==null?'':t).replace(/</g,'&lt;');
+
+  if(d === null || d === undefined)
+    return {titulo:nomeP, html:'<div class="pad"><div class="card"><p class="nota">Carregando…</p></div></div>'};
+  if(d === false)
+    return {titulo:nomeP, html:'<div class="pad"><div class="card"><p class="nota">Não achei esse professor. Ele pode ter saído da lista.</p></div></div>'};
+
+  const {pr, aulas, elogios, vagas} = d;
+  const sou = (window.MEU_UID === p.pid);
+  const DIAS = window.DIAS_LONGO || ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const media = elogios.length ? (elogios.reduce((t,e)=>t+e.estrelas,0)/elogios.length) : null;
+  const meuElogio = elogios.find(e=>e.autor_id===window.MEU_UID);
+  const estr = (n)=> '★'.repeat(Math.round(n)) + '☆'.repeat(5-Math.round(n));
+  const aceita = window.profAceitando ? profAceitando(pr) : false;
+  const tel = pr.contato ? pr.contato.replace(/[^0-9]/g,'') : null;
+  const faixa = (a)=> (a.idade_min||a.idade_max)
+    ? ` · ${a.idade_min&&a.idade_max? a.idade_min+'–'+a.idade_max+' anos' : a.idade_min? a.idade_min+'+' : 'até '+a.idade_max+' anos'}` : '';
+  const hoje = (()=>{ const n=new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+  const aba = abaDe('prof','turmas');
+
+  const turmas = aulas.length ? aulas.map(a=>{
+    const v = vagas[a.id];
+    const cheia = !!(v && v.maximo && v.ocupados >= v.maximo);
+    const placar = v && v.maximo ? ` · ${v.ocupados}/${v.maximo} aluno${v.maximo>1?'s':''}` : '';
+    const fila = cheia && v.fila ? ` · ${v.fila} na fila` : '';
+    const per = (h=>h<12?'manhã':h<18?'tarde':'noite')(+String(a.hora||'0').slice(0,2));
+    return `<div class="card" style="margin-bottom:8px">
+      <b style="font-size:14px">${DIAS[a.dia_semana]} · ${(a.hora||'').slice(0,5)}</b>
+      <small style="display:block;color:var(--ink3);margin-top:2px">${per} · ${a.esporte==='beach'?'Beach Tennis':'Tênis'} · ${a.duracao_min||60} min${a.local_txt?' · '+esc(a.local_txt):''}${placar}${fila}${faixa(a)}</small>
+      ${!sou ? `<button class="${cheia?'operf':'oconv'}" style="margin-top:10px;width:100%"
+          onclick="_net.pedirVaga('${p.pid}','${a.id}')">${cheia?'Entrar na fila de espera':'Pedir vaga nesta turma'}</button>`:''}
+    </div>`; }).join('') : '<div class="card"><p class="nota">Nenhuma turma aberta agora.</p></div>';
+
+  const avulsa = sou ? '' : `<div class="card" style="margin-top:8px">
+      <div class="rot">Aula avulsa · experimental</div>
+      <p class="nota" style="margin:2px 0 10px">Uma aula só, no dia que vocês combinarem — boa pra experimentar.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="av-data" type="date" min="${hoje}" class="onb-input" style="margin:0;flex:1">
+        <input id="av-hora" type="time" class="onb-input" style="margin:0;flex:1">
+      </div>
+      <input id="av-msg" class="onb-input" maxlength="280" placeholder="Mensagem (opcional) — ex.: nunca joguei, quero experimentar">
+      <button class="btn" style="margin-top:10px" onclick="_net.avulsaEnviar('${p.pid}')">Pedir aula avulsa</button>
+    </div>`;
+
+  const sobre = `<div class="card">
+      ${pr.apresentacao ? `<p>${esc(pr.apresentacao)}</p>` : '<p class="nota">Sem apresentação escrita.</p>'}
+      ${pr.atuacao ? `<p class="nota" style="margin-top:10px">◎ Atua em: ${esc(pr.atuacao)}</p>`:''}
+      ${pr.especialidades ? `<p class="nota" style="margin-top:6px">🎯 ${esc(pr.especialidades)}</p>`:''}
+    </div>`;
+
+  const listaEl = elogios.slice(0,5).map(e=>`<div class="card" style="margin-bottom:8px">
+      <span style="color:var(--acc)">${estr(e.estrelas)}</span>
+      ${e.texto?`<p style="margin:6px 0 0">${esc(e.texto)}</p>`:''}
+      <small style="color:var(--ink3);display:block;margin-top:4px">${esc((typeof _nomeDe==='function'?_nomeDe(e.autor_id):'') || 'alguém')}</small>
+    </div>`).join('') || '<div class="card"><p class="nota">Ninguém elogiou ainda.</p></div>';
+
+  const formEl = sou ? '' : `<div class="card" style="margin-top:8px">
+      <div class="rot">${meuElogio?'Seu elogio':'Elogiar'}</div>
+      <div id="vp-estrelas" style="font-size:24px;letter-spacing:4px;cursor:pointer;margin:6px 0">
+        ${[1,2,3,4,5].map(n=>`<span onclick="_net.vpEstrela(${n},'${p.pid}')" style="color:${meuElogio&&n<=meuElogio.estrelas?'var(--acc)':'var(--ink3)'}">★</span>`).join('')}
+      </div>
+      <textarea id="vp-texto" class="onb-input" maxlength="280" rows="2"
+        placeholder="Conta como é treinar com ${esc(nomeP.split(' ')[0])} (opcional)">${meuElogio&&meuElogio.texto?esc(meuElogio.texto):''}</textarea>
+      <button class="btn" style="margin-top:10px" onclick="_net.enviarElogio('${p.pid}')">${meuElogio?'Atualizar elogio':'Enviar elogio'}</button>
+    </div>`;
+
+  const corpo = aba==='sobre' ? sobre
+              : aba==='elogios' ? (listaEl + formEl)
+              : (turmas + avulsa);
+
+  return {titulo:nomeP, html:`
+    <div class="pcab">
+      ${avatar(p.pid,'gg')}
+      <div class="info">
+        <div class="nm"><b>${esc(nomeP)}</b>
+          ${media!==null ? `<span class="cl">${media.toFixed(1)}</span>` : ''}
+          <span class="estilo">${aceita?'Pegando aluno':'Turma fechada'}</span></div>
+        ${media!==null ? `<div class="bio" style="color:var(--acc)">${estr(media)} <span style="color:var(--ink3)">${elogios.length} elogio${elogios.length>1?'s':''}</span></div>` : ''}
+      </div>
+    </div>
+    <div class="pnums">
+      <div class="n"><b>${aulas.length}</b><small>Turmas</small></div>
+      <div class="n"><b>${elogios.length}</b><small>Elogios</small></div>
+      <div class="n"><b>${media!==null?media.toFixed(1):'—'}</b><small>Média</small></div>
+    </div>
+    ${sou ? '' : `<div class="pcta" style="display:flex;gap:8px">
+      ${aceita?`<button style="flex:1" onclick="profPedir('${p.pid}')">Quero ser aluno</button>`:''}
+      ${(tel && tel.length>=8)?`<a class="btn sec" style="flex:1;text-align:center;text-decoration:none;padding:13px"
+         href="https://wa.me/55${tel}" target="_blank" rel="noopener">Falar no zap</a>`:''}
+    </div>`}
+    ${abasHtml('prof', [['turmas','Turmas'],['sobre','Sobre'],['elogios','Elogios']], 'linha')}
+    <div class="pad">${corpo}</div>`};
 },
 
 historico(){
