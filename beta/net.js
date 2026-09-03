@@ -2799,6 +2799,54 @@ async function netFeed({grupo=null, autor=null, limite=30}={}){
    cada post recusado (o teto de 20/hora, por exemplo) deixaria um arquivo pago
    e órfão no balde, sem nenhuma linha apontando pra ele — lixo que ninguém
    descobre porque não aparece em tela nenhuma. */
+/* ── ATIVIDADE (mig 94) ─────────────────────────────────────────────────────
+   O que a pessoa fez em quadra e NÃO é partida: casual (jogo sem placar),
+   aula (com professor) e treino solo.
+
+   ⚠️ NADA AQUI CREDITA NÍVEL OU PONTO. É a lei da tabela, escrita no
+   cabeçalho da migração 94, e está repetida aqui porque este é o outro lugar
+   onde alguém seria tentado a "só somar uns pontinhos": não há chamada a
+   `pontos_creditar`, não se escreve em `matches`, não se toca em `nivel`.
+   Atividade alimenta CONQUISTA e PRESENÇA, que é trilho separado. */
+async function netAtividadeCriar(d){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  if(!d || !d.tipo || !d.quando) return {erro:'faltou o tipo ou a data'};
+  const linha = {
+    player_id: MEU_UID,
+    tipo:    d.tipo,
+    esporte: d.esporte || (typeof ehBeach === 'function' && ehBeach() ? 'beach' : 'tenis'),
+    quando:  d.quando,
+    /* campo vazio vira NULL, não string vazia: '' passaria pelo check de
+       horário (que só compara quando os dois existem) e viraria '00:00' em
+       qualquer leitura futura — hora inventada é pior que hora ausente. */
+    subtipo: d.tipo === 'solo' ? (d.subtipo || null) : null,
+    inicio:  d.inicio || null,
+    fim:     d.fim || null,
+    local:   (d.local || '').trim() || null,
+    notas:   (d.notas || '').trim() || null,
+    parceiros: d.tipo === 'solo' ? [] : (d.parceiros || []),
+    professor_id: d.tipo === 'aula' ? (d.professor_id || null) : null,
+  };
+  const { error } = await sb.from('atividades').insert(linha);
+  /* o teto diário e a data no futuro chegam como exceção do banco; repassar a
+     frase dele é melhor que traduzir, porque ela já diz o que fazer */
+  if(error) return {erro:error.message};
+  return {ok:true};
+}
+/* A CONTAGEM é o que a comunidade vê — nunca a linha. A policy de select da
+   `atividades` é fechada ao dono de propósito (notas, local e com quem jogou
+   são dele); o selo do perfil vive desta função, que é `security definer` e
+   devolve só números. */
+async function netAtividadesResumo(playerId){
+  const alvo = playerId || MEU_UID;
+  if(!alvo) return null;
+  const { data, error } = await sb.rpc('atividades_resumo', { p_player: alvo });
+  if(error){ console.error('[net] atividades_resumo', error); return null; }
+  return (data && data[0]) || null;
+}
+window.netAtividadeCriar = netAtividadeCriar;
+window.netAtividadesResumo = netAtividadesResumo;
+
 async function netPostar(corpo, grupo, arquivo){
   if(!MEU_UID) return {erro:'sem sessão'};
   const t = (corpo||'').trim();
@@ -7037,6 +7085,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   onPiso:_onPiso,   // (83) saibro | dura | rapida
   cancelarDesafio:netCancelarDesafio,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
+  atividadeCriar:netAtividadeCriar, atividadesResumo:netAtividadesResumo,
   /* (30/08) `trofeusDe` já existia desde 18/08, escrita com este uso em mente
      — o comentário dela diz "a ficha do outro jogador precisa dos troféus
      dele". Ficou fora da ponte, e por isso a aba Conquistas do oponente passou

@@ -2183,6 +2183,58 @@ button,input,select{font:inherit;color:inherit}
   background:var(--marca);color:var(--marca-ink);font:700 var(--t-body) var(--f-ui);cursor:pointer}
 #cp .cp-pub[disabled]{opacity:.5;cursor:default}
 
+/* =========================================================================
+   REGISTRAR ATIVIDADE (03/09) — nodes 1:3469 (hub), 1:3533 (casual),
+   1:3593 (aula), 1:3657 (treino solo).
+   Quatro telas no arquivo, DOIS passos aqui: o hub escolhe modalidade e
+   tipo, e o detalhe muda de cara conforme o tipo. As três telas de detalhe
+   são o mesmo formulário com uma seção trocada — construir três telas
+   separadas seria manter três cópias da data, do local e das notas.
+   ========================================================================= */
+#at{position:fixed;inset:0;z-index:60;display:none;background:var(--bg);overflow-y:auto}
+#at.on{display:block}
+#at .at-brilho{position:absolute;inset:0;background:var(--brilho),var(--bg);pointer-events:none}
+#at .at-topo{position:sticky;top:0;z-index:2;display:flex;align-items:center;
+  padding:calc(12px + env(safe-area-inset-top)) var(--pad-lado) 12px;
+  background:var(--acc-ink);border-bottom:1px solid var(--linha3)}
+#at .at-voltar{width:34px;height:34px;border-radius:50%;border:1px solid var(--linha3);
+  background:none;color:var(--ink);font:400 17px var(--f-ui);cursor:pointer;line-height:1}
+#at .at-in{position:relative;z-index:1;padding:20px var(--pad-lado) calc(24px + env(safe-area-inset-bottom))}
+#at .at-h1{font:700 var(--t-title-l) var(--f-disp);color:var(--ink);margin-bottom:16px}
+#at .at-cartao{background:rgba(11,11,11,.8);border-radius:var(--r-lg);padding:18px 16px}
+#at .at-rot{font:700 var(--t-body) var(--f-ui);color:var(--ink);margin:0 0 12px}
+#at .at-rot+.at-rot,#at .at-bloco+.at-bloco{margin-top:22px}
+#at .at-pilulas{display:flex;gap:10px}
+#at .at-pilulas button{flex:1;padding:12px 8px;border-radius:var(--rp);cursor:pointer;
+  background:none;border:1px solid var(--ink3);color:var(--ink3);font:400 var(--t-body) var(--f-ui)}
+#at .at-pilulas button.sel{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+#at .at-lista button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:14px 13px;border-radius:10px;cursor:pointer;margin-bottom:10px;
+  background:none;border:1px solid var(--ink3);color:var(--ink3);font:400 var(--t-body) var(--f-ui)}
+#at .at-lista button.sel{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+#at .at-lista svg{width:22px;height:22px;flex:0 0 auto}
+#at .at-lista b{font-weight:700}
+#at .at-quando{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#at .at-quando .as{color:var(--ink3);font:400 var(--t-label) var(--f-ui)}
+#at input.at-c,#at select.at-c,#at textarea.at-c{padding:13px 12px;border-radius:10px;
+  background:none;border:1px solid var(--ink3);color:var(--ink);font:400 var(--t-body) var(--f-ui)}
+/* 03/09: o arquivo põe data, hora, "às" e hora numa linha só — em 1080px de
+   frame cabe, em 375px de iPhone não: o segundo campo caía pra baixo e o "às"
+   ficava órfão no fim da primeira linha. A data toma a linha inteira e as duas
+   horas dividem a seguinte com o "às" entre elas, que é a mesma leitura. */
+#at input.at-c[type=date]{flex:1 1 100%;min-width:0}
+#at input.at-c[type=time]{flex:1 1 0;min-width:0;text-align:center}
+#at select.at-c,#at textarea.at-c,#at input.at-c.larg{width:100%}
+#at textarea.at-c{min-height:110px;resize:vertical;line-height:1.5}
+#at select.at-c[multiple]{min-height:112px}
+#at .at-dica{margin-top:8px;font:400 var(--t-caption)/1.45 var(--f-ui);color:var(--ink3)}
+#at .at-lei{margin-top:14px;padding:12px 13px;border-radius:10px;
+  background:var(--up-bg);color:var(--ink3);font:400 var(--t-caption)/1.5 var(--f-ui)}
+#at .at-lei b{color:var(--acc)}
+#at .at-ok{margin-top:18px;width:100%;padding:17px 12px;border-radius:15px;border:none;
+  background:var(--marca);color:var(--marca-ink);font:700 var(--t-body) var(--f-ui);cursor:pointer}
+#at .at-ok[disabled]{opacity:.5;cursor:default}
+
 /* botão Concluir do vestiário quando ele é aberto durante o cadastro */
 .vest-concluir{position:absolute;left:16px;right:16px;bottom:max(18px,env(safe-area-inset-bottom));z-index:30;
   padding:16px;border:0;border-radius:var(--rp);background:var(--marca);color:var(--marca-ink);
@@ -2270,7 +2322,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788448060"></script>
+<script src="net.js?v=1788449078"></script>
 
 <script>
 /* =========================================================================
@@ -3062,13 +3114,10 @@ function maisItens(){
   if(veProfessor()) eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()", false]);
   eu.push(['1-1','Registrar placar','Uma partida que já aconteceu', "_net.abrirMao()", false]);
   eu.push([MAISIC.partida,'Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
-  /* 03/09 — o quarto item que o arquivo novo pede (HOME, node 1:1819). Entra
-     como CASCA de propósito: "atividade" (casual, aula com professor, treino
-     solo) não tem tabela, policy nem regra de pontos, e a pergunta que decide
-     tudo — treino solo mexe em quê? — ainda não foi respondida. Ligar o clique
-     agora seria abrir uma tela que não guarda nada. Some da lista seria pior:
-     esconderia o que falta. Quando o motor existir, é trocar o `true` final. */
-  eu.push([MAISIC.atividade,'Registrar atividade','Em breve — casual, aula e treino solo', "", true]);
+  /* 03/09 — DEIXOU DE SER CASCA no mesmo dia. A pergunta que travava ("treino
+     solo mexe em quê?") foi respondida pelo Nuno: mexe em CONQUISTA, nunca em
+     ranking. Com isso a tabela pôde nascer (mig 94) e a tela existir. */
+  eu.push([MAISIC.atividade,'Registrar atividade','Casual, aula ou treino solo', "abrirAtividade()", false]);
   /* 03/09: o item passa a abrir a TELA de novo post (node 1:3743) em vez de
      empurrar pro campo dentro do feed. O `irFeed()` continua vivo — é pra
      onde a tela volta depois de publicar. */
@@ -3336,7 +3385,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788448060"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788449078"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3468,7 +3517,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788448060"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788449078"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4851,7 +4900,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788448060"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788449078"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -8015,6 +8064,168 @@ window.abrirCriarPost = abrirCriarPost;
 window.fecharCriarPost = fecharCriarPost;
 window.cpDestino = cpDestino; window.cpFoto = cpFoto;
 window.cpValidar = cpValidar; window.cpPublicar = cpPublicar;
+
+/* =========================================================================
+   REGISTRAR ATIVIDADE (03/09) — nodes 1:3469 / 3533 / 3593 / 3657.
+
+   ⚠️ A LEI, que é a mesma da migração 94 e do net.js: NADA AQUI MEXE EM
+   NÍVEL OU PONTO. Atividade alimenta conquista e presença. Se um dia esta
+   tela chamar a ponte que credita pontos, ou empurrar uma linha pra tabela
+   de partidas, está errada por desenho.
+   (O nome dessas duas pontes NÃO é escrito aqui de propósito: a prova-net
+   varre o arquivo por texto e não distingue comentário de código — citar a
+   chamada em prosa a faz acusar clique morto que não existe. Aconteceu ao
+   escrever este bloco, 03/09.)
+
+   O arquivo desenha quatro telas; aqui são dois passos. As três de detalhe
+   são o mesmo formulário — data, local, notas — com UMA seção trocada:
+   participantes (casual), participantes + professor (aula), tipo de treino
+   (solo). Três telas separadas seriam três cópias dos campos comuns.
+   ========================================================================= */
+const ATIC = { casual:`<svg viewBox="0 0 26.0458 24.1156" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Group 165"> <circle id="Ellipse 31" cx="13.9681" cy="12.0397" r="11.0397" stroke="currentColor" stroke-width="2"/> <path id="Vector 175" d="M25.0455 12.4585C25.0455 12.4585 20.5947 11.1576 16.7644 14.3854C12.9341 17.6132 13.9232 23.1154 13.9232 23.1154" stroke="currentColor" stroke-width="2" stroke-linecap="round"/> <path id="Vector 176" d="M3.66601 15.1996C3.66601 15.1996 8.40937 14.8173 10.9959 10.4498C13.5824 6.08232 10.735 1.32445 10.735 1.32445" stroke="currentColor" stroke-width="2" stroke-linecap="round"/> </g></svg>`, aula:`<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="fi-rr-package" clip-path="url(#clip0_0_50)"> <path id="Vector" d="M21 7.99979H17C16.2043 7.99979 15.4413 8.31586 14.8787 8.87847C14.3161 9.44108 14 10.2041 14 10.9998V15.9998H12V11.9998C11.9994 10.9263 11.7108 9.87268 11.1643 8.94874C10.6178 8.02479 9.83343 7.26438 8.89299 6.74679C9.4339 6.1803 9.79659 5.46746 9.93606 4.69672C10.0755 3.92598 9.98566 3.13126 9.67759 2.41113C9.36951 1.691 8.85679 1.07717 8.20303 0.645786C7.54927 0.214399 6.78325 -0.0155585 5.99999 -0.0155585C5.21673 -0.0155585 4.45071 0.214399 3.79695 0.645786C3.1432 1.07717 2.63048 1.691 2.3224 2.41113C2.01432 3.13126 1.92445 3.92598 2.06392 4.69672C2.2034 5.46746 2.56609 6.1803 3.10699 6.74679C2.16655 7.26438 1.38219 8.02479 0.835705 8.94874C0.289217 9.87268 0.000614552 10.9263 -7.62939e-06 11.9998L-7.62939e-06 22.9998C-7.62939e-06 23.265 0.105349 23.5194 0.292886 23.7069C0.480422 23.8944 0.734776 23.9998 0.999992 23.9998C1.26521 23.9998 1.51956 23.8944 1.7071 23.7069C1.89464 23.5194 1.99999 23.265 1.99999 22.9998V17.9998H22V22.9998C22 23.265 22.1053 23.5194 22.2929 23.7069C22.4804 23.8944 22.7348 23.9998 23 23.9998C23.2652 23.9998 23.5196 23.8944 23.7071 23.7069C23.8946 23.5194 24 23.265 24 22.9998V10.9998C24 10.2041 23.6839 9.44108 23.1213 8.87847C22.5587 8.31586 21.7956 7.99979 21 7.99979ZM3.99999 3.99979C3.99999 3.60422 4.11729 3.21754 4.33705 2.88865C4.55682 2.55975 4.86917 2.3034 5.23463 2.15203C5.60008 2.00065 6.00221 1.96105 6.39017 2.03822C6.77813 2.11539 7.1345 2.30587 7.41421 2.58557C7.69391 2.86528 7.88439 3.22164 7.96156 3.60961C8.03873 3.99757 7.99913 4.3997 7.84775 4.76515C7.69638 5.13061 7.44003 5.44296 7.11113 5.66273C6.78223 5.88249 6.39555 5.99979 5.99999 5.99979C5.46956 5.99979 4.96085 5.78907 4.58578 5.414C4.21071 5.03893 3.99999 4.53022 3.99999 3.99979V3.99979ZM5.99999 7.99979C7.06086 7.99979 8.07827 8.42122 8.82842 9.17136C9.57857 9.92151 9.99999 10.9389 9.99999 11.9998V15.9998H1.99999V11.9998C1.99999 10.9389 2.42142 9.92151 3.17157 9.17136C3.92171 8.42122 4.93913 7.99979 5.99999 7.99979V7.99979ZM16 15.9998V10.9998C16 10.7346 16.1053 10.4802 16.2929 10.2927C16.4804 10.1051 16.7348 9.99979 17 9.99979H18V10.9998C18 11.265 18.1053 11.5194 18.2929 11.7069C18.4804 11.8944 18.7348 11.9998 19 11.9998C19.2652 11.9998 19.5196 11.8944 19.7071 11.7069C19.8946 11.5194 20 11.265 20 10.9998V9.99979H21C21.2652 9.99979 21.5196 10.1051 21.7071 10.2927C21.8946 10.4802 22 10.7346 22 10.9998V15.9998H16Z" fill="currentColor"/> </g> <defs> <clipPath id="clip0_0_50"> <rect width="24" height="24" fill="white"/> </clipPath> </defs></svg>`, solo:`<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Group 354"> <path id="Vector" d="M23 12C23 14.2696 22.3127 16.3786 21.1348 18.1303C19.1598 21.0675 15.8056 23 12 23C8.19444 23 4.84025 21.0675 2.86522 18.1303C1.68734 16.3786 1 14.2696 1 12C1 5.92487 5.92487 1 12 1C18.0751 1 23 5.92487 23 12Z" stroke="currentColor" stroke-width="2"/> <path id="Vector_2" d="M14.4444 8.33333C14.4444 9.68336 13.35 10.7778 12 10.7778C10.65 10.7778 9.55556 9.68336 9.55556 8.33333C9.55556 6.9833 10.65 5.88889 12 5.88889C13.35 5.88889 14.4444 6.9833 14.4444 8.33333Z" stroke="currentColor" stroke-width="2"/> <path id="Vector_3" d="M15.6645 15.6667H8.33114C6.11678 15.6667 4.24626 17.1389 3.64497 19.1579C5.66239 21.5099 8.65608 23 11.9978 23C15.3395 23 18.3332 21.5099 20.3506 19.1579C19.7494 17.1389 17.8788 15.6667 15.6645 15.6667Z" stroke="currentColor" stroke-width="2"/> </g></svg>` };
+const AT_TIPOS = [
+  ['casual', ATIC.casual, 'Casual',      'Jogo sem placar com outros jogadores'],
+  ['aula',   ATIC.aula,   'Aula',        'Treino com um professor'],
+  ['solo',   ATIC.solo,   'Treino solo', 'Sessão de treino individual'],
+];
+/* os quatro sabores do treino solo (node 1:3657). Sem ícone: o arquivo
+   desenha um pra cada, e eles não vieram nesta leva de export — pôr ícone
+   parecido no lugar seria inventar desenho que o arquivo não tem. */
+const AT_SUB = [
+  ['paredao',  'Paredão',           'Treino contra a parede'],
+  ['saque',    'Treino de saque',   'Foco na técnica de saque'],
+  ['lancador', 'Lançador de bolas', 'Treino com lançador de bolas'],
+  ['outros',   'Outros',            'Outro tipo de treino solo'],
+];
+let _at = {};
+function abrirAtividade(){
+  _at = { passo:1, esporte:(typeof ehBeach==='function' && ehBeach()) ? 'beach' : 'tenis',
+          tipo:'casual', subtipo:'paredao', parceiros:[], professor:null };
+  let el = document.getElementById('at');
+  if(!el){ el = document.createElement('div'); el.id = 'at'; document.body.appendChild(el); }
+  el.classList.add('on');
+  atPintar();
+}
+function atPintar(){
+  const el = document.getElementById('at');
+  el.innerHTML = `
+    <div class="at-brilho"></div>
+    <div class="at-topo"><button class="at-voltar" onclick="atVoltar()" aria-label="Voltar">&#8249;</button></div>
+    <div class="at-in">
+      <div class="at-h1">Registrar atividade</div>
+      <div class="at-cartao">${_at.passo === 1 ? atPasso1() : atPasso2()}</div>
+      ${_at.passo === 1
+        ? `<button class="at-ok" onclick="_at.passo=2;atPintar()">Avan&ccedil;ar</button>`
+        : `<button class="at-ok" id="at-ok" onclick="atSalvar()">Registrar nova atividade</button>`}
+    </div>`;
+  if(_at.passo === 2) atValidar();
+}
+function atPasso1(){
+  return `
+    <div class="at-bloco">
+      <p class="at-rot">Modalidade</p>
+      <div class="at-pilulas">
+        <button class="${_at.esporte==='tenis'?'sel':''}" onclick="_at.esporte='tenis';atPintar()">Tennis</button>
+        <button class="${_at.esporte==='beach'?'sel':''}" onclick="_at.esporte='beach';atPintar()">Beach Tennis</button>
+      </div>
+    </div>
+    <div class="at-bloco">
+      <p class="at-rot">Tipo de atividade</p>
+      <div class="at-lista">${AT_TIPOS.map(([k,ic,t,d])=>
+        `<button class="${_at.tipo===k?'sel':''}" onclick="_at.tipo='${k}';atPintar()">${ic}<span><b>${t}</b> - ${d}</span></button>`
+      ).join('')}</div>
+    </div>
+    <div class="at-lei">Atividade <b>não mexe no seu Nível nem nos Pontos</b> — ela conta pras suas conquistas e mostra que você está em quadra.</div>`;
+}
+function atPasso2(){
+  const amigos = ((S.jogadores[EU] && S.jogadores[EU].amigos) || []);
+  const nomeDe = (uid)=> (typeof _nomeDe === 'function' ? _nomeDe(uid) : null) || 'Jogador';
+  const pessoas = _at.tipo === 'solo' ? '' : `
+    <div class="at-bloco">
+      <p class="at-rot">Adicionar participantes (opcional)</p>
+      ${amigos.length
+        ? `<select class="at-c" multiple onchange="_at.parceiros=[...this.selectedOptions].map(o=>o.value);atValidar()">
+             ${amigos.map(u=>`<option value="${u}">${nomeDe(u)}</option>`).join('')}
+           </select>
+           <p class="at-dica">Segure para escolher mais de um. S&oacute; quem j&aacute; &eacute; seu amigo no app aparece aqui.</p>`
+        : `<p class="at-dica">Voc&ecirc; ainda n&atilde;o tem amigos no app — d&aacute; pra registrar assim mesmo e marcar depois.</p>`}
+    </div>
+    ${_at.tipo === 'aula' ? `
+    <div class="at-bloco">
+      <p class="at-rot">Professor (opcional)</p>
+      <select class="at-c" id="at-prof" onchange="_at.professor=this.value||null;atValidar()">
+        <option value="">Carregando professores&hellip;</option>
+      </select>
+      <p class="at-dica">O professor confirma que a aula aconteceu — &eacute; a &uacute;nica atividade que tem uma segunda pessoa pra atestar.</p>
+    </div>` : ''}`;
+  const treino = _at.tipo !== 'solo' ? '' : `
+    <div class="at-bloco">
+      <p class="at-rot">Tipo de treino</p>
+      <div class="at-lista">${AT_SUB.map(([k,t,d])=>
+        `<button class="${_at.subtipo===k?'sel':''}" onclick="_at.subtipo='${k}';atPintar()"><span><b>${t}</b> - ${d}</span></button>`
+      ).join('')}</div>
+    </div>`;
+  setTimeout(atCarregarProfs, 0);
+  return `
+    <div class="at-bloco">
+      <p class="at-rot">Data e hora</p>
+      <div class="at-quando">
+        <input class="at-c" type="date" id="at-dia" max="${new Date().toISOString().slice(0,10)}" onchange="atValidar()">
+        <input class="at-c" type="time" id="at-ini" onchange="atValidar()">
+        <span class="as">&agrave;s</span>
+        <input class="at-c" type="time" id="at-fim" onchange="atValidar()">
+      </div>
+    </div>
+    ${treino}${pessoas}
+    <div class="at-bloco">
+      <p class="at-rot">Adicionar localiza&ccedil;&atilde;o (opcional)</p>
+      <input class="at-c larg" id="at-local" placeholder="Onde foi?">
+    </div>
+    <div class="at-bloco">
+      <p class="at-rot">Adicionar notas (opcional)</p>
+      <textarea class="at-c" id="at-notas" placeholder="Como foi?"></textarea>
+    </div>`;
+}
+async function atCarregarProfs(){
+  const sel = document.getElementById('at-prof');
+  if(!sel || sel.dataset.pronto) return;
+  try{
+    const lista = await _net.professores() || [];
+    const nomeDe = (uid)=> (typeof _nomeDe === 'function' ? _nomeDe(uid) : null) || 'Professor';
+    sel.innerHTML = '<option value="">Sem professor</option>' +
+      lista.map(p=>`<option value="${p.player_id}">${nomeDe(p.player_id)}</option>`).join('');
+    sel.dataset.pronto = '1';
+  }catch(e){ sel.innerHTML = '<option value="">Não deu pra carregar</option>'; }
+}
+/* a data é o único campo obrigatório: o resto o arquivo marca como opcional,
+   e o banco aceita nulo em todos eles */
+function atValidar(){
+  const bt = document.getElementById('at-ok'); if(!bt) return;
+  const d = document.getElementById('at-dia');
+  bt.disabled = !(d && d.value);
+}
+function atVoltar(){ if(_at.passo === 2){ _at.passo = 1; atPintar(); } else fecharAtividade(); }
+async function atSalvar(){
+  const bt = document.getElementById('at-ok');
+  const v = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  bt.disabled = true; bt.textContent = 'Registrando…';
+  const r = await _net.atividadeCriar({
+    tipo:_at.tipo, esporte:_at.esporte, quando:v('at-dia'),
+    inicio:v('at-ini'), fim:v('at-fim'), local:v('at-local'), notas:v('at-notas'),
+    subtipo:_at.subtipo, parceiros:_at.parceiros, professor_id:_at.professor,
+  });
+  if(r && r.erro){
+    bt.textContent = 'Registrar nova atividade'; bt.disabled = false;
+    if(window.toast) toast(r.erro); else alert(r.erro);
+    return;
+  }
+  fecharAtividade();
+  if(window.toast) toast('Atividade registrada — ela conta pras suas conquistas.');
+}
+function fecharAtividade(){ const el = document.getElementById('at'); if(el) el.classList.remove('on') }
+window.abrirAtividade = abrirAtividade; window.fecharAtividade = fecharAtividade;
+window.atPintar = atPintar; window.atVoltar = atVoltar;
+window.atValidar = atValidar; window.atSalvar = atSalvar;
 
 // filtro de lugar do radar (11/08) — estado de sessão, não persiste de propósito:
 // o radar abre sempre em "Todos" pra nunca esconder gente por um filtro esquecido
