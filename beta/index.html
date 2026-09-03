@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0A1100">
+<meta name="theme-color" content="var(--acc-ink)">
 <title>Ranket — protótipo navegável</title>
 <!-- 11/08: o app não tinha ícone nem manifest — na tela de início do celular
      ele aparecia como um retângulo em branco. O ícone usa o símbolo COM fundo
@@ -19,8 +19,8 @@
 <meta name="apple-mobile-web-app-title" content="Ranket">
 <style>
 /* 11/08: paleta RANKET. Quatro cores da marca, medidas dos arquivos oficiais:
-   preto #0A1100 (tem viés verde, não é neutro) · laranja #FF6A00 · off-white
-   #FFFEFD · lime da bola #83E000. As demais são degraus derivados delas.
+   preto var(--acc-ink) (tem viés verde, não é neutro) · laranja var(--marca) · off-white
+   var(--ink) · lime da bola var(--acc). As demais são degraus derivados delas.
 
    DUAS DECISÕES QUE NÃO SÃO ÓBVIAS:
    · O laranja é a marca, então ele NÃO pode significar "caiu de nível" — quem
@@ -28,12 +28,22 @@
    · `--clay` virou `--marca`: a variável guardava o saibro e agora guarda o
      laranja da raquetada. Nome que descreve a cor antiga mente sobre a nova. */
 /* 25/08: paleta das TELAS RANKET (telas-referencia/, medidas por canvas):
-   fundo frio #00060C→#0A0E06 · cards neutros #0C0F13 · laranja #FF6A00 vira o
-   botão de AÇÃO (com texto branco) · lime #83E000 vira SELEÇÃO e estado ativo
+   fundo frio #00060C→#0A0E06 · cards neutros #0C0F13 · laranja var(--marca) vira o
+   botão de AÇÃO (com texto branco) · lime var(--acc) vira SELEÇÃO e estado ativo
    (com texto preto). --acc deixou de ser o giz: agora é o lime da seleção —
    quem age é o laranja (--marca), quem confirma escolha é o lime (--acc). */
 :root{
-  --bg:#060B08; --sup:#0C1013; --sup2:#131920; --linha:#1B2320; --linha2:#2A3430;
+  /* 03/09 — ID NOVA, medida no arquivo `RANKET - TELAS FINAIS`
+     (`dac5VU1eoiqruZCVhOykgY`), que NÃO é o arquivo de onde a paleta de 25/08 e
+     29/08 saiu. O desenho mudou de casa, e com ele a temperatura: o fundo deixa
+     de ser esverdeado (#060B08) e as superfícies deixam de ser azuladas
+     (#0C1013 / #131920). A ID nova é NEUTRA sobre carvão.
+     Medidas na HOME (node 1:1819): fundo var(--bg) · cartão sólido var(--bg) ·
+     cartão translúcido rgba(18,18,18,.5–.6) · barra inferior var(--bar).
+     O lime, o laranja, o var(--ink) e o var(--ink3) não mudaram — só o chão mudou. */
+  --bg:#0B0B0B; --sup:#121212; --sup2:#1E1E1E; --linha:#1B2320; --linha2:#2A3430;
+  --sup-a:rgba(18,18,18,.6);   /* cartão SOBRE foto: deixa o fundo aparecer */
+  --bar:#06090E;               /* a barra inferior é mais escura que o fundo */
   /* 29/08 — AS DUAS RÉGUAS DO BOARD. `--linha` e `--linha2` foram feitas pra
      contornar CARTÃO: escuras de propósito, pra que a borda não competisse com
      o conteúdo. O board usa a linha de outro jeito — como DIVISOR estrutural,
@@ -49,18 +59,28 @@
   --up:#83E000; --up-bg:#16240A;             /* o lime da bola premia */
   --dn:#E8433C; --dn-bg:#2B0F0C;             /* vermelho, não laranja */
   /* 02/09 — o RÓTULO do laranja deixa de ser branco.
-     É a única falha de contraste real do arquivo (§7, R3): #FFFEFD sobre
-     #FF6A00 dá 2,87:1 e reprova o AA em texto normal (4,5:1) e até em texto
+     É a única falha de contraste real do arquivo (§7, R3): var(--ink) sobre
+     var(--marca) dá 2,87:1 e reprova o AA em texto normal (4,5:1) e até em texto
      grande (3:1). Afeta o CTA principal — "Ver oponentes no seu radar",
      "Publicar", "Convidar", "Aplicar filtros" —, ou seja, o botão que mais
-     importa em cada tela. Com #0A1100 sobe pra 6,7:1.
-     E não é invenção minha: #0A1100 é exatamente o que o próprio arquivo já
+     importa em cada tela. Com var(--acc-ink) sobe pra 6,7:1.
+     E não é invenção minha: var(--acc-ink) é exatamente o que o próprio arquivo já
      usa como texto sobre o lime. O laranja passa a seguir a mesma regra do
      verde em vez de ter uma própria. A COR DE MARCA não muda — a alternativa
      era escurecer o laranja pra ~#C24E00, e essa sim mexeria na identidade. */
-  --marca:#FF6A00; --marca-ink:#0A1100;      /* laranja = ação */
+  /* 03/09 — REVERTIDO POR DECISÃO DO NUNO: o rótulo do laranja volta a ser
+     BRANCO, seguindo o arquivo `RANKET - TELAS FINAIS` ao pé da letra.
+     O custo que 02/09 mediu continua valendo e fica aqui pra não se perder:
+     #FFFEFD sobre #FF6A00 dá 2,87:1 e reprova o AA em texto normal (4,5:1) e
+     em texto grande (3:1) — e é o CTA principal de cada tela. A escolha foi
+     paridade com o desenho em vez de contraste; não é descuido.
+     Se voltar à mesa, o caminho sem mexer na marca é escurecer o laranja pra
+     ~#C24E00, não trocar o rótulo de novo. */
+  --marca:#FF6A00; --marca-ink:#FFFEFD;      /* laranja = ação */
   --gold:#E0C48A; --gold-bg:#26220F;
-  --r:14px; --rp:999px;
+  /* 03/09: o raio do cartão sobe de 14 pra 20. O arquivo novo desenha cartão em
+     20px e bloco grande (notícias) em 30px — o 14 era do board anterior. */
+  --r:20px; --r-lg:30px; --rp:999px;
   /* 29/08 — A MARGEM LATERAL, agora proporcional.
      O board pede ~10% da largura (107 de 1080). Em 393pt de iPhone isso são
      39px, contra os 18px fixos que o app usava: era essa a desproporção. Mas
@@ -74,9 +94,14 @@
      vindo do alto, que é o que tira o fundo do preto morto. O original é um
      radialGradient com matriz de transformação que o CSS não reproduz igual;
      isto é a leitura do efeito, não a cópia da matriz — mesma cor, mesma
-     origem, mesma queda. Medido contra o screenshot de 29:256. */
+     origem, mesma queda. Medido contra o screenshot de 29:256.
+
+     03/09: os STOPS eram fracos demais. O arquivo novo mede .10 → .30 → .40 →
+     .50 (rgba 131,224,0 / 70,121,0 / 40,69,0 / 10,17,0) — o brilho não some no
+     transparente, ele FECHA num verde quase preto. Era por isso que a tela do
+     app lia mais chapada que a do Figma. */
   --brilho:radial-gradient(ellipse 120% 60% at 88% -6%,
-    rgba(131,224,0,.10) 0%, rgba(70,121,0,.07) 38%, rgba(40,69,0,.04) 62%, transparent 82%);
+    rgba(131,224,0,.10) 0%, rgba(70,121,0,.30) 38%, rgba(40,69,0,.40) 62%, rgba(10,17,0,.50) 100%);
   /* 11/08: era Bodoni/Didot, e a regra virou "sem webfont, e não vai começar
      agora" — Avenir Next era a mais próxima do logo entre as já instaladas.
      29/08: o board do Figma inteiro é desenhado em INTER, e o Nuno decidiu
@@ -108,17 +133,17 @@
    entende a unidade ignora a segunda linha e fica no comportamento de antes. */
 html,body{height:100%;height:100dvh}
 /* 01/09 — O FUNDO DAS TELAS, pelo código dos nodes (10 de 10 telas do Figma
-   têm a mesma camada, ex. node 28:155 no Radar): base #0A1100 com um brilho
-   RADIAL lime (#83E000 a 10%) descendo do canto superior direito.
-   O app tinha #060A00 chapado — é a divergência que mais aparece no
+   têm a mesma camada, ex. node 28:155 no Radar): base var(--acc-ink) com um brilho
+   RADIAL lime (var(--acc) a 10%) descendo do canto superior direito.
+   O app tinha var(--bg) chapado — é a divergência que mais aparece no
    levantamento: 50 ocorrências nas 10 telas.
    ⚠️ Na HOME ele quase não se vê, porque lá a foto da quadra fica na frente
    dele. Nas telas sem foto, ele É o fundo. */
 body{
   /* usa a var(--brilho) que já existia desde 29/08 e nunca tinha sido ligada em
-     lugar nenhum — o brilho estava definido e apagado. Base #0A1100, que é a cor
-     do node, no lugar do #060A00 que estava aqui. */
-  background:var(--brilho), #0a1100;
+     lugar nenhum — o brilho estava definido e apagado. Base var(--acc-ink), que é a cor
+     do node, no lugar do var(--bg) que estava aqui. */
+  background:var(--brilho), var(--acc-ink);
   color:var(--ink);font:14px/1.5 var(--f-ui);
   display:flex;align-items:center;justify-content:center;
   -webkit-font-smoothing:antialiased;
@@ -239,7 +264,7 @@ button,input,select{font:inherit;color:inherit}
 .av .ro{position:absolute;inset:0;background-repeat:no-repeat}
 .av.g{width:52px;height:52px;flex:0 0 52px;font-size:16px;box-shadow:0 0 0 2.5px var(--camisa,var(--linha2))}
 .av.gg{width:76px;height:76px;flex:0 0 76px;box-shadow:0 0 0 3px var(--camisa,var(--linha2))}
-.av.eu{background:var(--marca);color:#FFFEFD}
+.av.eu{background:var(--marca);color:var(--ink)}
 
 .pil{
   display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;
@@ -413,22 +438,22 @@ button,input,select{font:inherit;color:inherit}
 .cls-hero .letra sup{font:800 17px var(--f-ui);color:var(--acc);margin-left:2px;top:.15em;position:relative}
 .cls-hero .dir{text-align:right}
 .cls-hero .dir b{font:700 var(--t-title-s) var(--f-ui);color:var(--ink)}
-/* 02/09: o "› B" é #BCBCBC no arquivo (node 174:1865), não o cinza-esverdeado
+/* 02/09: o "› B" é var(--ink3) no arquivo (node 174:1865), não o cinza-esverdeado
    do --ink2. É a classe de DESTINO, e ela é deliberadamente apagada: quem tem
    que puxar o olho ali é o "Faltam", que é lime. */
 .cls-hero .dir .prox{color:var(--ink3);font-weight:700}
 .cls-hero .dir small{display:block;font:700 var(--t-caption) var(--f-ui);color:var(--acc);margin-top:3px}
-/* 02/09 — a BARRA pelo node 174:1874: trilho de 6px em #0A1100 com raio 100 e
-   preenchimento lime. O app tinha 3px sobre --linha2 (#2A3430): metade da
-   altura e um trilho que se confunde com borda de cartão. O #0A1100 é o mesmo
+/* 02/09 — a BARRA pelo node 174:1874: trilho de 6px em var(--acc-ink) com raio 100 e
+   preenchimento lime. O app tinha 3px sobre --linha2 (var(--linha2)): metade da
+   altura e um trilho que se confunde com borda de cartão. O var(--acc-ink) é o mesmo
    quase-preto do cabeçalho — o trilho é um vazio, não uma linha. */
-.cls-hero .barra{height:6px;border-radius:100px;background:#0A1100;margin:12px 0 10px;overflow:hidden}
+.cls-hero .barra{height:6px;border-radius:100px;background:var(--acc-ink);margin:12px 0 10px;overflow:hidden}
 .cls-hero .barra i{display:block;height:100%;border-radius:100px;background:var(--acc)}
 
 /* 02/09 — O ENVELOPE DA ABA RANKING (node 173:1809, "Rectangle 156").
    Pódio, cartão da sua classe e a lista de classes NÃO são três blocos soltos
    no arquivo: são o conteúdo de UM contêiner de 970 de largura, sem fundo,
-   com raio 30 (→ 12pt pela §5) e borda de 1px em #83E000. É a única borda
+   com raio 30 (→ 12pt pela §5) e borda de 1px em var(--acc). É a única borda
    lime de tela cheia do board inteiro, e é ela que diz "isto aqui é o
    ranking" — sem ela os três blocos leem como três assuntos.
    Sem fundo de propósito: o que se vê por dentro é o fundo da tela. */
@@ -470,7 +495,7 @@ button,input,select{font:inherit;color:inherit}
    a colisão; o nome próprio a elimina, e de quebra impede que esta regra vaze
    pros chips do radar. */
 .cls-cab .cbadge{flex:0 0 auto;min-width:37px;height:37px;padding:0 9px;border-radius:var(--rp);
-  background:#fff;color:#0A0A0A;display:flex;align-items:center;justify-content:center;
+  background:var(--ink);color:#0A0A0A;display:flex;align-items:center;justify-content:center;
   font:800 11px var(--f-ui)}
 .cls-cab .risco{height:1px;background:#E0E1DD}
 .cls-cab .faixa{flex:0 0 auto;font:600 11px var(--f-ui);color:var(--ink2)}
@@ -574,7 +599,7 @@ button,input,select{font:inherit;color:inherit}
 .ghero .capa{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .ghero .capa-bt{position:absolute;top:10px;right:10px;z-index:2;cursor:pointer;
   padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.28);
-  background:rgba(0,0,0,.45);color:#fff;font:600 var(--t-nav) var(--f-ui);
+  background:rgba(0,0,0,.45);color:var(--ink);font:600 var(--t-nav) var(--f-ui);
   backdrop-filter:blur(4px)}
 .ghero{position:relative;border:1px solid var(--linha2);border-radius:var(--r);overflow:hidden;
   background:linear-gradient(150deg,var(--sup2),var(--sup));min-height:150px;display:flex;align-items:flex-end}
@@ -600,9 +625,9 @@ button,input,select{font:inherit;color:inherit}
    Eram ◈ ◎ ▣ 💬 — caracteres, não os desenhos do board. Agora saem dos SVGs
    exportados dos próprios nodes (Navigation/House_03, Navigation/Compass, o
    Vector da COMUNIDADE e Communication/Chat), inline pra que o traço herde a
-   cor do botão: #BCBCBC parado, lime ativo, que é o que o Figma pinta.
+   cor do botão: var(--ink3) parado, lime ativo, que é o que o Figma pinta.
    ⚠️ `opacity` saiu: com o traço em currentColor quem diz o estado é a COR, e
-   meia opacidade sobre #BCBCBC derrubava o contraste sem motivo.
+   meia opacidade sobre var(--ink3) derrubava o contraste sem motivo.
    Altura 24px por R12 da especificação — no arquivo eles medem 17,7 a 21,5pt,
    pequenos demais pro padrão de barra (24–28). A largura sai do viewBox de
    cada um, não de uma regra só: são três proporções diferentes. */
@@ -648,17 +673,27 @@ button,input,select{font:inherit;color:inherit}
 #mais .mais-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
   background:none;border:0;padding:var(--t-body) 4px;color:var(--ink);font:600 15px var(--f-ui);cursor:pointer}
 #mais .mais-item + .mais-item{border-top:1px solid var(--linha)}
-#mais .mais-item i{font-style:normal;font-size:19px;width:24px;text-align:center;color:var(--acc)}
+/* 03/09: `width:24px` sozinho quebrava o "1-1" em duas linhas — é texto, não
+   ícone, e 24px não cabem dois dígitos e um hífen. `flex:0 0 24px` reserva a
+   coluna sem espremer, e o nowrap garante que nenhum rótulo curto se parta. */
+#mais .mais-item i{font-style:normal;font-size:19px;flex:0 0 24px;text-align:center;
+  white-space:nowrap;color:var(--acc);display:flex;align-items:center;justify-content:center}
 #mais .mais-item small{display:block;font:400 var(--t-label) var(--f-ui);color:var(--ink3);margin-top:2px}
 /* o item que o board pede e o app ainda não tem. Não some da lista — some da
    lista seria esconder o que falta; fica visível, apagado e sem clique, e o
    subtítulo diz por quê. Laranja tracejado é a mesma marca da classe .casca. */
-#mais .mais-item.casca{opacity:.5;cursor:default}
+/* 03/09: `.casca` global é selo de BLOCO — tem `position:relative`, moldura
+   tracejada, padding de 26px no topo e um `::before` "SEM DADO REAL" ancorado
+   ali. Dentro de um item de lista isso cai por cima do próprio título. Aqui
+   fica só o que a marca precisa comunicar: laranja e sem clique. O aviso de
+   que não existe ainda já está escrito no subtítulo, em palavra. */
+#mais .mais-item.casca{opacity:.5;cursor:default;border:0;padding:var(--t-body) 4px;margin:0}
+#mais .mais-item.casca::before{content:none}
 #mais .mais-item.casca i{color:var(--marca)}
 #mais .mais-item.casca small{color:var(--marca)}
 .nav button .badge{
   display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:99px;
-  background:var(--up);color:#0A1100;font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
+  background:var(--up);color:var(--acc-ink);font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
 }
 
 /* efeitos / o que mexeu */
@@ -700,7 +735,7 @@ button,input,select{font:inherit;color:inherit}
    pode estar preso na versão velha sem saber. */
 #vnova{
   position:absolute;left:0;right:0;top:0;z-index:70;
-  background:var(--marca);color:#0A1100;cursor:pointer;
+  background:var(--marca);color:var(--acc-ink);cursor:pointer;
   padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;
   font-size:12.5px;line-height:1.35;text-align:center;
   box-shadow:0 6px 20px rgba(0,0,0,.45);
@@ -724,7 +759,7 @@ button,input,select{font:inherit;color:inherit}
 #splash img{width:212px;height:auto;opacity:.96;display:block}
 /* a assinatura: caixa alta, espaçada, com os pontos em lime — o mesmo ritmo do
    desenho, onde ela é o que sustenta a marca no vazio da tela */
-#splash .assina{font:800 12px var(--f-ui),system-ui;letter-spacing:.22em;
+#splash .assina{font:800 12px var(--f-ui);letter-spacing:.22em;
   text-transform:uppercase;color:var(--ink);opacity:.92;white-space:nowrap}
 #splash .assina i{color:var(--acc);font-style:normal;margin:0 2px}
 #splash .pulso{
@@ -754,8 +789,8 @@ button,input,select{font:inherit;color:inherit}
 #instale[hidden]{display:none}
 #instale .tx{flex:1;min-width:0;font-size:var(--t-caption);line-height:1.4;color:var(--ink2)}
 #instale .tx b{color:var(--ink);font-size:12.5px}
-#instale button{border-radius:10px;font:700 12px system-ui;cursor:pointer;padding:9px 12px;white-space:nowrap}
-#instale .sim{background:var(--marca);color:#0A1100;border:none}
+#instale button{border-radius:10px;font:700 12px var(--f-ui);cursor:pointer;padding:9px 12px;white-space:nowrap}
+#instale .sim{background:var(--marca);color:var(--acc-ink);border:none}
 #instale .nao{background:none;color:var(--ink3);border:none;font-size:18px;line-height:1;padding:4px 6px}
 
 /* 18/08: a gaveta de teste e a engrenagem que a abria saíram. Ela dizia de si
@@ -779,7 +814,7 @@ button,input,select{font:inherit;color:inherit}
   background:#0F0C09;aspect-ratio:16/10}
 .qcard img{width:100%;height:100%;object-fit:cover;display:block}
 .qcard span{position:absolute;left:0;right:0;bottom:0;padding:14px 9px 7px;text-align:left;
-  font:700 var(--t-nav) system-ui;color:#FBF6EE;background:linear-gradient(180deg,transparent,rgba(11,8,6,.9))}
+  font:700 var(--t-nav) var(--f-ui);color:#FBF6EE;background:linear-gradient(180deg,transparent,rgba(11,8,6,.9))}
 .qcard.on{border-color:var(--acc)}
 .qcard.on span{color:var(--acc)}
 
@@ -794,7 +829,7 @@ button,input,select{font:inherit;color:inherit}
 .dcol.tem{background:rgba(131,224,0,.10);border:1px solid rgba(131,224,0,.4)}
 .dcol b{margin-top:auto;font-size:var(--t-nav);letter-spacing:.08em;color:var(--ink3)}
 .dcol.tem b{color:var(--up)}
-.dsl{background:var(--up);color:#0A1100;font-weight:800;font-size:9.5px;border-radius:6px;padding:2px 5px;white-space:nowrap}
+.dsl{background:var(--up);color:var(--acc-ink);font-weight:800;font-size:9.5px;border-radius:6px;padding:2px 5px;white-space:nowrap}
 .doff{font-size:var(--t-nav);color:var(--ink3);font-weight:700;margin:auto 0}
 .rtabs{flex:1;display:flex;gap:4px;background:var(--sup);border:1px solid var(--linha2);border-radius:var(--rp);padding:3px}
 .rtab{flex:1;border:0;border-radius:var(--rp);background:transparent;color:var(--ink2);font:600 12px var(--f-ui);padding:8px 4px;cursor:pointer;white-space:nowrap}
@@ -835,15 +870,15 @@ button,input,select{font:inherit;color:inherit}
   color:var(--ink3);font:400 var(--t-caption) var(--f-ui);cursor:pointer}
 .dhoje button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 /* node 89:179 pelo código: 263x50, raio 30, fundo rgba(18,18,18,.6), SEM
-   borda, rótulo "Filtros" em bold #BCBCBC com um chevron SVG. O app tinha
-   pílula com borda #2A3430, fundo #0C1013 e o rótulo "Filtrar". */
+   borda, rótulo "Filtros" em bold var(--ink3) com um chevron SVG. O app tinha
+   pílula com borda var(--linha2), fundo #0C1013 e o rótulo "Filtrar". */
 /* node 31:738: pílula de 717x53 (66% da largura do topo), raio 100, borda 1px
-   #BCBCBC, fundo transparente, lupa à esquerda e placeholder "Buscar". */
-/* node 58:1419 — o envelope dos filtros: #0B0B0B, raio 30 de 1080 (≈11px em
+   var(--ink3), fundo transparente, lupa à esquerda e placeholder "Buscar". */
+/* node 58:1419 — o envelope dos filtros: var(--bg), raio 30 de 1080 (≈11px em
    375), sem borda. E `.dhoje-f`: o mesmo painel de 3 colunas do radar, mas sem
    a faixa do boneco, que ali não existe. */
-.filtro-folha{background:#0b0b0b;border-radius:11px;padding:16px 14px;margin-bottom:14px}
-.dhoje-f{grid-template-columns:repeat(3,1fr);background:transparent;border:1px solid #bcbcbc;
+.filtro-folha{background:var(--bg);border-radius:11px;padding:16px 14px;margin-bottom:14px}
+.dhoje-f{grid-template-columns:repeat(3,1fr);background:transparent;border:1px solid var(--ink3);
   border-radius:20px}
 .dhoje-f .col + .col{border-left:1px solid rgba(188,188,188,.45)}
 .dhoje-f .chip{display:block;width:100%;margin-bottom:7px;padding:8px 4px;border-radius:99px;
@@ -851,7 +886,7 @@ button,input,select{font:inherit;color:inherit}
   font:400 var(--t-nav) var(--f-ui);cursor:pointer;white-space:nowrap}
 .dhoje-f .chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 /* node 58:1600: LIMPAR FILTROS em caixa alta, cinza, na linha do título */
-.flimpar{border:0;background:transparent;cursor:pointer;color:#bcbcbc;
+.flimpar{border:0;background:transparent;cursor:pointer;color:var(--ink3);
   font:700 var(--t-nav) var(--f-ui);letter-spacing:.08em;text-transform:uppercase;padding:0}
 /* ⚠️ `display:flex` vence o atributo `hidden` — sem esta linha a pílula
    aparecia em TODAS as telas, e ainda espremia o título até virar "FILTR…". */
@@ -859,12 +894,12 @@ button,input,select{font:inherit;color:inherit}
 .topo-busca{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
   height:38px;padding:0 14px;border-radius:100px;border:1px solid rgba(188,188,188,.55);
   background:transparent}
-.topo-busca i{font-style:normal;color:#bcbcbc;font-size:15px;line-height:1}
+.topo-busca i{font-style:normal;color:var(--ink3);font-size:15px;line-height:1}
 .topo-busca input{flex:1;min-width:0;border:0;background:transparent;outline:none;
   color:var(--ink);font:400 var(--t-label) var(--f-ui)}
-.topo-busca input::placeholder{color:#bcbcbc}
+.topo-busca input::placeholder{color:var(--ink3)}
 .topo-busca input::-webkit-search-cancel-button{filter:invert(.7)}
-.rfiltro{border:0;border-radius:11px;background:rgba(18,18,18,.6);color:#bcbcbc;
+.rfiltro{border:0;border-radius:11px;background:rgba(18,18,18,.6);color:var(--ink3);
   font:700 var(--t-label) var(--f-ui);padding:9px 14px;cursor:pointer;white-space:nowrap;
   display:inline-flex;align-items:center;gap:7px;backdrop-filter:blur(6px)}
 .rfiltro i{font-style:normal;font-size:11px;opacity:.85;transform:translateY(1px)}
@@ -872,10 +907,10 @@ button,input,select{font:inherit;color:inherit}
 .odir{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:0 0 122px}
 .olivre{color:var(--up);font-size:10.5px;font-weight:700;text-align:right;white-space:nowrap}
 /* node 28:149: os dois botões do card têm 228x55 e raio 10 — não são pílula.
-   Convidar em #FF6A00; Ver perfil com fundo #0B0B0B e borda #BCBCBC. */
-.oconv{border:0;border-radius:10px;background:#ff6a00;color:var(--marca-ink);font:700 var(--t-label) var(--f-ui);padding:11px 8px;cursor:pointer;min-height:44px}
-.operf{border:1px solid #bcbcbc;border-radius:10px;background:#0b0b0b;color:#bcbcbc;font:400 var(--t-label) var(--f-ui);padding:11px 8px;cursor:pointer;min-height:44px}
-.dpil{background:var(--up);color:#0A1100;font-weight:800;font-size:var(--t-caption);border-radius:8px;padding:8px 10px;white-space:nowrap}
+   Convidar em var(--marca); Ver perfil com fundo var(--bg) e borda var(--ink3). */
+.oconv{border:0;border-radius:10px;background:var(--marca);color:var(--marca-ink);font:700 var(--t-label) var(--f-ui);padding:11px 8px;cursor:pointer;min-height:44px}
+.operf{border:1px solid var(--ink3);border-radius:10px;background:var(--bg);color:var(--ink3);font:400 var(--t-label) var(--f-ui);padding:11px 8px;cursor:pointer;min-height:44px}
+.dpil{background:var(--up);color:var(--acc-ink);font-weight:800;font-size:var(--t-caption);border-radius:8px;padding:8px 10px;white-space:nowrap}
 .dx{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--linha2);border-radius:50%;background:none;color:var(--ink2);font-size:15px;cursor:pointer}
 
 /* ===== INÍCIO — a home vitrine (organização Tennis Clash, sem loot) ===== */
@@ -912,7 +947,7 @@ button,input,select{font:inherit;color:inherit}
      35:769  um gradiente RADIAL verde por cima dela — é ele que dá o tom da
              tela inteira, e ele não existia: o app tinha um scrim linear PRETO,
              que escurece em vez de esverdear. Era a diferença de cor.
-     35:772  uma faixa sólida #06090E de 422 de 1920 (22% da altura) no rodapé,
+     35:772  uma faixa sólida var(--bar) de 422 de 1920 (22% da altura) no rodapé,
              atrás da barra inferior.
    O gradiente radial vem do próprio código do node, convertido de SVG para
    CSS: mesmos quatro stops, mesmas opacidades. */
@@ -927,12 +962,12 @@ button,input,select{font:inherit;color:inherit}
    overlay. E o radial do node 35:769 fica ATRÁS da foto: a foto o cobre, então
    ele quase não participa do que se vê. Composto, o efeito dele é de 8 a 15
    níveis em 255 (spec item 4).
-   O que resta, e é o que o Figma mostra: a foto, mais a faixa #06090E do node
+   O que resta, e é o que o Figma mostra: a foto, mais a faixa var(--bar) do node
    35:772 fechando os 22% de baixo, atrás da barra. Nada de cor por cima. */
 .ini .scrim{position:absolute;inset:0;z-index:0;pointer-events:none;
   background:linear-gradient(180deg,
     rgba(6,9,14,.30) 0%, rgba(6,9,14,.10) 22%,
-    rgba(6,9,14,0) 46%, rgba(6,9,14,.55) 78%, #06090e 100%)}
+    rgba(6,9,14,0) 46%, rgba(6,9,14,.55) 78%, var(--bar) 100%)}
 .ini .hud{position:relative;z-index:2;
   padding:max(8px,env(safe-area-inset-top)) var(--pad-lado) 0}
 .ini .linha1{display:flex;align-items:center;gap:10px}
@@ -974,7 +1009,7 @@ button,input,select{font:inherit;color:inherit}
 .ini .ic.vitrine i{position:relative;z-index:1;font-style:normal;font-size:15px;
   color:var(--acc);text-shadow:0 1px 3px rgba(0,0,0,.85)}
 .ini .ic .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;line-height:17px;
-  border-radius:99px;background:var(--up);color:#0A1100;font-size:10px;font-weight:800;text-align:center;padding:0 4px}
+  border-radius:99px;background:var(--up);color:var(--acc-ink);font-size:10px;font-weight:800;text-align:center;padding:0 4px}
 /* (51) o ponto de recado: PONTO e não número, porque S.novidades conta AÇÃO e
    recado não é ação. Mora embaixo pra não brigar com o badge de cima. O valor
    vem sempre do carimbo no banco (net.js netAvisos) — nunca de um zero local. */
@@ -1040,7 +1075,7 @@ button,input,select{font:inherit;color:inherit}
    define a cor aqui e o app, nao o arquivo: lime vence, vermelho perde. */
 .hano{background:rgba(11,11,11,.8);border:0;border-radius:8px;padding:16px 8px}
 .hano-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:10px}
-/* a pilula do ano (node 169:1098): 108x39, raio 100, borda lime, rotulo #BCBCBC.
+/* a pilula do ano (node 169:1098): 108x39, raio 100, borda lime, rotulo var(--ink3).
    `S.histAno` existia desde sempre e NENHUMA tela deixava troca-lo — o ano
    ficava preso no atual. So aparece como botao quando ha mais de um ano com
    partida; com um ano so, um seletor de uma opcao e um controle que mente. */
@@ -1065,7 +1100,7 @@ button,input,select{font:inherit;color:inherit}
   text-align:center;overflow:hidden}
 .hbarras .m.on .rot{color:var(--ink)}
 /* O TRILHO DOS MESES (node 169:1052): doze retangulos sob o eixo, #1E1E1E, e o
-   do mes escolhido em #FFFEFD. Nao e enfeite — e o que diz qual coluna esta
+   do mes escolhido em var(--ink). Nao e enfeite — e o que diz qual coluna esta
    selecionada quando o mes nao tem partida nenhuma e as duas barras tem altura
    zero. Sem ele, mes vazio escolhido e mes vazio qualquer sao identicos. */
 .hbarras .m .trilho{display:block;height:4px;border-radius:2px;background:#1E1E1E;margin:5px 0 4px}
@@ -1082,7 +1117,7 @@ button,input,select{font:inherit;color:inherit}
    conta (vitorias, derrotas, partidas) em duas colunas; o da direita empilha o
    que se deriva (aproveitamento e pontos), um por linha, com o numero grande a
    esquerda e o rotulo a direita.
-   A borda e #BCBCBC no arquivo, bem mais viva que a --linha de antes: aqui ela
+   A borda e var(--ink3) no arquivo, bem mais viva que a --linha de antes: aqui ela
    e divisoria estrutural, nao contorno discreto de cartao. */
 .hmes{display:grid;grid-template-columns:1fr;gap:9px;margin-top:12px}
 @media(min-width:390px){.hmes{grid-template-columns:1.35fr 1fr}}
@@ -1107,7 +1142,7 @@ button,input,select{font:inherit;color:inherit}
    mostrava. Era o caso do `matches.cantada`, em menor escala: coluna com
    valor e nenhuma superfície.
    Do arquivo: pílula de 203x41 (r=66, que satura em redondo), fundo
-   rgba(18,18,18,.5), borda #83E000 e rótulo #83E000.
+   rgba(18,18,18,.5), borda var(--acc) e rótulo var(--acc).
    ⚠️ A borda do arquivo é 0,664 — sub-pixel, invisível. Vira 1px, que é o
    `hairline` da especificação. */
 .pcab .nm .estilo{font:600 var(--t-caption) var(--f-ui);color:var(--acc);
@@ -1153,7 +1188,7 @@ button,input,select{font:inherit;color:inherit}
   color:var(--acc-ink);font:700 var(--t-nav) var(--f-ui);display:flex;align-items:center;
   justify-content:center;font-variant-numeric:tabular-nums}
 /* os filtros do topo (nodes 299:1135/1139/1142): pilula de 172x49, contorno
-   #BCBCBC, rotulo #BCBCBC. O arquivo desenha os tres APAGADOS — nao ha estado
+   var(--ink3), rotulo var(--ink3). O arquivo desenha os tres APAGADOS — nao ha estado
    escolhido desenhado —, entao o aceso segue a convencao do app: lime cheio. */
 .convf{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
 .convf button{border:1px solid var(--ink3);border-radius:999px;background:transparent;
@@ -1179,7 +1214,7 @@ button,input,select{font:inherit;color:inherit}
   word-break:break-word}
 .pcel .leg span{display:block;margin-top:5px;font:400 10.5px var(--f-ui);color:var(--ink3);
   font-variant-numeric:tabular-nums}
-.pcel.comfoto .leg p{color:#FFFEFD}
+.pcel.comfoto .leg p{color:var(--ink)}
 /* a celula com foto precisa de altura propria: sem conteudo em fluxo atras da
    imagem absoluta, ela colapsaria na altura da legenda. */
 .pcel.comfoto{min-height:200px}
@@ -1229,7 +1264,7 @@ button,input,select{font:inherit;color:inherit}
 .pstats .ic{font-style:normal;color:var(--acc);font-size:13px;margin-right:4px}
 
 /* 01/09 — VALORES DO CÓDIGO DO FIGMA (get_design_context no node 35:773), não
-   estimados por screenshot: fundo é GRADIENTE diagonal a 101,1deg de #0B0B0B
+   estimados por screenshot: fundo é GRADIENTE diagonal a 101,1deg de var(--bg)
    até transparente, não cor chapada; raio 20px; sem contorno. */
 /* o gradiente do node tem o 2o stop 4,5x além do fim da caixa: na borda oposta
    percorre só 10,7% dele, indo de 100% a 91,2% de opacidade (spec item 4).
@@ -1241,18 +1276,18 @@ button,input,select{font:inherit;color:inherit}
 /* 01/09: a coluna direita tem 44% da tela (board 35:773), então os corpos
    caem junto. `clamp` e não valor fixo: em 375px o card tem ~160px de largura
    e em 430px tem ~185px — a mesma fonte não serve pros dois. */
-.hcard .cls{font:700 var(--t-display)/1 var(--f-disp);color:#fffefd;letter-spacing:-.02em}
-.hcard .suf{font:600 var(--t-nav) var(--f-ui);color:#83e000;margin-left:-3px}
-.hcard .pts{flex:1;text-align:right;font:600 var(--t-title-m) var(--f-ui);color:#fffefd;white-space:nowrap;font-variant-numeric:tabular-nums}
-.hcard .prox{font:600 var(--t-title-m) var(--f-ui);color:#bcbcbc}
-.hcard .faltam{text-align:right;font:400 var(--t-caption) var(--f-ui);color:#83e000;margin-top:4px}
-/* cores exatas do Figma (nodes 120:89 e 120:90): trilho #0a1100, preenchimento
-   #83e000, 6px de altura, raio 100px. O trilho estava em var(--acc-ink), que é
+.hcard .cls{font:700 var(--t-display)/1 var(--f-disp);color:var(--ink);letter-spacing:-.02em}
+.hcard .suf{font:600 var(--t-nav) var(--f-ui);color:var(--acc);margin-left:-3px}
+.hcard .pts{flex:1;text-align:right;font:600 var(--t-title-m) var(--f-ui);color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hcard .prox{font:600 var(--t-title-m) var(--f-ui);color:var(--ink3)}
+.hcard .faltam{text-align:right;font:400 var(--t-caption) var(--f-ui);color:var(--acc);margin-top:4px}
+/* cores exatas do Figma (nodes 120:89 e 120:90): trilho var(--acc-ink), preenchimento
+   var(--acc), 6px de altura, raio 100px. O trilho estava em var(--acc-ink), que é
    quase a mesma coisa por acaso — agora é o valor, não a coincidência. */
-.hcard .barra{height:6px;border-radius:100px;background:#0a1100;margin:9px 0 8px;overflow:hidden}
-.hcard .barra i{display:block;height:100%;border-radius:100px;background:#83e000}
-/* node 35:778: Inter Regular, #bcbcbc */
-.hcard .fim{font:400 var(--t-label)/1.4 var(--f-ui);color:#bcbcbc;margin-top:6px}
+.hcard .barra{height:6px;border-radius:100px;background:var(--acc-ink);margin:9px 0 8px;overflow:hidden}
+.hcard .barra i{display:block;height:100%;border-radius:100px;background:var(--acc)}
+/* node 35:778: Inter Regular, var(--ink3) */
+.hcard .fim{font:400 var(--t-label)/1.4 var(--f-ui);color:var(--ink3);margin-top:6px}
 .hcard .fim b{color:var(--ink2)}
 
 /* O card "Let's Ranket" — o convite pra entrar no radar. É o único bloco da
@@ -1265,21 +1300,21 @@ button,input,select{font:inherit;color:inherit}
    node 89:186). Estava escrito aqui como <h3> com a fonte do app, e por isso
    nunca ia bater: desenho de letra não se reproduz com font-family. O arquivo
    veio do próprio Figma e vive em app/fig/lets-ranket.svg.
-   O texto é Inter LIGHT 20px com entrelinha 30px em #bcbcbc; o botão tem
-   58px de altura, raio 100px, fundo #83e000 e rótulo Inter Bold em #0a1100. */
+   O texto é Inter LIGHT 20px com entrelinha 30px em var(--ink3); o botão tem
+   58px de altura, raio 100px, fundo var(--acc) e rótulo Inter Bold em var(--acc-ink). */
 .hlets{margin-top:11px;border:0;border-radius:20px;padding:20px 18px;
   background:linear-gradient(94.4deg, rgba(11,11,11,1) 0%, rgba(11,11,11,.91) 100%);
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .hlets .lets{display:block;width:min(100%,152px);height:auto;margin-bottom:2px}
 /* Light 300 descartado (spec item 3): texto fino claro sobre quase-preto sofre
    halation em OLED. Regular 400. */
-.hlets p{font:400 var(--t-label)/1.45 var(--f-ui);color:#bcbcbc;margin:10px 0 16px}
+.hlets p{font:400 var(--t-label)/1.45 var(--f-ui);color:var(--ink3);margin:10px 0 16px}
 /* ⚠️ ALVO DE TOQUE: no Figma este botão tem 58px de altura, que ÷2,88 dá
    20pt — menos da metade do mínimo utilizável (44pt). Todos os controles do
    arquivo reprovam nisso (spec item 2), porque foram dimensionados ao redor do
    texto de 1x. A altura sobe pra 48; a forma e a cor são as do node. */
 .hlets button{width:100%;min-height:48px;border:0;border-radius:100px;padding:13px 10px;
-  background:#83e000;color:#0a1100;font:600 var(--t-nav) var(--f-ui);
+  background:var(--acc);color:var(--acc-ink);font:600 var(--t-nav) var(--f-ui);
   letter-spacing:.06em;text-transform:uppercase;cursor:pointer;line-height:1.2}
 
 .ini .degrau{margin-top:11px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);
@@ -1339,25 +1374,25 @@ button,input,select{font:inherit;color:inherit}
    de duas colunas — não flutua sobre o boneco. Enquanto era `absolute` ela
    cobria o card "Let's Ranket" da coluna direita, que agora ocupa a mesma
    altura do boneco. */
-/* node 35:794 pelo código: 971x70 (raio 100px = pílula), contorno #83e000 e
+/* node 35:794 pelo código: 971x70 (raio 100px = pílula), contorno var(--acc) e
    SEM preenchimento — o retângulo de trás não tem fill. O app pintava
    rgba(11,11,11,.55) por baixo, o que fechava a faixa contra a quadra em vez
    de deixá-la vazada como no desenho. */
 .ini .placa{position:relative;z-index:2;margin-top:12px;
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:12px 22px;border-radius:100px;
-  border:1px solid #83e000;background:transparent}
-.placa .pos{flex:0 0 auto;font:700 var(--t-nav) var(--f-ui);color:#fffefd;
+  border:1px solid var(--acc);background:transparent}
+.placa .pos{flex:0 0 auto;font:700 var(--t-nav) var(--f-ui);color:var(--ink);
   letter-spacing:.5px;text-transform:uppercase;text-align:right}
 /* nodes 35:796 e 35:797: os dois são Inter BOLD e brancos; o nome tem 30px e a
    posição 20px — razão de 1,5. A posição estava em 9,5px contra 15px do nome
    (razão 1,58) e, pior, com o corpo pequeno demais pra um rótulo que o desenho
    trata como segunda informação da faixa, não como legenda. */
-.ini .placa .nm{font:700 var(--t-title-l) var(--f-ui);color:#fffefd;min-width:0;
+.ini .placa .nm{font:700 var(--t-title-l) var(--f-ui);color:var(--ink);min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.7)}
 .ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
 .ini .placa .meta b{font-family:var(--f-disp);font-size:var(--t-label);color:var(--ink)}
-.ini .placa .meta .pil2{background:var(--up);color:#0A1100;font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
+.ini .placa .meta .pil2{background:var(--up);color:var(--acc-ink);font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
 .ini .acao{position:relative;z-index:2;padding:0 16px 8px}
 /* 25/08 (telas novas): a ação da home é a pílula LARANJA */
 /* 01/09 (board 35:808): o botão tem 668 de 1080 — 62% da largura, centralizado.
@@ -1480,7 +1515,7 @@ button,input,select{font:inherit;color:inherit}
    barra em `rgba(21,16,13,.6)`, blur de 10 a 12px em oito superfícies, e
    sombra de texto em todo rótulo que pousasse direto na quadra.
 
-   No arquivo NENHUMA tela interna tem foto: são #0B0B0B com o brilho radial
+   No arquivo NENHUMA tela interna tem foto: são var(--bg) com o brilho radial
    lime, e as superfícies são os quase-pretos da paleta. Por isso o marrom sai
    junto com a foto — ele não era uma escolha de cor, era a resposta a ela.
    Mantido sobre fundo chapado, daria marrom sobre preto, que é a divergência
@@ -1497,14 +1532,14 @@ button,input,select{font:inherit;color:inherit}
    rotas que o `render()` marca como `cenaPropria`. O que muda é só o que
    corre por baixo das telas internas. */
 #amb{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .25s;
-  background:#0B0B0B}
-#fone.noturno #amb{opacity:1;background:#0B0B0B}
+  background:var(--bg)}
+#fone.noturno #amb{opacity:1;background:var(--bg)}
 /* o brilho do arquivo, a mesma camada que já vale na home e no cadastro */
 #fone.noturno #amb::after{content:"";position:absolute;inset:0;background:var(--brilho)}
 
-/* topo e barra: o #0A1100 do arquivo (bg/header), chapado. */
-#fone.noturno .topo{background:#0A1100;border-bottom-color:var(--linha3)}
-#fone.noturno .nav{background:#0A1100;border-top-color:var(--linha3)}
+/* topo e barra: o var(--acc-ink) do arquivo (bg/header), chapado. */
+#fone.noturno .topo{background:var(--acc-ink);border-bottom-color:var(--linha3)}
+#fone.noturno .nav{background:var(--acc-ink);border-top-color:var(--linha3)}
 
 /* as superfícies: o `surface/card` do arquivo, rgba(11,11,11,.8). */
 #fone.noturno .card,
@@ -1574,7 +1609,7 @@ button,input,select{font:inherit;color:inherit}
    personagem, que é justamente o que a pessoa está tentando olhar. */
 .vestir{display:block;width:100%;margin-top:12px;border:0;border-radius:12px;
   padding:14px;cursor:pointer;background:var(--acc);color:var(--acc-ink);
-  font:800 13px system-ui;letter-spacing:.08em;text-transform:uppercase}
+  font:800 13px var(--f-ui);letter-spacing:.08em;text-transform:uppercase}
 .vestir:active{transform:scale(.985)}
 /* bandeja que carrega só o botão (categoria fechada, mas troca pendente) */
 .vtray.so-vestir{padding-top:14px}
@@ -1589,7 +1624,7 @@ button,input,select{font:inherit;color:inherit}
    sem trocar nada e sair. */
 .vest-concluir-tray{display:block;width:100%;margin-top:12px;border:0;border-radius:12px;
   padding:14px;cursor:pointer;background:var(--marca);color:var(--marca-ink);
-  font:800 13px system-ui;letter-spacing:.08em;text-transform:uppercase}
+  font:800 13px var(--f-ui);letter-spacing:.08em;text-transform:uppercase}
 .vest-concluir-tray:active{transform:scale(.985)}
 .vest-preview .vfig{position:relative;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center}
 .vest-preview .vfig .chao{position:absolute;left:0;right:0;bottom:0;height:34%;
@@ -1692,7 +1727,7 @@ button,input,select{font:inherit;color:inherit}
   padding:13px 16px max(15px,env(safe-area-inset-bottom));
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .vtray .tt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:11px}
-.vtray .tt b{font:700 var(--t-nav) system-ui;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+.vtray .tt b{font:700 var(--t-nav) var(--f-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
 .vtray .tt span{font-size:var(--t-caption);color:var(--ink3);text-align:right}
 /* 6 colunas: com a 11ª cor (o preto), 5 colunas jogava a paleta pra TRÊS
    fileiras e a bandeja passava a rolar — e rolagem num provador é erro de
@@ -1751,11 +1786,11 @@ button,input,select{font:inherit;color:inherit}
 .seg2 button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
 
 /* ===== CADASTRO / ONBOARDING ===== */
-#onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:#060A00;overflow:hidden}
+#onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:var(--bg);overflow:hidden}
 #onb.on{display:flex}
 /* 02/09 — O FUNDO DO CADASTRO SAI DA FOTO E VAI PRO DO ARQUIVO.
    Era a quadra em `--cena-url` com um scrim escuro por cima. Nas 7 telas de
-   entrada do board não há foto nenhuma: é #0B0B0B com o MESMO brilho radial
+   entrada do board não há foto nenhuma: é var(--bg) com o MESMO brilho radial
    lime das outras telas — o node 28:211 do CADASTRE-SE traz exatamente a
    matriz que a `--brilho` já reproduz desde 29/08.
    O que forçou a troca foi o campo. No arquivo o campo não tem preenchimento:
@@ -1765,7 +1800,7 @@ button,input,select{font:inherit;color:inherit}
    Ou o campo é chapado, ou o fundo é; o arquivo escolheu o fundo.
    ⚠️ A foto continua sendo o fundo do app DEPOIS do cadastro (o `#fone`
    noturno). O que muda é só a porta de entrada. */
-#onb .onb-bg{position:absolute;inset:0;z-index:0;background:#0B0B0B}
+#onb .onb-bg{position:absolute;inset:0;z-index:0;background:var(--bg)}
 #onb .onb-bg::after{content:"";position:absolute;inset:0;background:var(--brilho)}
 #onb .onb-wrap{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding:18px 22px max(24px,env(safe-area-inset-bottom));overflow-y:auto}
 #onb .onb-wrap::-webkit-scrollbar{width:0}
@@ -1796,7 +1831,7 @@ button,input,select{font:inherit;color:inherit}
    repete em NOVE telas do cadastro, e trocar as nove à mão é nove chances de
    deixar uma pra trás. O CSS vira a ordem de uma vez, e quem escrever a décima
    tela continua escrevendo na ordem antiga sem quebrar nada.
-   A cor do kick já era `--up` (#83E000) — idêntica ao verde do desenho. */
+   A cor do kick já era `--up` (var(--acc)) — idêntica ao verde do desenho. */
 #onb .onb-head{margin:4px 0 16px;display:flex;flex-direction:column-reverse;align-items:flex-start}
 #onb .onb-head.center{text-align:center;align-items:center}
 #onb .onb-kick{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--up);font-weight:700;margin:6px 0 0}
@@ -1844,7 +1879,7 @@ button,input,select{font:inherit;color:inherit}
 /* 26/08: o secundário do desenho é BOTÃO de fundo escuro, não link sublinhado
    — mesma altura e mesmo raio do primário, e é isso que faz os dois lerem como
    duas saídas do mesmo peso em vez de "a ação e a desistência". */
-#onb .onb-sec{width:100%;padding:16px;border:0;border-radius:var(--rp);background:#121212;
+#onb .onb-sec{width:100%;padding:16px;border:0;border-radius:var(--rp);background:var(--sup);
   color:var(--ink2);font-weight:600;font-size:15px;cursor:pointer;font-family:var(--f-ui);margin-top:12px}
 #onb .onb-prim.lime{background:var(--marca)}   /* 25/08: telas novas — o fechamento também é laranja */
 #onb .nota.center{text-align:center}
@@ -1869,7 +1904,7 @@ button,input,select{font:inherit;color:inherit}
    repintaria meia dúzia de telas que ninguém pediu. */
 
 /* o campo: sem preenchimento, borda branca sólida, raio médio.
-   (era fundo marrom, borda #FFFEFD a 55% e raio 16 — o dobro do desenho) */
+   (era fundo marrom, borda var(--ink) a 55% e raio 16 — o dobro do desenho) */
 #onb .onb-input, #onb .onb-area{
   background:transparent;
   border:1px solid var(--ink);
@@ -1880,7 +1915,7 @@ button,input,select{font:inherit;color:inherit}
 
 /* o chip de escolha: parado é CONTORNO LIME sobre nada, escolhido é lime
    cheio com texto escuro. O contorno lime no estado parado é do arquivo e é o
-   que diz "isto aqui é escolhível" — a borda `--linha2` de antes (#2A3430)
+   que diz "isto aqui é escolhível" — a borda `--linha2` de antes (var(--linha2))
    não se via sobre o fundo quase preto, e os chips liam como texto solto. */
 #onb .seg2 button, #onb .seg3 button{
   background:transparent;
@@ -2006,7 +2041,147 @@ button,input,select{font:inherit;color:inherit}
 #vs .vs-acoes{display:flex;gap:10px}
 #vs .vs-acoes button{flex:1;padding:15px;border-radius:13px;border:none;font:700 15px var(--f-ui);cursor:pointer}
 #vs .vs-no{background:#2a1a16;color:var(--ink);border:1px solid var(--linha2)}
-#vs .vs-ok{background:var(--up);color:#0A1100}
+#vs .vs-ok{background:var(--up);color:var(--acc-ink)}
+
+/* =========================================================================
+   TELA DE MATCH GAME (03/09) — node 1:2334 do `RANKET - TELAS FINAIS`.
+   É a tela de DEPOIS do aceite. Não confundir com o `#vs` logo acima, que é
+   a de ANTES ("quem vai ganhar?", Aceitar/Recusar): mesmo momento do fluxo,
+   telas diferentes. As duas dividem a casca — fundo de quadra e bonecos —,
+   e é por isso que esta reaproveita a mesma quadra em vez de trazer a foto
+   do arquivo: o fundo do app é escolhido pelo jogador no vestiário, e cravar
+   a foto do Figma apagaria essa escolha.
+   O arquivo desenha os avatares como FOTO de rosto. O app não tem foto de
+   perfil — tem boneco. `estiloRosto()` enquadra a cabeça do boneco no
+   círculo pela proporção medida de cada um, que é o equivalente honesto. */
+#mg{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;
+  background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+#mg.on{display:flex}
+#mg .mg-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center}
+#mg .mg-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,11,11,.82) 0%,rgba(11,11,11,.55) 42%,rgba(11,11,11,.92) 100%)}
+/* 03/09: o conteúdo CENTRALIZA. `margin-top:auto` nos botões colava eles no
+   rodapé e abria um vazio no miolo — no arquivo os botões ficam a ~74% da
+   altura, com folga embaixo, não grudados na borda. */
+#mg .mg-in{position:relative;z-index:2;padding:calc(14px + env(safe-area-inset-top)) var(--pad-lado)
+  calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;min-height:100%;
+  justify-content:center}
+#mg .mg-x{position:absolute;top:calc(14px + env(safe-area-inset-top));left:var(--pad-lado)}
+#mg .mg-x{align-self:flex-start;width:34px;height:34px;border-radius:50%;border:1px solid var(--linha3);
+  background:rgba(18,18,18,.6);color:var(--ink);font:400 17px var(--f-ui);cursor:pointer;line-height:1}
+#mg .mg-kick{margin-top:26px;text-align:center;font:400 var(--t-body) var(--f-ui);
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+#mg .mg-tit{margin-top:6px;text-align:center;font:700 clamp(34px,11vw,46px)/1.05 var(--f-disp);color:var(--acc)}
+#mg .mg-rule{height:1px;background:var(--linha3);margin:14px auto 0;max-width:78%;width:100%}
+#mg .mg-sub{margin-top:12px;text-align:center;font:400 var(--t-body) var(--f-ui);color:var(--ink3)}
+#mg .mg-duo{display:flex;align-items:flex-start;justify-content:center;gap:8px;margin-top:26px}
+#mg .mg-lado{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center}
+/* o círculo do arquivo tem 324 de 1080 = 30% da largura do frame */
+#mg .mg-face{width:100%;max-width:150px;aspect-ratio:1;border-radius:50%;border:2px solid var(--acc);
+  background-color:var(--bg);background-repeat:no-repeat}
+#mg .mg-nome{margin-top:12px;font:700 var(--t-body) var(--f-ui);color:var(--ink);text-transform:uppercase;
+  text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mg .mg-pil{margin-top:10px;width:100%;display:flex;align-items:center;justify-content:space-around;gap:6px;
+  padding:8px 10px;border-radius:var(--rp);border:1px solid var(--acc);background:rgba(18,18,18,.5)}
+#mg .mg-pil b{font:700 var(--t-body) var(--f-ui);color:var(--acc)}
+#mg .mg-pil span{font:400 var(--t-body) var(--f-ui);color:var(--ink3)}
+#mg .mg-pos{margin-top:8px;font:400 var(--t-caption) var(--f-ui);color:var(--ink);text-align:center}
+/* as raquetes do arquivo entram pelo recorte que o próprio arquivo faz: o PNG
+   exportado é a imagem inteira (900x1600) e o frame mostra uma fração dela */
+#mg .mg-net{flex:0 0 22%;align-self:center;position:relative;overflow:hidden;aspect-ratio:205/184;margin-top:34px}
+#mg .mg-net img{position:absolute;width:407.67%;height:807.84%;left:-154.23%;top:-226.96%;max-width:none}
+/* 03/09: três selos numa linha só. Com `--t-caption` (12px) os rótulos
+   quebravam em duas linhas e desalinhavam os ícones; 11px com gap menor é o
+   que faz os três caberem lado a lado como no arquivo. O `min-width:0` é o
+   que permite o texto encolher em vez de empurrar o vizinho. */
+#mg .mg-selos{margin-top:22px;display:flex;align-items:center;justify-content:space-between;gap:6px;
+  padding:14px 10px;border-radius:var(--r);background:rgba(11,11,11,.8)}
+#mg .mg-selo{flex:1;display:flex;align-items:center;gap:6px;min-width:0}
+#mg .mg-selo svg{flex:0 0 auto;width:20px;height:20px}
+#mg .mg-selo em{font-style:normal;font:400 var(--t-nav) var(--f-ui);color:var(--ink);line-height:1.25}
+#mg .mg-barras{flex:0 0 auto;display:flex;align-items:flex-end;gap:2px;height:20px}
+#mg .mg-barras i{display:block;width:3px;background:var(--acc);border-radius:1px}
+#mg .mg-acoes{margin-top:22px;display:flex;gap:10px}
+/* 03/09: 13px e nowrap. O arquivo escreve o rótulo em 20px sobre um frame de
+   1080 — proporcionalmente isso é ~7px num iPhone, pequeno demais pra usar
+   literal. Com 15px "Enviar mensagem" quebrava em duas linhas e o botão
+   crescia; 13px é o maior tamanho em que os dois rótulos cabem numa linha. */
+#mg .mg-acoes button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:14px 8px;border-radius:var(--rp);font:700 var(--t-label) var(--f-ui);cursor:pointer;border:none;
+  white-space:nowrap}
+#mg .mg-acoes svg{width:19px;height:19px;flex:0 0 auto}
+/* 03/09: `button.classe`, não `.classe`. A regra de cima (`#mg .mg-acoes
+   button`) já tem elemento na conta e vence uma classe sozinha — era ela que
+   apagava a borda do botão vazado, nas duas telas. */
+#mg .mg-acoes button.mg-msg{background:var(--marca);color:var(--marca-ink)}
+#mg .mg-acoes button.mg-hora{background:none;border:1px solid var(--acc);color:var(--acc)}
+
+/* =========================================================================
+   NOVA PARTIDA CRIADA (03/09) — node 1:3429. O irmão da MATCH GAME: aquela
+   fecha o ACEITE, esta fecha o ENVIO. Até agora o envio era um toast.
+   O "Let's Ranket" aqui NÃO é texto — o arquivo desenha o lettering da marca
+   em curvas (a MATCH GAME usa Inter de verdade). Vem do export como SVG.
+   ========================================================================= */
+#np{position:fixed;inset:0;z-index:60;display:none;background:var(--bg)}
+#np.on{display:flex}
+#np .np-brilho{position:absolute;inset:0;background:var(--brilho),var(--bg)}
+#np .np-in{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;
+  padding:calc(20px + env(safe-area-inset-top)) var(--pad-lado) calc(20px + env(safe-area-inset-bottom))}
+#np .np-marca{width:64px;margin-bottom:26px}
+#np .np-marca svg{width:100%;height:auto;display:block}
+#np .np-lettering{width:min(78%,300px);color:var(--acc)}
+#np .np-lettering svg{width:100%;height:auto;display:block}
+#np .np-txt{margin-top:22px;max-width:32ch;font:400 var(--t-label)/1.55 var(--f-ui);color:var(--ink3)}
+#np .np-acoes{margin-top:40px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px}
+#np .np-acoes button{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  padding:16px 12px;border-radius:15px;font:700 var(--t-body) var(--f-ui);cursor:pointer;border:none}
+#np .np-acoes svg{width:20px;height:20px;flex:0 0 auto}
+#np .np-acoes button.np-share{background:none;border:1px solid var(--ink3);color:var(--ink3);font-weight:500}
+#np .np-acoes button.np-ok{background:var(--marca);color:var(--marca-ink)}
+
+/* =========================================================================
+   CRIAR POST (03/09) — node 1:3743. Até agora postar era um campo dentro do
+   feed: um no feed da Comunidade (index 3804) e outro no feed do Grupo
+   (index 4104), duas portas pro mesmo `netPostar`. A tela do arquivo junta
+   as duas e põe a escolha do destino ANTES do texto, que é a ordem certa:
+   onde vai aparecer muda o que a pessoa escreve.
+   ========================================================================= */
+#cp{position:fixed;inset:0;z-index:60;display:none;background:var(--bg);overflow-y:auto}
+#cp.on{display:block}
+#cp .cp-brilho{position:absolute;inset:0;background:var(--brilho),var(--bg);pointer-events:none}
+#cp .cp-topo{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top)) var(--pad-lado) 12px;
+  background:var(--acc-ink);border-bottom:1px solid var(--linha3)}
+#cp .cp-voltar{width:34px;height:34px;border-radius:50%;border:1px solid var(--linha3);
+  background:none;color:var(--ink);font:400 17px var(--f-ui);cursor:pointer;line-height:1;flex:0 0 auto}
+#cp .cp-in{position:relative;z-index:1;padding:20px var(--pad-lado) calc(24px + env(safe-area-inset-bottom))}
+#cp .cp-h1{font:700 var(--t-title-l) var(--f-disp);color:var(--ink);margin-bottom:16px}
+#cp .cp-cartao{background:rgba(11,11,11,.8);border-radius:var(--r-lg);padding:18px 16px}
+#cp .cp-rot{font:700 var(--t-body) var(--f-ui);color:var(--ink);margin-bottom:12px}
+#cp .cp-dest{display:flex;gap:12px}
+#cp .cp-dest button{flex:1;min-width:0;text-align:left;padding:14px 13px;border-radius:var(--r);
+  background:none;border:1px solid var(--ink3);color:var(--ink3);cursor:pointer}
+#cp .cp-dest button.sel{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+#cp .cp-dest svg{width:17px;height:19px;display:block;margin-bottom:9px}
+#cp .cp-dest b{display:block;font:700 var(--t-label) var(--f-ui);margin-bottom:6px}
+#cp .cp-dest span{display:block;font:400 var(--t-caption)/1.35 var(--f-ui)}
+#cp .cp-grupo{margin-top:12px;width:100%;padding:13px 12px;border-radius:var(--r);
+  background:var(--sup);border:1px solid var(--ink3);color:var(--ink);font:400 var(--t-body) var(--f-ui)}
+#cp textarea.cp-txt{margin-top:18px;width:100%;min-height:150px;resize:vertical;padding:14px 13px;
+  border-radius:var(--r);background:none;border:1px solid var(--ink3);color:var(--ink);
+  font:400 var(--t-body)/1.5 var(--f-ui)}
+#cp textarea.cp-txt::placeholder{color:var(--ink3)}
+#cp .cp-foto{margin-top:18px;width:100%;display:flex;align-items:center;justify-content:center;gap:11px;
+  padding:16px 12px;border-radius:15px;background:none;border:1px solid var(--ink3);
+  color:var(--ink3);font:700 var(--t-body) var(--f-ui);cursor:pointer}
+#cp .cp-foto svg{width:22px;height:22px;flex:0 0 auto}
+#cp .cp-previa{margin-top:12px;width:100%;border-radius:var(--r);display:block}
+#cp .cp-loc{margin-top:20px}
+#cp .cp-loc .cp-rot{margin-bottom:9px}
+#cp .cp-pub{margin-top:18px;width:100%;padding:17px 12px;border-radius:15px;border:none;
+  background:var(--marca);color:var(--marca-ink);font:700 var(--t-body) var(--f-ui);cursor:pointer}
+#cp .cp-pub[disabled]{opacity:.5;cursor:default}
 
 /* botão Concluir do vestiário quando ele é aberto durante o cadastro */
 .vest-concluir{position:absolute;left:16px;right:16px;bottom:max(18px,env(safe-area-inset-bottom));z-index:30;
@@ -2028,7 +2203,7 @@ button,input,select{font:inherit;color:inherit}
     <div class="marca" id="marca"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
     <h1 id="titulo">Quadro</h1>
     <!-- 01/09 (node 31:738) — A BUSCA DO RADAR. O Figma põe uma pílula de
-         busca de 717x53 (raio 100, borda #BCBCBC) ocupando o meio do topo,
+         busca de 717x53 (raio 100, borda var(--ink3)) ocupando o meio do topo,
          entre o voltar e o avatar, e NÃO escreve título de tela nessa aba.
          O app não tinha campo nenhum — a busca por nome só existia dentro de
          _net.abrirBusca(). Aparece só no radar; nas outras telas o título
@@ -2095,7 +2270,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788373270"></script>
+<script src="net.js?v=1788448060"></script>
 
 <script>
 /* =========================================================================
@@ -2485,10 +2660,10 @@ async function exportarCard(){
   // o texto. Ordem de leitura: nome grande, número embaixo, marca no rodapé.
   x.textAlign='center';
   x.fillStyle='#FFFEFD';
-  x.font='700 78px system-ui, sans-serif';
+  x.font='700 78px Inter, system-ui, sans-serif';
   x.shadowColor='rgba(0,0,0,.75)'; x.shadowBlur=24; x.shadowOffsetY=3;
   x.fillText((j.nome||'Jogador').toUpperCase(), W/2, H-232);
-  x.font='600 40px system-ui, sans-serif';
+  x.font='600 40px Inter, system-ui, sans-serif';
   x.fillStyle='rgba(255,254,253,.86)';
   x.fillText(`CLASSE ${divDe(j)} · NÍVEL ${nivelDe(j)}`, W/2, H-166);
   x.shadowBlur=0; x.shadowOffsetY=0;
@@ -2871,12 +3046,33 @@ window.modoTrocar = modoTrocar;
 
    O que não existe fica VISÍVEL como não existente, e não escondido: item que
    parece funcionar e não faz nada é pior que item ausente. */
+/* 03/09 — OS ÍCONES DO MENU DO `+`, tirados do arquivo novo
+   (`RANKET - TELAS FINAIS`, HOME node 1:1819). Vinham do arquivo com
+   `fill="#83E000"` cravado; viram `currentColor` pra que `.mais-item i`
+   continue mandando na cor, como já manda nos ícones da barra.
+   O `+` do "novo post" é composto: o arquivo desenha o círculo (Ellipse 83) e
+   a cruz como nodes separados, e só o círculo veio no export. */
+const MAISIC = {
+  partida:`<svg viewBox="0 0 31 31" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><g id="fi-rs-tennis"> <path id="Vector" d="M26.46 4.54135C24.2928 2.37616 21.5323 0.902107 18.5275 0.305508C15.5227 -0.291091 12.4085 0.0165526 9.57848 1.18955C6.74848 2.36255 4.32978 4.34824 2.62811 6.89561C0.926435 9.44298 0.0181956 12.4377 0.0181956 15.5011C0.0181956 18.5646 0.926435 21.5593 2.62811 24.1067C4.32978 26.654 6.74848 28.6397 9.57848 29.8127C12.4085 30.9857 15.5227 31.2934 18.5275 30.6968C21.5323 30.1002 24.2928 28.6261 26.46 26.4609C29.3625 23.552 30.9925 19.6105 30.9925 15.5011C30.9925 11.3918 29.3625 7.45031 26.46 4.54135V4.54135ZM28.3316 14.1216C26.7827 14.3095 25.2113 14.1426 23.7364 13.6335C22.2615 13.1244 20.9218 12.2865 19.8185 11.1831C18.7153 10.0798 17.8775 8.73994 17.3686 7.26498C16.8597 5.79003 16.6929 4.21863 16.881 2.66972C19.8127 2.97795 22.5497 4.28357 24.6341 6.36816C26.7184 8.45275 28.0237 11.1899 28.3316 14.1216V14.1216ZM2.66879 16.8806C4.21773 16.6927 5.78911 16.8597 7.264 17.3687C8.7389 17.8778 10.0787 18.7158 11.1819 19.8191C12.2851 20.9225 13.1229 22.2623 13.6318 23.7373C14.1408 25.2122 14.3075 26.7836 14.1194 28.3326C11.1877 28.0243 8.45071 26.7187 6.36636 24.6341C4.282 22.5495 2.97669 19.8124 2.66879 16.8806V16.8806ZM24.6336 24.6306C22.5115 26.7574 19.7112 28.0732 16.7195 28.3493C16.9049 26.4548 16.668 24.5428 16.0259 22.7508C15.3838 20.9588 14.3524 19.3314 13.006 17.9858C11.6596 16.6401 10.0317 15.6096 8.23932 14.9685C6.44697 14.3274 4.53479 14.0915 2.64038 14.2779C2.92133 11.2868 4.23829 8.48777 6.36371 6.36447C8.48912 4.24118 11.2895 2.92701 14.2809 2.64905C14.1072 4.44002 14.3101 6.24751 14.8766 7.95537C15.4432 9.66322 16.3608 11.2336 17.5705 12.5657C18.7801 13.8978 20.2552 14.962 21.9007 15.69C23.5462 16.418 25.3258 16.7936 27.1252 16.7928C27.5347 16.7928 27.9454 16.7721 28.3562 16.7334C28.0756 19.7209 26.7587 22.5161 24.6336 24.6345V24.6306Z" fill="currentColor"/> </g></svg>`,
+  atividade:`<svg viewBox="0 0 30.0004 33.291" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><path id="Union" d="M13.9035 23.4717C15.3042 23.1468 16.7328 23.0837 17.8937 23.5811C20.0685 24.5131 20.7172 26.619 20.8781 28.2002C20.9606 29.0121 20.9253 29.764 20.8722 30.3076C20.8454 30.5813 20.8141 30.8079 20.7882 30.9678C20.7753 31.0476 20.7636 31.1118 20.755 31.1572C20.7508 31.1797 20.7469 31.1977 20.7443 31.2109C20.743 31.2175 20.7422 31.2233 20.7413 31.2275C20.7409 31.2296 20.7407 31.2319 20.7404 31.2334L20.7394 31.2354V31.2363C20.6251 31.7766 20.0942 32.1221 19.5538 32.0078C19.014 31.8933 18.6685 31.3632 18.7824 30.8232C18.7825 30.8224 18.783 30.821 18.7833 30.8193C18.7845 30.8134 18.7864 30.802 18.7892 30.7871C18.7948 30.7573 18.8036 30.7104 18.8136 30.6484C18.8337 30.5239 18.8598 30.3399 18.882 30.1133C18.9267 29.6562 18.9531 29.0437 18.8878 28.4023C18.753 27.0768 18.2708 25.918 17.1066 25.4189C16.5176 25.1666 15.5872 25.1343 14.3556 25.4199C13.1509 25.6994 11.7833 26.254 10.4181 27.0059C7.65958 28.5251 5.11067 30.7339 3.96986 32.7783C3.70068 33.2604 3.09172 33.4331 2.60951 33.1641C2.12754 32.8949 1.95481 32.2859 2.22377 31.8037C3.61664 29.3077 6.51982 26.87 9.45424 25.2539C10.9352 24.4383 12.4756 23.8029 13.9035 23.4717ZM28.1369 5.2002C28.4157 4.72364 29.0284 4.56314 29.505 4.8418C29.9817 5.12071 30.1423 5.7333 29.8634 6.20996C20.2579 22.625 7.64304 24.1851 0.558732 20.7031C0.0633601 20.4595 -0.140706 19.8598 0.102677 19.3643C0.346258 18.8687 0.945936 18.6648 1.44154 18.9082C7.35729 21.8155 18.9223 20.9467 28.1369 5.2002ZM11.5001 7.69727C12.7158 7.69727 13.7427 8.1305 14.4601 8.9043C15.1668 9.66671 15.5001 10.6804 15.5001 11.7246C15.5001 12.7688 15.1668 13.7826 14.4601 14.5449C13.7427 15.3186 12.7157 15.751 11.5001 15.751C10.2846 15.7509 9.25751 15.3186 8.54018 14.5449C7.83356 13.7826 7.50021 12.7687 7.50014 11.7246C7.50014 10.6805 7.8336 9.66669 8.54018 8.9043C9.25752 8.13047 10.2845 7.69733 11.5001 7.69727ZM28.5001 0C28.9653 0 29.339 0.22214 29.5773 0.472656C29.8089 0.716235 30.0001 1.07779 30.0001 1.5C30.0001 1.92221 29.8089 2.28377 29.5773 2.52734C29.339 2.77786 28.9653 3 28.5001 3C28.035 2.99991 27.6612 2.77787 27.423 2.52734C27.1915 2.28377 27.0001 1.92213 27.0001 1.5C27.0001 1.07787 27.1915 0.716233 27.423 0.472656C27.6612 0.222133 28.035 8.61612e-05 28.5001 0ZM28.5001 1C28.3083 1.00008 28.1847 1.08991 28.1281 1.14941C28.0781 1.20201 28.0001 1.31373 28.0001 1.5C28.0001 1.68627 28.0781 1.79799 28.1281 1.85059C28.1847 1.91009 28.3083 1.99992 28.5001 2C28.2269 1.99983 28.0001 1.73576 28.0001 1.5C28.0001 1.26424 28.2269 1.00017 28.5001 1ZM28.5001 1C28.7735 1 29.0001 1.26416 29.0001 1.5C29.0001 1.73584 28.7735 2 28.5001 2C28.692 2 28.8155 1.91012 28.8722 1.85059C28.9222 1.79805 29.0001 1.68643 29.0001 1.5C29.0001 1.31357 28.9222 1.20195 28.8722 1.14941C28.8155 1.08988 28.692 1 28.5001 1Z" fill="currentColor"/></svg>`,
+  post:`<svg viewBox="0 0 31 31" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><circle id="Ellipse 83" cx="15.5" cy="15.5" r="14.5" stroke="currentColor" stroke-width="2"/> <path d="M15.5 9.5V21.5M9.5 15.5H21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+};
 function maisItens(){
   const eu = [];
   if(veProfessor()) eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()", false]);
   eu.push(['1-1','Registrar placar','Uma partida que já aconteceu', "_net.abrirMao()", false]);
-  eu.push(['◎','Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
-  eu.push(['✎','Novo post no feed','Escrever pra comunidade', "irFeed()", false]);
+  eu.push([MAISIC.partida,'Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
+  /* 03/09 — o quarto item que o arquivo novo pede (HOME, node 1:1819). Entra
+     como CASCA de propósito: "atividade" (casual, aula com professor, treino
+     solo) não tem tabela, policy nem regra de pontos, e a pergunta que decide
+     tudo — treino solo mexe em quê? — ainda não foi respondida. Ligar o clique
+     agora seria abrir uma tela que não guarda nada. Some da lista seria pior:
+     esconderia o que falta. Quando o motor existir, é trocar o `true` final. */
+  eu.push([MAISIC.atividade,'Registrar atividade','Em breve — casual, aula e treino solo', "", true]);
+  /* 03/09: o item passa a abrir a TELA de novo post (node 1:3743) em vez de
+     empurrar pro campo dentro do feed. O `irFeed()` continua vivo — é pra
+     onde a tela volta depois de publicar. */
+  eu.push([MAISIC.post,'Novo post no feed','Escrever pra comunidade ou pra um grupo', "abrirCriarPost()", false]);
   /* a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse; ela
      reaparece aqui — mesma superfície, um toque, outro lugar. */
   if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')", false]);
@@ -3140,7 +3336,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788373270"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788448060"]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3272,7 +3468,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788373270"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v=1788448060"]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4407,7 +4603,7 @@ function homeProfessor(){
         <!-- 28/08: a ida pra lente de jogador, no MESMO lugar e com o mesmo
              peso do "👥 Sou professor" que volta de lá — a simetria é o que
              faz as duas lentes se lerem como um par, e não como dois acasos -->
-        <button onclick="modoTrocar('jogo')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px system-ui;cursor:pointer;backdrop-filter:blur(6px)">🎾 Jogar</button>`:''}
+        <button onclick="modoTrocar('jogo')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer;backdrop-filter:blur(6px)">🎾 Jogar</button>`:''}
         <div class="painel">
           <div class="q"><b>${D?D.length:'—'}</b><small>Alunos</small></div>
           <div class="q"><b>${nAulas===null?'—':nAulas}</b><small>Aulas/sem</small></div>
@@ -4655,7 +4851,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788373270"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v=1788448060"]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
@@ -4922,7 +5118,7 @@ inicio(){
         </div>
         ${modoJogador()?`
         <!-- 28/08: a volta da lente — só o professor vendo o app como jogador -->
-        <button onclick="modoTrocar('prof')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px system-ui;cursor:pointer;backdrop-filter:blur(6px)">👥 Sou professor</button>`:''}
+        <button onclick="modoTrocar('prof')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer;backdrop-filter:blur(6px)">👥 Sou professor</button>`:''}
         <!-- 01/09 (board, node 35:756) — DUAS COLUNAS, e é o que fazia esta tela
              parecer outra. No board o boneco e os cards dividem a MESMA faixa
              vertical: boneco em x 33→541 (47% da largura) e a coluna de cards
@@ -5546,7 +5742,7 @@ radarFiltros(){
   return {titulo:'Filtros', dir:'', html:`
     <div class="pad">
       <!-- 01/09 (nodes 58:1419, 58:1436, 58:1600) — os filtros vivem DENTRO de
-           um card: retângulo #0B0B0B de 970x1489 com raio 30 no frame de 1080.
+           um card: retângulo var(--bg) de 970x1489 com raio 30 no frame de 1080.
            O app deixava os blocos soltos na página. E o título da tela mora
            dentro do card ("Filtrar oponentes", branco, caixa normal), com o
            LIMPAR FILTROS na mesma linha, à direita — no app ele era um "limpar"
@@ -6874,7 +7070,7 @@ jogador(p){
            direita, não um card com ícone e seta. Card dá a ele o mesmo peso
            visual dos blocos de conteúdo, e ele é uma saída, não conteúdo. -->
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
-        <a onclick="ir('historico')" style="cursor:pointer;color:#bcbcbc;
+        <a onclick="ir('historico')" style="cursor:pointer;color:var(--ink3);
            font:400 var(--t-label) var(--f-ui)">Ver histórico completo ›</a>
       </div>
 
@@ -7573,6 +7769,252 @@ function mostrarDesafioVS(m){
 }
 function fecharVS(){ const el=document.getElementById('vs'); if(el) el.classList.remove('on') }
 window.mostrarDesafioVS = mostrarDesafioVS;
+
+/* =========================================================================
+   TELA DE MATCH GAME (03/09) — node 1:2334. O que acontece DEPOIS do aceite.
+   Até aqui o aceite era um toast ("Combinado! Agora é só jogar") e sumia em
+   três segundos. O arquivo transforma esse instante na tela que dá o motivo
+   de marcar: os dois lado a lado, classe, posição e por que o jogo faz
+   sentido.
+
+   ⚠️ Os três selos são DERIVADOS, não escritos. O arquivo mostra "Equilíbrio
+   ótimo · Pontuação próxima · Partida única" como se fossem rótulo fixo, mas
+   fixar isso seria carimbar "equilíbrio ótimo" num confronto de classes
+   distantes — número inventado, que é justamente o que a regra da `casca`
+   proíbe. Cada selo lê o dado real do par e diz o que ele é. Quando o par é
+   o do arquivo (mesma classe, pontos perto, set único), o texto sai igual ao
+   desenho; quando não é, sai a verdade.
+   ========================================================================= */
+const MGIC = {
+  alvo:`<svg viewBox="0 0 55.9997 55.983" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Group 177"> <circle id="Ellipse 32" cx="27.9964" cy="28.0003" r="20.7499" stroke="currentColor" stroke-width="2"/> <circle id="Ellipse 33" cx="27.9981" cy="28.0001" r="13.2499" stroke="currentColor" stroke-width="2"/> <path id="Vector 177" d="M54.9997 27.9998H39.1254M16.8743 27.9998H1M27.9998 54.983V39.2498M27.9998 16.7332V1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/> <circle id="Ellipse 34" cx="28.0033" cy="27.9994" r="5.24997" fill="currentColor"/> </g></svg>`,
+  trofeu:`<svg viewBox="0 0 59.0005 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path id="Vector 173" d="M29.7264 34.126V48.4882M15.5062 24.2992C17.7189 29.6905 21.9363 33.9731 29.7264 34.126C37.6941 34.2824 41.924 29.8861 44.0938 24.2992C46.3919 18.3821 46.3792 11.1295 46.0489 6.53543M29.7264 48.4882L18.1277 50H42.0285L29.7264 48.4882ZM46.0489 6.53543C45.8517 3.79455 45.5415 2 45.5415 2H13.9082C13.9082 2 13.5899 3.79455 13.3936 6.53543M46.0489 6.53543H56.4393C56.4393 6.53543 57.7009 15.5487 56.4393 19.7638C55.1776 23.9788 51.928 26.2296 49.0581 26.189C46.1882 26.1483 44.0938 24.2992 44.0938 24.2992M13.3936 6.53543H3.00061C3.00061 6.53543 1.27286 17.8182 2.35802 20.5455C3.44319 23.2727 4.19419 25.287 7.92103 26.189C11.6479 27.0909 15.5062 24.2992 15.5062 24.2992M13.3936 6.53543C13.0644 11.1295 13.0778 18.3821 15.5062 24.2992" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>`,
+  agenda:`<svg viewBox="0 0 32.4914 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Group 198"> <path id="Vector" d="M1 13.0625H31.4914M1 13.0625V27.2004C1 29.2305 1 30.2442 1.41542 31.0197C1.78084 31.7017 2.36349 32.2577 3.08065 32.6053C3.89517 33 4.96199 33 7.09242 33H25.399C27.5295 33 28.5947 33 29.4092 32.6053C30.1264 32.2577 30.711 31.7017 31.0764 31.0197C31.4914 30.245 31.4914 29.2318 31.4914 27.2056V13.0625M1 13.0625V9.80035C1 7.77016 1 6.75431 1.41542 5.97888C1.78084 5.29679 2.36349 4.74264 3.08065 4.3951C3.89596 4 4.96406 4 7.09866 4H25.3935C27.5281 4 28.5939 4 29.4092 4.3951C30.1264 4.74264 30.711 5.29679 31.0764 5.97888C31.4914 6.75355 31.4914 7.76818 31.4914 9.79439V13.0625" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/> <path id="Vector 181" d="M7.5 1V7M24.5 1V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/> </g></svg>`,
+  chat:`<svg viewBox="0 0 43 43" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Communication / Chat"> <path id="Vector" d="M10.0318 35.6906L12.7622 33.5063L12.7823 33.4909C13.3515 33.0355 13.6387 32.8057 13.9592 32.6419C14.2467 32.4951 14.5533 32.3881 14.8696 32.3232C15.2261 32.25 15.5974 32.25 16.3428 32.25H31.8963C33.8993 32.25 34.9019 32.25 35.6677 31.8598C36.3419 31.5163 36.8904 30.9676 37.2339 30.2933C37.6241 29.5275 37.6241 28.526 37.6241 26.5231V12.8945C37.6241 10.8915 37.6241 9.88859 37.2339 9.12282C36.8904 8.44857 36.3408 7.90079 35.6665 7.55724C34.9 7.16668 33.898 7.16668 31.8911 7.16668H11.1078C9.10095 7.16668 8.09677 7.16668 7.33026 7.55724C6.65601 7.90079 6.10823 8.44857 5.76468 9.12282C5.37412 9.88933 5.37412 10.8935 5.37412 12.9004V33.4526C5.37412 35.362 5.37412 36.3165 5.76552 36.8068C6.10592 37.2332 6.6219 37.4813 7.16754 37.4807C7.79493 37.48 8.54078 36.8834 10.0318 35.6906Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/> </g></svg>`,
+};
+function _mgFicha(chave){
+  const j = S.jogadores[chave] || {nome:'Jogador', bon:'m1', nivel:1200};
+  const T = tabelaPontos();
+  const ord = ordena(T.comunidade || {});
+  const i = ord.indexOf(chave);
+  return { j, chave, classe: classeDe(j), nivel: nivelDe(j),
+           pts: (T.comunidade && T.comunidade[chave]) || 0,
+           pos: i >= 0 ? i + 1 : null };
+}
+function mostrarMatchGame(m){
+  const eu = _mgFicha(EU);
+  /* `_advId`/`_chaveLocal` são const de net.js — no escopo global de script,
+     mas fora de `window`. Referenciar direto lança ReferenceError se o arquivo
+     não tiver carregado; `typeof` é o mesmo cuidado que net.js:2300 já toma. */
+  const uid = (typeof _advId === 'function') ? _advId(m) : m.criador_id;
+  const advKey = (typeof _chaveLocal === 'function') ? _chaveLocal(uid) : uid;
+  const ad = _mgFicha(advKey);
+  const q = (eu.j.cena && eu.j.cena.quadra) || 'saibro';
+  const mo = (eu.j.cena && eu.j.cena.momento) || 'noite';
+
+  /* selo 1 — o equilíbrio sai da CLASSE, que é a régua que o app já usa pra
+     emparelhar (janela de ±1). Três barras acesas = mesma classe. */
+  const mesma = eu.classe[0] === ad.classe[0];
+  const barras = mesma ? 3 : 2;
+  const selo1 = mesma ? 'Equilíbrio ótimo' : 'Classes vizinhas';
+  /* selo 2 — "próxima" precisa de régua. 10% do maior dos dois é a mesma
+     proporção que o arquivo insinua (0.000 contra 0.000). */
+  const dif = Math.abs(eu.pts - ad.pts), teto = Math.max(eu.pts, ad.pts, 1);
+  const selo2 = dif <= teto * 0.1 ? 'Pontuação próxima' : `${dif} pts de diferença`;
+  /* selo 3 — fato puro, vem da partida */
+  const selo3 = m.formato === 'set' ? 'Partida única' : 'Melhor de 3';
+
+  const lado = (f)=> `
+    <div class="mg-lado">
+      <div class="mg-face" style="${estiloRosto(f.j.bon || 'm1')}"></div>
+      <div class="mg-nome">${(f.j.nome || 'Jogador').split(' ')[0]}</div>
+      <div class="mg-pil"><b>${f.classe}</b><span>${f.pts.toLocaleString('pt-BR')}</span></div>
+      ${f.pos ? `<div class="mg-pos">${f.pos}º lugar na comunidade</div>` : ''}
+    </div>`;
+
+  let el = document.getElementById('mg');
+  if(!el){ el = document.createElement('div'); el.id = 'mg'; document.body.appendChild(el); }
+  el.innerHTML = `
+    <div class="mg-bg" style="background-image:url('../quadras/${q}-${mo}.jpg')"></div>
+    <div class="mg-scrim"></div>
+    <div class="mg-in">
+      <button class="mg-x" onclick="fecharMatchGame()" aria-label="Fechar">&#8249;</button>
+      <div class="mg-kick">Desafio confirmado</div>
+      <div class="mg-tit">Let&rsquo;s Ranket!</div>
+      <div class="mg-rule"></div>
+      <div class="mg-sub">Voc&ecirc;s t&ecirc;m um perfil compat&iacute;vel para jogar.</div>
+      <div class="mg-duo">
+        ${lado(eu)}
+        <div class="mg-net"><img src="icones/mg-raquetes.png" alt=""></div>
+        ${lado(ad)}
+      </div>
+      <div class="mg-selos">
+        <div class="mg-selo"><span class="mg-barras">${
+          [12,20,12].map((h,i)=>`<i style="height:${h}px;opacity:${i<barras?1:.25}"></i>`).join('')
+        }</span><em>${selo1}</em></div>
+        <div class="mg-selo">${MGIC.alvo}<em>${selo2}</em></div>
+        <div class="mg-selo">${MGIC.trofeu}<em>${selo3}</em></div>
+      </div>
+      <div class="mg-acoes">
+        <button class="mg-msg" onclick="fecharMatchGame();_net.abrirChatPartida('${m.id}')">${MGIC.chat}Enviar mensagem</button>
+        <button class="mg-hora" onclick="fecharMatchGame();_net.abrirContra('${m.id}')">${MGIC.agenda}Propor hor&aacute;rio</button>
+      </div>
+    </div>`;
+  el.classList.add('on');
+}
+function fecharMatchGame(){ const el = document.getElementById('mg'); if(el) el.classList.remove('on') }
+window.mostrarMatchGame = mostrarMatchGame;
+window.fecharMatchGame = fecharMatchGame;
+
+/* =========================================================================
+   NOVA PARTIDA CRIADA (03/09) — node 1:3429.
+   Fecha o envio do desafio, como a MATCH GAME fecha o aceite. O texto do
+   arquivo diz por que o envio não é um beco: "caso ele não aceite, você
+   aparece disponível no radar de outros jogadores" — é a promessa do
+   produto no momento exato em que a pessoa fica esperando.
+   ========================================================================= */
+const NPIC = { marca:`<svg viewBox="0 0 103.213 76.9175" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Elemento 3"> <path id="Subtract" d="M79.0859 67.4017C81.5183 67.2774 83.9987 67.4396 86.1933 68.2865C88.0755 69.0129 89.746 70.2448 90.997 72.2728C91.7193 73.4438 92.3137 74.9009 92.7206 76.7113C92.1551 76.7915 91.5769 76.8344 90.9892 76.8344C85.1988 76.8342 80.3483 72.8076 79.0859 67.4017ZM89.8437 52.4408C90.2232 56.1064 91.2708 59.2041 93.1542 61.7074C95.3233 64.5901 98.5147 66.5744 102.799 67.767C101.723 71.804 98.6338 75.0177 94.6708 76.2679C94.2226 74.2745 93.5536 72.6072 92.6992 71.222C91.1974 68.7878 89.1641 67.2887 86.914 66.4203C84.335 65.425 81.4707 65.264 78.7929 65.4144C78.7757 65.1488 78.7665 64.8807 78.7665 64.6107C78.7667 58.2465 83.6304 53.0185 89.8437 52.4408ZM91.8515 52.4193C98.1999 52.8616 103.213 58.1499 103.213 64.6107C103.213 65.0083 103.192 65.4015 103.155 65.7894C99.2792 64.6802 96.5607 62.9091 94.7519 60.5052C93.1677 58.3997 92.2181 55.7278 91.8515 52.4193Z" fill="#83E000"/> <path id="Subtract_2" d="M53.382 0.144723C54.6308 -0.150586 55.935 -0.0185656 57.1535 0.769723C58.3589 1.5496 59.4317 2.94053 60.3029 5.07148L60.3117 5.09101L60.3186 5.1125C61.3731 8.51253 61.3927 13.3667 60.2863 18.9914C59.1931 24.5493 56.99 30.9 53.5451 37.4211C56.763 41.8691 61.9494 45.5374 67.6545 48.1174C73.1598 50.6069 79.1012 52.0607 84.132 52.2394C79.718 54.5071 76.6984 59.1065 76.6984 64.4103C76.6986 68.6293 78.6101 72.4012 81.6135 74.9094C63.3518 72.3674 52.6164 61.9769 47.1613 50.4172C41.6109 59.6159 34.443 67.5149 27.2697 72.2365C19.9086 77.0817 12.3757 78.6742 6.63302 74.5695C2.57188 71.6666 0.615862 66.7691 0.126181 60.9728C-0.363679 55.1728 0.605025 48.3956 2.47188 41.6047C6.20143 28.0383 13.5654 14.2479 20.3186 7.88496L21.0588 8.55C14.9825 16.5497 11.3925 25.2849 9.95235 33.2824C8.5106 41.2898 9.23086 48.5156 11.718 53.5227C12.9593 56.0215 14.6342 57.954 16.6858 59.1721C18.7327 60.3872 21.1862 60.9098 24.0275 60.5412C29.6936 59.8061 36.9141 55.5214 45.3625 46.0861C42.8424 38.3104 42.2222 29.9951 42.7834 22.6838C43.3505 15.297 45.1272 8.87867 47.4172 5.05781C48.6866 2.93985 50.9321 0.724287 53.382 0.144723ZM58.7912 5.77754C57.8726 4.70241 56.8758 4.35661 55.8762 4.63691C54.8963 4.91212 53.9527 5.77959 53.0998 7.02949C51.3899 9.53565 49.977 13.675 49.3322 18.1369L49.3313 18.1408L49.2424 18.9484C48.8 23.2123 48.5066 30.8108 52.6877 37.0939L52.8303 37.3059L52.9465 37.0793C55.7394 31.6473 57.4333 26.9899 59.0041 20.5959C59.5974 18.181 60.1048 15.143 60.1877 12.383C60.2291 11.0033 60.1657 9.68749 59.9504 8.55195C59.7355 7.41875 59.3662 6.4506 58.7912 5.77754Z" fill="#FF6A00"/> </g></svg>`, lettering:`<svg viewBox="0 0 576 76" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Let&#226;&#128;&#153;s Ranket"> <path d="M0 72.6776V0H13.5999V62.0874H46.0304V72.6776H0Z" fill="currentColor"/> <path d="M76.8795 73.9235C60.978 73.9235 49.8889 63.1257 49.8889 47.3442C49.8889 31.3552 60.6642 19.9344 76.8795 19.9344C92.3624 19.9344 102.928 30.9399 102.928 45.2677C102.928 46.7213 102.928 48.3825 102.719 50.1475H63.3842C64.0119 58.1421 69.5564 62.918 76.7748 62.918C82.0056 62.918 85.7717 60.3224 87.6548 56.4809H101.464C98.5347 66.3442 89.3286 73.9235 76.8795 73.9235ZM76.9841 30.8361C70.498 30.8361 65.058 34.4699 63.698 41.8415H89.224C88.8055 35.1967 83.6794 30.8361 76.9841 30.8361Z" fill="currentColor"/> <path d="M129.911 72.6776C119.449 72.6776 113.905 69.9781 113.905 56.7923V32.4973H105.013V21.1803H113.905V7.37159H127.505V21.1803H140.582V32.4973H127.505V55.1311C127.505 60.3224 128.76 61.153 133.991 61.153H140.268V72.6776H129.911Z" fill="currentColor"/> <path d="M145.338 25.6448L151.092 0H165.32L154.754 25.6448H145.338Z" fill="currentColor"/> <path d="M195.514 73.9235C181.81 73.9235 172.185 67.071 171.139 56.377H185.053C185.994 60.7377 190.388 63.541 196.037 63.541C202 63.541 205.243 61.0492 205.243 57.8306C205.243 55.235 203.256 53.7814 197.606 53.0546C195.514 52.847 191.643 52.1202 189.446 51.7049C180.868 50.0437 173.754 45.4754 173.754 36.235C173.754 27.0984 180.763 19.9344 194.049 19.9344C207.231 19.9344 215.391 25.9563 216.437 36.5464H203.256C202.837 32.3934 198.757 30.3169 194.154 30.3169C188.609 30.3169 185.68 32.6011 185.68 35.5082C185.68 38.2076 188.086 39.6612 192.585 40.4918C194.468 40.8033 199.28 41.53 201.477 41.8415C209.637 42.9836 217.902 46.0984 217.902 56.6885C217.902 66.8634 209.846 73.9235 195.514 73.9235Z" fill="currentColor"/> <path d="M253.058 74.7541V2.07651H283.71C301.285 2.07651 309.759 11.7322 309.759 24.5027C309.759 31.2514 306.516 37.1694 301.285 41.1147C306.935 44.7486 309.759 50.459 310.073 58.0382L310.91 74.7541H297.624L296.473 58.2459C295.95 50.459 293.021 46.8251 283.71 46.8251H266.658V74.7541H253.058ZM266.658 35.9235H282.873C291.975 35.9235 295.95 31.459 295.95 24.5027C295.95 17.4426 292.079 13.082 282.873 13.082H266.658V35.9235Z" fill="currentColor"/> <path d="M335.691 76C323.974 76 316.965 68.9399 316.965 60.53C316.965 49.8361 325.544 43.6065 338.202 43.6065C344.165 43.6065 348.454 44.6448 351.279 45.5792V43.0874C351.279 35.9235 346.78 32.7049 340.19 32.7049C335.587 32.7049 331.611 34.2623 330.565 39.0383H317.698C318.953 28.0328 328.473 22.0109 340.19 22.0109C355.673 22.0109 364.879 29.694 364.879 43.0874V54.7158C364.879 62.7104 366.134 63.4371 369.691 63.4371H370.109V74.7541H367.18C359.753 74.7541 354.731 73.3005 352.639 67.5901C349.082 72.4699 343.328 76 335.691 76ZM338.725 65.7213C345.316 65.7213 349.291 60.7377 350.547 54.3005C347.617 53.4699 343.537 52.5355 339.667 52.5355C334.331 52.5355 330.67 55.0273 330.67 59.388C330.67 63.0218 333.704 65.7213 338.725 65.7213Z" fill="currentColor"/> <path d="M375.935 74.7541V23.2568H389.535V31.0437C392.883 25.541 398.846 22.0109 406.692 22.0109C419.559 22.0109 426.883 30.3169 426.883 45.7869V74.7541H413.283V47.0328C413.283 38.2077 409.83 33.4317 402.193 33.4317C394.766 33.4317 389.535 38.8306 389.535 48.1749V74.7541H375.935Z" fill="currentColor"/> <path d="M435.391 74.7541V0H448.991V44.0219L467.822 23.2568H483.723L462.487 45.2677L487.28 74.7541H470.647L454.327 53.7814L448.991 59.2841V74.7541H435.391Z" fill="currentColor"/> <path d="M512.298 76C496.397 76 485.307 65.2022 485.307 49.4208C485.307 33.4317 496.083 22.0109 512.298 22.0109C527.781 22.0109 538.347 33.0164 538.347 47.3443C538.347 48.7978 538.347 50.459 538.138 52.224H498.803C499.43 60.2186 504.975 64.9945 512.193 64.9945C517.424 64.9945 521.19 62.3989 523.073 58.5574H536.882C533.953 68.4208 524.747 76 512.298 76ZM512.403 32.9126C505.916 32.9126 500.476 36.5464 499.116 43.918H524.642C524.224 37.2732 519.098 32.9126 512.403 32.9126Z" fill="currentColor"/> <path d="M565.329 74.7541C554.868 74.7541 549.323 72.0546 549.323 58.8689V34.5738H540.431V23.2568H549.323V9.4481H562.923V23.2568H576V34.5738H562.923V57.2076C562.923 62.3989 564.179 63.2295 569.409 63.2295H575.686V74.7541H565.329Z" fill="currentColor"/> </g></svg>`, share:`<svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Icon Frame"> <path id="Vector" d="M18.75 10.4166L25 4.16657L31.25 10.4166M25 4.16657L25 29.1666" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/> <path id="Vector 137" d="M12.5 18.7499H8.33333V37.4999C8.33333 39.8011 10.1988 41.6666 12.5 41.6666H37.5C39.8012 41.6666 41.6667 39.8011 41.6667 37.4999V18.7499H37.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/> </g></svg>` };
+function mostrarPartidaCriada(nomeAdv, ehDupla){
+  const primeiro = (nomeAdv || '').split(' ')[0] || 'seu oponente';
+  const txt = ehDupla
+    ? 'Duplas proposta com sucesso. Enquanto os outros tr&ecirc;s n&atilde;o topam, voc&ecirc; segue dispon&iacute;vel no radar de outros jogadores.'
+    : `Nova partida criada com sucesso. Caso ${primeiro} n&atilde;o aceite o desafio, voc&ecirc; ir&aacute; aparecer dispon&iacute;vel no radar de outros jogadores.`;
+  let el = document.getElementById('np');
+  if(!el){ el = document.createElement('div'); el.id = 'np'; document.body.appendChild(el); }
+  el.innerHTML = `
+    <div class="np-brilho"></div>
+    <div class="np-in">
+      <div class="np-marca">${NPIC.marca}</div>
+      <div class="np-lettering">${NPIC.lettering}</div>
+      <p class="np-txt">${txt}</p>
+      <div class="np-acoes">
+        <button class="np-share" onclick="partidaCriadaCompartilhar()">${NPIC.share}Compartilhar</button>
+        <button class="np-ok" onclick="fecharPartidaCriada()">Concluir</button>
+      </div>
+    </div>`;
+  el.classList.add('on');
+}
+/* mesmo caminho do `perfilCompartilhar`: share nativo, área de transferência
+   como recuo, e o silêncio de quem fechou a folha não vira erro */
+async function partidaCriadaCompartilhar(){
+  const texto = 'Marquei uma partida no Ranket. Bora?';
+  try{
+    if(navigator.share){ await navigator.share({title:'Ranket', text:texto}); return; }
+    if(navigator.clipboard){ await navigator.clipboard.writeText(texto); if(window.toast) toast('Copiado — é só colar.'); return; }
+    if(window.toast) toast('Este navegador não deixa compartilhar daqui.');
+  }catch(e){ /* fechou a folha: não é erro */ }
+}
+function fecharPartidaCriada(){ const el = document.getElementById('np'); if(el) el.classList.remove('on') }
+window.mostrarPartidaCriada = mostrarPartidaCriada;
+window.fecharPartidaCriada = fecharPartidaCriada;
+window.partidaCriadaCompartilhar = partidaCriadaCompartilhar;
+
+/* =========================================================================
+   CRIAR POST (03/09) — node 1:3743.
+   `netPostar(corpo, grupo, arquivo)` já sabia fazer tudo o que esta tela
+   pede — destino e foto —, só não tinha uma tela que juntasse as duas
+   portas. Uma coisa o arquivo pede e o banco não tem: LOCALIZAÇÃO. `posts`
+   não tem coluna de lugar (mig 91 traz `img`, não local). O campo entra
+   como casca, pela mesma razão do "Registrar atividade": esconder o que
+   falta é pior do que mostrar apagado.
+
+   ⚠️ Uma diferença de vocabulário que vale registrar: o arquivo diz que
+   "Meu feed" deixa o post "visível na sua página de perfil". No app,
+   `grupo_id:null` publica no feed da COMUNIDADE — que é onde o perfil
+   também mostra as postagens da pessoa. O rótulo segue o arquivo; o
+   subtítulo diz o que de fato acontece, pra ninguém achar que é privado.
+   ========================================================================= */
+const CPIC = { perfil:`<svg viewBox="0 0 15.3333 19" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path id="Vector" d="M14.3333 18C14.3333 15.4963 11.3486 13.4667 7.66667 13.4667C3.98477 13.4667 1 15.4963 1 18M7.66667 10.0667C5.21207 10.0667 3.22222 8.03702 3.22222 5.53333C3.22222 3.02964 5.21207 1 7.66667 1C10.1213 1 12.1111 3.02964 12.1111 5.53333C12.1111 8.03702 10.1213 10.0667 7.66667 10.0667Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`, grupos:`<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path id="Vector" d="M21 17.9999C21 16.0261 19.1449 14.3469 16.5556 13.7245M14.3333 18C14.3333 15.4963 11.3486 13.4667 7.66667 13.4667C3.98477 13.4667 1 15.4963 1 18M14.3333 10.0667C16.7879 10.0667 18.7778 8.03702 18.7778 5.53333C18.7778 3.02964 16.7879 1 14.3333 1M7.66667 10.0667C5.21207 10.0667 3.22222 8.03702 3.22222 5.53333C3.22222 3.02964 5.21207 1 7.66667 1C10.1213 1 12.1111 3.02964 12.1111 5.53333C12.1111 8.03702 10.1213 10.0667 7.66667 10.0667Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`, camera:`<svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="Icon Frame"> <g id="Base"> </g> <path id="Rectangle 63" d="M5.5 9.16667H38.5V31.1667C38.5 33.1917 36.8584 34.8333 34.8333 34.8333H9.16667C7.14162 34.8333 5.5 33.1917 5.5 31.1667V9.16667Z" stroke="currentColor" stroke-width="3.03448" stroke-linejoin="round"/> <circle id="Ellipse 25" cx="22" cy="22" r="5.5" stroke="currentColor" stroke-width="3.03448" stroke-linecap="round" stroke-linejoin="round"/> <path id="Vector 77" d="M31.1667 3.66667L34.8333 3.66667" stroke="currentColor" stroke-width="3.03448" stroke-linecap="round" stroke-linejoin="round"/> </g></svg>` };
+let _cp = { destino:'feed', grupo:null, arquivo:null };
+async function abrirCriarPost(){
+  _cp = { destino:'feed', grupo:null, arquivo:null };
+  let el = document.getElementById('cp');
+  if(!el){ el = document.createElement('div'); el.id = 'cp'; document.body.appendChild(el); }
+  el.innerHTML = `
+    <div class="cp-brilho"></div>
+    <div class="cp-topo"><button class="cp-voltar" onclick="fecharCriarPost()" aria-label="Voltar">&#8249;</button></div>
+    <div class="cp-in">
+      <div class="cp-h1">Novo post</div>
+      <div class="cp-cartao">
+        <div class="cp-rot">Onde voc&ecirc; quer postar?</div>
+        <div class="cp-dest">
+          <button id="cp-d-feed" class="sel" onclick="cpDestino('feed')">${CPIC.perfil}
+            <b>Meu feed</b><span>Aparece pra comunidade e na sua ficha.</span></button>
+          <button id="cp-d-grupo" onclick="cpDestino('grupo')">${CPIC.grupos}
+            <b>Grupos</b><span>S&oacute; quem participa do grupo escolhido v&ecirc;.</span></button>
+        </div>
+        <select class="cp-grupo" id="cp-sel-grupo" hidden onchange="_cp.grupo=this.value||null;cpValidar()">
+          <option value="">Carregando seus grupos&hellip;</option>
+        </select>
+        <textarea class="cp-txt" id="cp-txt" placeholder="Diga algo sobre a partida" oninput="cpValidar()"></textarea>
+        <input type="file" id="cp-file" accept="image/jpeg,image/png,image/webp" hidden onchange="cpFoto(this)">
+        <button class="cp-foto" onclick="document.getElementById('cp-file').click()">${CPIC.camera}Adicionar foto</button>
+        <img class="cp-previa" id="cp-previa" hidden alt="">
+        <div class="cp-loc">
+          <div class="cp-rot">Adicionar localiza&ccedil;&atilde;o (opcional)</div>
+          <input class="cp-grupo" disabled placeholder="Em breve">
+        </div>
+      </div>
+      <button class="cp-pub" id="cp-pub" disabled onclick="cpPublicar()">Publicar nova postagem</button>
+    </div>`;
+  el.classList.add('on');
+  /* os grupos só são buscados quando a aba deles é escolhida — abrir a tela
+     pra escrever no feed não precisa pagar duas consultas ao banco */
+}
+function cpDestino(d){
+  _cp.destino = d;
+  document.getElementById('cp-d-feed').classList.toggle('sel', d==='feed');
+  document.getElementById('cp-d-grupo').classList.toggle('sel', d==='grupo');
+  const sel = document.getElementById('cp-sel-grupo');
+  sel.hidden = (d !== 'grupo');
+  if(d === 'grupo' && !sel.dataset.pronto) cpCarregarGrupos(sel);
+  if(d === 'feed') _cp.grupo = null;
+  cpValidar();
+}
+async function cpCarregarGrupos(sel){
+  try{
+    const r = await _net.meusGrupos();
+    const meus = (r && (r.meus || r)) || [];
+    sel.innerHTML = meus.length
+      ? '<option value="">Escolha o grupo</option>' + meus.map(g=>`<option value="${g.id}">${g.nome||'Grupo'}</option>`).join('')
+      : '<option value="">Você ainda não participa de nenhum grupo</option>';
+    sel.dataset.pronto = '1';
+  }catch(e){ sel.innerHTML = '<option value="">Não deu pra carregar seus grupos</option>'; }
+  cpValidar();
+}
+function cpFoto(input){
+  const f = input.files && input.files[0];
+  _cp.arquivo = f || null;
+  const p = document.getElementById('cp-previa');
+  if(f){ p.src = URL.createObjectURL(f); p.hidden = false; } else { p.hidden = true; }
+  cpValidar();
+}
+/* o botão só acende quando o post pode existir: texto sempre, e grupo
+   escolhido quando o destino é grupo. É a mesma regra que `netPostar`
+   aplica — checar aqui evita a viagem até o banco pra ouvir não. */
+function cpValidar(){
+  const t = (document.getElementById('cp-txt').value||'').trim();
+  const ok = !!t && (_cp.destino === 'feed' || !!_cp.grupo);
+  document.getElementById('cp-pub').disabled = !ok;
+}
+async function cpPublicar(){
+  const bt = document.getElementById('cp-pub');
+  const t = (document.getElementById('cp-txt').value||'').trim();
+  bt.disabled = true; bt.textContent = 'Publicando…';
+  const r = await _net.postar(t, _cp.destino === 'grupo' ? _cp.grupo : null, _cp.arquivo);
+  if(r && r.erro){
+    bt.textContent = 'Publicar nova postagem'; bt.disabled = false;
+    if(window.toast) toast(r.erro); else alert(r.erro);
+    return;
+  }
+  fecharCriarPost();
+  if(window.toast) toast('Publicado.');
+  if(window.irFeed) irFeed();
+}
+function fecharCriarPost(){ const el = document.getElementById('cp'); if(el) el.classList.remove('on') }
+window.abrirCriarPost = abrirCriarPost;
+window.fecharCriarPost = fecharCriarPost;
+window.cpDestino = cpDestino; window.cpFoto = cpFoto;
+window.cpValidar = cpValidar; window.cpPublicar = cpPublicar;
 
 // filtro de lugar do radar (11/08) — estado de sessão, não persiste de propósito:
 // o radar abre sempre em "Todos" pra nunca esconder gente por um filtro esquecido
@@ -8489,7 +8931,7 @@ if(location.pathname.startsWith('/beta/')){
   const selo=document.createElement('div');
   selo.textContent='BETA · banco de testes';
   selo.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;'
-    +'background:#B3541E;color:#fff;font:600 10px/1.9 system-ui,sans-serif;'
+    +'background:#B3541E;color:var(--ink);font:600 10px/1.9 var(--f-ui),sans-serif;'
     +'text-align:center;letter-spacing:.08em;pointer-events:none';
   document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(selo));
   if(document.body) document.body.appendChild(selo);

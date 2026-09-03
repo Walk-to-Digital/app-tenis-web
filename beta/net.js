@@ -407,8 +407,8 @@ const _disco = (o, px=28)=>{
   const cor = (o && o.cor) || '#5C2E3C';
   const ini = _admEsc((o && o.ap) || '?');
   return `<div style="width:${px}px;height:${px}px;border-radius:50%;background:${cor};flex:0 0 ${px}px;`
-       + `display:flex;align-items:center;justify-content:center;color:#FFFEFD;`
-       + `font:700 ${Math.max(10, Math.round(px*0.36))}px system-ui">${ini}</div>`;
+       + `display:flex;align-items:center;justify-content:center;color:var(--ink);`
+       + `font:700 ${Math.max(10, Math.round(px*0.36))}px var(--f-ui)">${ini}</div>`;
 };
 const _discoUid = (uid, px=28)=> _disco(S.jogadores[_chaveLocal(uid)], px);
 const _inverter = (placar)=> (placar||'').split(/\s+/).map(p=>{ const m=p.match(/^(\d+)\D+(\d+)$/); return m?`${m[2]}-${m[1]}`:p; }).join(' ');
@@ -937,12 +937,12 @@ function _confrontoDireto(id){
   const h = (S.historico||[]).filter(x=> x.adv===id);
   const linha = (t)=>`<div style="font-size:11.5px;color:var(--ink2);margin-top:5px">${t}</div>`;
   if(!h.length) return `<div style="margin-top:16px">
-    <div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em">Confronto direto</div>
+    <div style="font:700 11px var(--f-ui);color:var(--ink2);text-transform:uppercase;letter-spacing:.07em">Confronto direto</div>
     ${linha('Vocês ainda não se enfrentaram.')}</div>`;
   const v = h.filter(x=>x.venceu).length;
   return `<div style="margin-top:16px">
-    <div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em">Confronto direto</div>
-    <div style="font:700 15px system-ui;margin-top:6px">${v} <span style="font-weight:400;font-size:12px;color:var(--ink2)">×</span> ${h.length-v}</div>
+    <div style="font:700 11px var(--f-ui);color:var(--ink2);text-transform:uppercase;letter-spacing:.07em">Confronto direto</div>
+    <div style="font:700 15px var(--f-ui);margin-top:6px">${v} <span style="font-weight:400;font-size:12px;color:var(--ink2)">×</span> ${h.length-v}</div>
     ${h.slice(0,5).map(x=>linha(
       `<span style="color:${x.venceu?'var(--up)':'var(--dn)'}">${x.venceu?'venceu':'perdeu'}</span> ${x.placar||''}${x.quando?' · '+x.quando:''}`
     )).join('')}
@@ -957,8 +957,8 @@ async function _carregarConquistas(id){
   ]);
   const el = document.getElementById('net-perfil-conq');
   if(!el) return;                       // fechou a ficha antes de a consulta voltar
-  const rot = (t)=>`<div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">${t}</div>`;
-  const pil = (txt,cor)=>`<span style="display:inline-block;padding:4px 9px;border-radius:99px;background:var(--sup2);color:${cor};font:700 11px system-ui;margin:0 5px 5px 0">${_admEsc(txt)}</span>`;
+  const rot = (t)=>`<div style="font:700 11px var(--f-ui);color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">${t}</div>`;
+  const pil = (txt,cor)=>`<span style="display:inline-block;padding:4px 9px;border-radius:99px;background:var(--sup2);color:${cor};font:700 11px var(--f-ui);margin:0 5px 5px 0">${_admEsc(txt)}</span>`;
   const bloco = [];
   if(trofeus.length) bloco.push(`<div>${rot(`Troféus · ${trofeus.length}`)}
     ${trofeus.map(t=> pil(`🏆 ${t.nome||t.tipo}${t.etiqueta?' · '+t.etiqueta:''}`, 'var(--gold)')).join('')}</div>`);
@@ -1095,7 +1095,7 @@ function _parceirosPossiveis(excluir){
    quatro precisam topar; na mão o jogo já aconteceu e só falta confirmar. */
 function _duplaBloco(nomeAdv, rodape){
   const aba=(on,rot,val)=>`<button type="button" onclick="_net.onDupla(${val})"
-    style="flex:1;padding:10px;border-radius:10px;font:700 13px system-ui;cursor:pointer;
+    style="flex:1;padding:10px;border-radius:10px;font:700 13px var(--f-ui);cursor:pointer;
            border:1px solid ${on?'var(--lime)':'var(--linha2)'};
            background:${on?'rgba(131,224,0,.12)':'transparent'};
            color:${on?'var(--lime)':'var(--ink2)'}">${rot}</button>`;
@@ -1103,7 +1103,7 @@ function _duplaBloco(nomeAdv, rodape){
     const ops=_parceirosPossiveis(excluir);
     return `<div style="font-size:12px;color:var(--ink2);margin:8px 0 6px">${rot} ${valor?'':'<span style="color:var(--dn)">— escolha</span>'}</div>
     <select onchange="_net.onParceiro('${qual}',this.value)"
-      style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:#fff;font:600 14px system-ui;
+      style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);
              border:1px solid ${valor?'var(--linha2)':'var(--dn)'}">
       <option value="" ${!valor?'selected':''}>Quem joga?</option>
       ${ops.map(o=>`<option value="${o.id}" ${valor===o.id?'selected':''}>${o.j.nome}${netEhAmigo(o.id)?' · amigo':''}</option>`).join('')}
@@ -1155,7 +1155,10 @@ async function _onConfirmarDesafio(){
     });
     if(error) throw error;
     netFecharOnline();
-    if(window.toast) toast(_on.dupla
+    /* 03/09 — o envio ganha tela (node 1:3429), como o aceite ganhou a MATCH
+       GAME. O toast fica como recuo se a função não tiver carregado. */
+    if(window.mostrarPartidaCriada) mostrarPartidaCriada(adv.nome, !!_on.dupla);
+    else if(window.toast) toast(_on.dupla
       ? `Duplas proposta — os outros três precisam topar no app deles.`
       : `Desafio enviado pra ${adv.nome.split(' ')[0]} — ele aceita no app dele.`);
     netAtualizarInbox();
@@ -1304,7 +1307,11 @@ async function netAceitar(matchId){
   }
   const { error } = await sb.from('matches').update({ status:'aceito', aceito_at:new Date().toISOString() }).eq('id',matchId);
   if(error){ alert('Erro ao aceitar: '+error.message); return; }
-  if(window.toast) toast('Desafio aceito! Agora é só jogar e lançar o placar.');
+  /* 03/09 — mesma troca do `netAceitarContra`: o aceite abre a TELA DE MATCH
+     GAME. `md` já foi buscado acima, e o ramo da duplas incompleta retorna
+     antes daqui — a tela só aparece quando o desafio abriu de verdade. */
+  if(md && window.mostrarMatchGame) mostrarMatchGame(md);
+  else if(window.toast) toast('Desafio aceito! Agora é só jogar e lançar o placar.');
   netAtualizarInbox();
 }
 async function netRecusar(matchId){
@@ -1363,7 +1370,12 @@ async function netCheckin(matchId){
 async function netAceitarContra(matchId){
   const { error } = await sb.rpc('contraproposta_aceitar', { p_match: matchId });
   if(error){ alert('Não deu pra aceitar: '+error.message); netAtualizarInbox(); return; }
-  if(window.toast) toast('Combinado! Agora é só jogar e lançar o placar.');
+  /* 03/09 — o aceite deixa de ser um toast que some em 3s e vira a TELA DE
+     MATCH GAME (node 1:2334). O toast continua pra quem a tela não alcança:
+     se a função não estiver carregada, o aviso antigo aparece — nunca os dois. */
+  const m = _inbox.find(x=>x.id===matchId);
+  if(m && window.mostrarMatchGame) mostrarMatchGame(m);
+  else if(window.toast) toast('Combinado! Agora é só jogar e lançar o placar.');
   netAtualizarInbox();
 }
 
@@ -1511,7 +1523,7 @@ async function _farmContar(advId){
 function _farmPts(v){ return v===0 ? 0 : (v>0 ? Math.max(1, Math.round(v*0.25)) : Math.min(-1, Math.round(v*0.25))); }
 function _farmAviso(nome){
   if(!_on || !(_on.nPar >= 4)) return '';
-  return `<div style="margin:10px 0;padding:10px 12px;border-radius:11px;border:1px solid var(--gold);color:var(--gold);font:600 12px system-ui;line-height:1.5">${_on.nPar+1}ª partida contra ${nome} este mês — vale 25% dos Pontos. O Nível conta cheio.</div>`;
+  return `<div style="margin:10px 0;padding:10px 12px;border-radius:11px;border:1px solid var(--gold);color:var(--gold);font:600 12px var(--f-ui);line-height:1.5">${_on.nPar+1}ª partida contra ${nome} este mês — vale 25% dos Pontos. O Nível conta cheio.</div>`;
 }
 
 async function netConfirmar(matchId){
@@ -1849,13 +1861,13 @@ function netFecharInbox(){ const el=document.getElementById('net-inbox'); if(el)
    onde o bloco fica, não o que ele é por dentro. */
 const _wrap = (inner, cartao)=>`<div style="width:100%;max-width:460px;background:var(--sup);border:1px solid var(--linha);
     border-radius:${cartao?'16px':'20px 20px 0 0'};padding:20px 18px ${cartao?'20px':'calc(20px + env(safe-area-inset-bottom))'};color:var(--ink);
-    font-family:system-ui,sans-serif;max-height:${cartao?'88vh':'82vh'};overflow:auto">${inner}</div>`;
+    font-family:var(--f-ui),sans-serif;max-height:${cartao?'88vh':'82vh'};overflow:auto">${inner}</div>`;
 /* `extra` (13/08) sobrescreve o flex pra um botão ocupar a linha inteira —
    é o que separa "Propor outro dia" da dupla Recusar/Aceitar sem espremer
    três rótulos numa fileira só. */
 const _btn = (txt,onclick,tipo,extra)=>`<button onclick="${onclick}" style="flex:1;padding:13px;border-radius:12px;
-    border:1px solid var(--linha2);font:600 14px system-ui;cursor:pointer;
-    background:${tipo==='ok'?'#2C5A00':tipo==='no'?'var(--dn-bg)':'var(--sup2)'};color:#fff;${extra||''}">${txt}</button>`;
+    border:1px solid var(--linha2);font:600 14px var(--f-ui);cursor:pointer;
+    background:${tipo==='ok'?'var(--acc)':tipo==='no'?'var(--dn-bg)':'var(--sup2)'};color:${tipo==='ok'?'var(--acc-ink)':'var(--ink)'};${extra||''}">${txt}</button>`;
 /* 29/08 — `opts.cartao`: a tela CRIAR GRUPOS do board (177:2733) não é folha
    que sobe de baixo. É um CARTÃO no meio da tela, com o fundo à mostra e sem
    blur — dá pra ver a aba Grupos por trás, e é isso que faz ele parecer parte
@@ -1902,7 +1914,7 @@ const _sheet = (id, inner, opts)=>{
    tela. `min-height:0` no meio é o que deixa a lista rolar dentro do flex em
    vez de empurrar o campo de escrever pra fora da viewport. */
 const _wrapCheia = (inner)=>`<div style="width:100%;max-width:460px;background:var(--bg);color:var(--ink);
-    font-family:system-ui,sans-serif;display:flex;flex-direction:column;height:100%;overflow:hidden">${inner}</div>`;
+    font-family:var(--f-ui),sans-serif;display:flex;flex-direction:column;height:100%;overflow:hidden">${inner}</div>`;
 
 function netAbrirInbox(){ _fbPend=null; _fbAberto=null; netRenderInbox(); }
 /* "🗓 sáb 15/08 · 19h" + "📍 Clube Bahiano de Tênis · Quadra 3 — endereço" —
@@ -2182,7 +2194,7 @@ function netRenderInbox(){
     const viva = ['desafiado','aceito','pendente','contestada'].includes(m.status);
     // (51) recado não lido acende o botão — número aqui pode, é contagem de sala
     const nrp = netRecadosDe('partida', m.id);
-    const conversar = viva ? `<button onclick="_net.abrirChatPartida('${m.id}')" title="conversar" style="flex:0 0 auto;padding:11px 13px;border-radius:12px;border:1px solid ${nrp?'var(--up)':'var(--linha2)'};background:none;color:${nrp?'var(--up)':'var(--ink2)'};font:600 13px system-ui;cursor:pointer">💬${nrp?` ${nrp}`:''}</button>` : '';
+    const conversar = viva ? `<button onclick="_net.abrirChatPartida('${m.id}')" title="conversar" style="flex:0 0 auto;padding:11px 13px;border-radius:12px;border:1px solid ${nrp?'var(--up)':'var(--linha2)'};background:none;color:${nrp?'var(--up)':'var(--ink2)'};font:600 13px var(--f-ui);cursor:pointer">💬${nrp?` ${nrp}`:''}</button>` : '';
     return `<div style="border:1px solid var(--linha);border-radius:14px;padding:14px;margin-top:10px">
       <div style="font-size:14px;margin-bottom:${(acoes||conversar)?'12px':'0'}">${txt}</div>
       ${(acoes||conversar)?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">${acoes}${conversar}</div>`:''}</div>`;
@@ -2195,36 +2207,36 @@ function netRenderInbox(){
      `S.jogadores` ainda — o disco com a cor não depende de carregar nada. */
   const _peds = (window.netPedidosAmizade ? netPedidosAmizade() : []);
   const pedidosH = !_peds.length ? '' :
-    `<div style="font:700 12px system-ui;color:var(--gold);margin:16px 0 2px;text-transform:uppercase;letter-spacing:.08em">Pedidos de amizade</div>`
+    `<div style="font:700 12px var(--f-ui);color:var(--gold);margin:16px 0 2px;text-transform:uppercase;letter-spacing:.08em">Pedidos de amizade</div>`
     + _peds.map(p=>`<div style="display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--sup2)">
         ${_discoUid(p.de, 28)}
         <div style="flex:1;min-width:0">
           <b>${_nomeDe(p.de)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.de)}</span>
           <div style="font-size:11px;color:var(--ink2)">quer ser seu amigo — amigos se desafiam em qualquer classe</div>
         </div>
-        <button onclick="_net.recusarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 12px system-ui;cursor:pointer">Recusar</button>
-        <button onclick="_net.aceitarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>
+        <button onclick="_net.recusarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Recusar</button>
+        <button onclick="_net.aceitarAmizade('${p.de}')" style="padding:7px 11px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Aceitar</button>
       </div>`).join('');
 
   /* 01/09 (node 64:360) — NOTIFICAÇÕES É TELA CHEIA, não folha de 82vh.
      O Figma desenha a lista ocupando de y=245 a y=1500, com barra superior
      própria e a barra de navegação visível embaixo. O app abria uma folha que
      subia de baixo e cobria tudo.
-     A barra do topo segue o node: faixa #0a1100 com fio de 1px na base e a
+     A barra do topo segue o node: faixa var(--acc-ink) com fio de 1px na base e a
      SETA CIRCULAR de voltar à esquerda — o Figma não tem título escrito nem
      botão ×, a saída é a seta. O rótulo fica como "Notificações", que é o nome
      da tela no board (o app dizia "Suas partidas").
      ⚠️ O modo `cheia` já existia, criado em 29/08 para as telas de CHATS, e é o
      mesmo aqui — não precisou de mecanismo novo. */
-  const topo = `<div style="position:sticky;top:0;z-index:2;background:#0a1100;
+  const topo = `<div style="position:sticky;top:0;z-index:2;background:var(--acc-ink);
       border-bottom:1px solid rgba(255,254,253,.10);
       display:flex;align-items:center;gap:12px;
       padding:max(10px,env(safe-area-inset-top)) var(--pad-lado) 12px">
       <button onclick="_net.fecharInbox()" aria-label="Voltar"
         style="width:38px;height:38px;flex:0 0 38px;border-radius:50%;cursor:pointer;
                border:1px solid rgba(188,188,188,.45);background:transparent;
-               color:#fffefd;font:400 18px var(--f-ui);line-height:1">‹</button>
-      <div style="font:700 var(--t-title-l) var(--f-ui);color:#fffefd">Notificações</div>
+               color:var(--ink);font:400 18px var(--f-ui);line-height:1">‹</button>
+      <div style="font:700 var(--t-title-l) var(--f-ui);color:var(--ink)">Notificações</div>
     </div>`;
   _sheet('net-inbox',
     `${topo}<div style="padding:14px var(--pad-lado) 24px">${pedidosH}${linhas}${_fbSecao()}</div>`,
@@ -2300,12 +2312,12 @@ function _fbCard(m){
   const adv = (typeof _advId==='function') ? _advId(m) : null;
   const nome = adv ? _nomeDe(adv) : 'seu adversário';
   const quando = m.quando ? new Date(m.quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
-  const bt=(t,js,cor)=>`<button onclick="${js}" style="flex:1;padding:11px 8px;border-radius:12px;cursor:pointer;font:700 13px system-ui;border:1px solid ${cor||'var(--linha2)'};background:${cor?'rgba(131,224,0,.12)':'var(--sup)'};color:${cor||'var(--ink)'}">${t}</button>`;
+  const bt=(t,js,cor)=>`<button onclick="${js}" style="flex:1;padding:11px 8px;border-radius:12px;cursor:pointer;font:700 13px var(--f-ui);border:1px solid ${cor||'var(--linha2)'};background:${cor?'rgba(131,224,0,.12)':'var(--sup)'};color:${cor||'var(--ink)'}">${t}</button>`;
   const motivos = _FB_MOTIVOS.map(([v,t])=>
-    `<button onclick="_net.fbResponder('${m.id}','nao',{motivo:'${v}'})" style="width:100%;text-align:left;padding:10px 12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:500 12.5px system-ui;cursor:pointer;margin-top:6px">${t}</button>`).join('');
+    `<button onclick="_net.fbResponder('${m.id}','nao',{motivo:'${v}'})" style="width:100%;text-align:left;padding:10px 12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:500 12.5px var(--f-ui);cursor:pointer;margin-top:6px">${t}</button>`).join('');
   const aberto = _fbAberto === m.id;
   return `<div style="background:var(--sup);border:1px solid var(--linha);border-radius:14px;padding:13px;margin-top:9px">
-      <div style="font:700 13.5px system-ui">O jogo com ${nome} aconteceu?</div>
+      <div style="font:700 13.5px var(--f-ui)">O jogo com ${nome} aconteceu?</div>
       <div style="font-size:11.5px;color:var(--ink3);margin-top:3px">Estava marcado pra ${quando}. Isso não mexe em nada do seu ranking — é só pra gente saber onde dá pra jogar de verdade.</div>
       ${aberto
         ? `<div style="margin-top:10px"><div style="font-size:11px;color:var(--ink3)">O que atrapalhou?</div>${motivos}</div>`
@@ -2329,7 +2341,7 @@ function _fbSecao(){
   /* NO MÁXIMO UM POR VEZ. Três cards de "como foi?" empilhados viram
      formulário, e formulário na caixa de recados ninguém responde. */
   return `<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--linha)">
-      <div style="font:700 10px system-ui;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)">Como foi?</div>
+      <div style="font:700 10px var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)">Como foi?</div>
       ${_fbCard(_fbPend[0])}
     </div>`;
 }
@@ -2366,7 +2378,7 @@ function _linhaPlacares(rotulo, inverte){
   const bts = _PLACARES.map(s=>{
     const [a,b] = s.split('-');
     const v = inverte ? `${b}-${a}` : s;
-    return `<button onclick="_net.addSet('${v}')" style="flex:1;min-width:0;padding:9px 0;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 12px system-ui;cursor:pointer">${v}</button>`;
+    return `<button onclick="_net.addSet('${v}')" style="flex:1;min-width:0;padding:9px 0;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:700 12px var(--f-ui);cursor:pointer">${v}</button>`;
   }).join('');
   return `<div style="font-size:11px;color:var(--ink2);margin:10px 0 5px">${rotulo}</div>
     <div style="display:flex;gap:5px">${bts}</div>`;
@@ -2401,7 +2413,7 @@ function netRenderOnline(){
     const teto  = new Date(agora.getTime() + 90*864e5);
     const atalhos = _atalhosQuando().map(a=>`
       <button type="button" onclick="_net.onQuandoAtalho('${_fmtLocal(a.d)}')"
-        style="flex:1;padding:9px 6px;border-radius:10px;font:600 12px system-ui;cursor:pointer;
+        style="flex:1;padding:9px 6px;border-radius:10px;font:600 12px var(--f-ui);cursor:pointer;
                border:1px solid ${qv===_fmtLocal(a.d)?'var(--lime)':'var(--linha2)'};
                background:${qv===_fmtLocal(a.d)?'rgba(131,224,0,.12)':'transparent'};
                color:${qv===_fmtLocal(a.d)?'var(--lime)':'var(--ink2)'}">${a.rot}</button>`).join('');
@@ -2418,7 +2430,7 @@ function netRenderOnline(){
       <div style="display:flex;gap:6px;margin-bottom:8px">${atalhos}</div>
       <input type="datetime-local" value="${qv}" onchange="_net.onQuando(this.value)"
         min="${_fmtLocal(agora)}" max="${_fmtLocal(teto)}"
-        style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:#fff;font:600 14px system-ui;color-scheme:dark;
+        style="width:100%;padding:12px;border-radius:12px;background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);color-scheme:dark;
                border:1px solid ${qv?'var(--linha2)':'var(--dn)'}"/>
       <div style="height:12px"></div>`;
     // 📍 da partida: nasce com o local principal do desafiante, dá pra trocar
@@ -2436,22 +2448,22 @@ function netRenderOnline(){
       <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">${rotulo} <span style="color:var(--ink3)">(opcional)</span></div>
       <div style="display:flex;gap:8px">
         ${[['eu','Eu'],['ele',_on.adv.nome.split(' ')[0]]].map(([v,n])=>
-          `<button onclick="_net.${fn}('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${atual===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('')}
+          `<button onclick="_net.${fn}('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px var(--f-ui);cursor:pointer;background:${atual===v?'var(--acc)':'var(--sup2)'};color:${atual===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('')}
       </div>`;
     const qpH = _par('quadra', _on.quadraPor, 'onQuadraPor', '🏟 Quem reserva a quadra');
     const bpH = _par('bola',   _on.bolaPor,   'onBolaPor',   '🎾 Quem leva a bola');
     const locH = ls.length ? `
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">📍 Onde</div>
-      <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+      <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)">
         <option value="" ${!_on.localId?'selected':''}>A combinar</option>
         ${ls.map(l=>`<option value="${l.id}" ${_on.localId===l.id?'selected':''}>${l.nome}</option>`).join('')}
       </select>
       ${_endLinha(lSel)}
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
-        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:8px">`:''}
       ${lSel?qpH:''}
       <div style="height:14px"></div>` : '';
-    body = `<div style="font:700 17px system-ui;margin-bottom:2px">${ehContra?`Propor outro combinado`:`Desafiar ${_on.adv.nome}`}</div>
+    body = `<div style="font:700 17px var(--f-ui);margin-bottom:2px">${ehContra?`Propor outro combinado`:`Desafiar ${_on.adv.nome}`}</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">${ehContra
         ? `${_on.adv.nome.split(' ')[0]} recebe a proposta e aceita (ou propõe de volta). Dá pra ir e voltar até três vezes — depois é aceitar ou deixar pra lá.${_on.rodadas?` <b>${_on.rodadas} de 3 já foram.</b>`:''}`
         : `Ele recebe o desafio e aceita (ou recusa) no app dele. Depois de aceito é que vocês lançam o placar.`}</div>
@@ -2498,41 +2510,41 @@ function netRenderOnline(){
       // o que o banco vai creditar, não o cheio. O Nível não é tocado.
       const ptsM = _on.nPar>=4 ? _farmPts(c.dPts) : c.dPts;
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:12px 0">
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${ptsM>=0?'var(--up)':'var(--dn)'}">${ptsM>0?'+':''}${ptsM}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
+        <div style="text-align:center"><div style="font:700 20px var(--f-ui);color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
+        <div style="text-align:center"><div style="font:700 20px var(--f-ui);color:${ptsM>=0?'var(--up)':'var(--dn)'}">${ptsM>0?'+':''}${ptsM}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
+        <div style="text-align:center"><div style="font:700 20px var(--f-ui)">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
       </div>${(!c.zebra && venceu && _on.zebraJa && faixa(advNivel)>faixa(meuN))?'<p style="text-align:center;color:var(--ink3);font-size:12px">Zebra já usada contra ele nesta temporada — pontos na base.</p>':''}`;
     }
-    body=`<div style="font:700 17px system-ui;margin-bottom:2px">Lançar na mão</div>
+    body=`<div style="font:700 17px var(--f-ui);margin-bottom:2px">Lançar na mão</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">Partida jogada fora do app. ${_on.advId?_nomeDe(_on.advId).split(' ')[0]+' recebe o placar e':'O adversário recebe o placar e'} confirma no app dele — com o mesmo prazo de 72h. Não vai contar em circuito aberto, só nas fechadas.</div>
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">Contra quem</div>
-      <select onchange="_net.maoAdv(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+      <select onchange="_net.maoAdv(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)">
         <option value="" ${!_on.advId?'selected':''}>Escolher…</option>
         ${eleg.map(u=>`<option value="${u}" ${_on.advId===u?'selected':''}>${_nomeDe(u)}${netEhAmigo(u)?' · amigo':''}</option>`).join('')}
       </select>
       <div style="font-size:11px;color:var(--ink3);margin-top:4px">Amigo em qualquer classe; fora isso, a mesma janela de ±1 classe do radar.</div>
       ${_on.advId ? _farmAviso(_nomeDe(_on.advId).split(' ')[0]) : ''}
       <div style="display:flex;gap:8px;margin-top:10px">
-        ${[['md3','Melhor de 3'],['set','Set único']].map(([v,n])=>`<button onclick="_net.maoFmt('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_on.fmt===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('')}
+        ${[['md3','Melhor de 3'],['set','Set único']].map(([v,n])=>`<button onclick="_net.maoFmt('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px var(--f-ui);cursor:pointer;background:${_on.fmt===v?'var(--acc)':'var(--sup2)'};color:${_on.fmt===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('')}
       </div>
       <div style="height:12px"></div>
       ${_on.advId ? _duplaBloco(_nomeDe(_on.advId).split(' ')[0],
           `O jogo já aconteceu, então não há o que combinar: ${_nomeDe(_on.advId).split(' ')[0]} confirma o placar pelos dois. O Nível de duplas dos quatro mexe junto.`) : ''}
       <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Placar — seus games primeiro. Ex: <b>6-3 6-4</b></div>
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
-        style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 17px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+        style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 17px var(--f-ui);text-align:center;letter-spacing:.05em" autocomplete="off"/>
       ${previa}
       <div style="font-size:12px;color:var(--ink2);margin:10px 0 6px">🗓 Quando foi <span style="color:var(--ink3)">(opcional)</span></div>
       <input type="datetime-local" value="${qvm}" max="${new Date().toISOString().slice(0,16)}" onchange="_net.onQuando(this.value)"
-        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;color-scheme:dark"/>
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);color-scheme:dark"/>
       ${ls.length?`<div style="font-size:12px;color:var(--ink2);margin:10px 0 6px">📍 Onde <span style="color:var(--ink3)">(opcional)</span></div>
-      <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+      <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)">
         <option value="" ${!_on.localId?'selected':''}>Não lembro / outro lugar</option>
         ${ls.map(l=>`<option value="${l.id}" ${_on.localId===l.id?'selected':''}>${l.nome}</option>`).join('')}
       </select>
       ${_endLinha(lSel)}
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
-        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:8px">`:''}`:''}
+        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:8px">`:''}`:''}
       <div style="display:flex;gap:8px;margin-top:14px">${_btn('Cancelar','_net.fechar()')}${(_on.sets&&_on.advId)?_btn('Lançar placar','_net.maoEnviar()','ok'):''}</div>`;
   }
   else if(_on.step==='placar'){
@@ -2565,19 +2577,19 @@ function netRenderOnline(){
       // da 5ª do mês, Nível intacto. Prévia que mostra o cheio aqui mente.
       const ptsP = _on.nPar>=4 ? _farmPts(c.dPts) : c.dPts;
       previa=`<div style="display:flex;gap:14px;justify-content:center;margin:14px 0">
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui;color:${ptsP>=0?'var(--up)':'var(--dn)'}">${ptsP>0?'+':''}${ptsP}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
-        <div style="text-align:center"><div style="font:700 20px system-ui">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
+        <div style="text-align:center"><div style="font:700 20px var(--f-ui);color:${c.dNivel>=0?'var(--up)':'var(--dn)'}">${c.dNivel>0?'+':''}${c.dNivel}</div><div style="font-size:10px;color:var(--ink2)">${_on.dupla?'NÍVEL DE DUPLAS':'NÍVEL'}</div></div>
+        <div style="text-align:center"><div style="font:700 20px var(--f-ui);color:${ptsP>=0?'var(--up)':'var(--dn)'}">${ptsP>0?'+':''}${ptsP}</div><div style="font-size:10px;color:var(--ink2)">PONTOS</div></div>
+        <div style="text-align:center"><div style="font:700 20px var(--f-ui)">${venceu?'Vitória':'Derrota'}</div><div style="font-size:10px;color:var(--ink2)">RESULTADO</div></div>
       </div>${c.zebra?'<p style="text-align:center;color:var(--up);font-size:12px">Zebra — multiplicador nos pontos.</p>':''}${(!c.zebra && venceu && _on.zebraJa && faixa(advNivel)>faixa(meuN))?'<p style="text-align:center;color:var(--ink3);font-size:12px">Zebra já usada contra ele nesta temporada — pontos na base.</p>':''}`;
     }
-    body=`<div style="font:700 17px system-ui;margin-bottom:2px">Placar vs ${_on.adv.nome}</div>
+    body=`<div style="font:700 17px var(--f-ui);margin-bottom:2px">Placar vs ${_on.adv.nome}</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Seus games primeiro. Toque nos sets ou digite.</div>
       ${_farmAviso(_on.adv.nome.split(' ')[0])}
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
-        style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+        style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 18px var(--f-ui);text-align:center;letter-spacing:.05em" autocomplete="off"/>
       ${_linhaPlacares('Set que VOCÊ ganhou', false)}
       ${_linhaPlacares('Set que você PERDEU', true)}
-      ${(_on.placarTxt||'').trim() ? `<button onclick="_net.tiraSet()" style="width:100%;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--linha2);background:none;color:var(--ink2);font:600 12px system-ui;cursor:pointer">← apagar o último set</button>` : ''}
+      ${(_on.placarTxt||'').trim() ? `<button onclick="_net.tiraSet()" style="width:100%;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--linha2);background:none;color:var(--ink2);font:600 12px var(--f-ui);cursor:pointer">← apagar o último set</button>` : ''}
       ${previa}
       <div style="display:flex;gap:8px;margin-top:8px">${_btn('Voltar','_net.fechar()')}${sets?_btn('Enviar placar','_net.enviar()','ok'):''}</div>`;
   }
@@ -2586,12 +2598,12 @@ function netRenderOnline(){
     let previa='';
     if(sets){
       let g=0,p=0; sets.forEach(([a,b])=>{ if(a>b)g++; else if(b>a)p++; });
-      previa=`<div style="text-align:center;font:700 16px system-ui;margin:14px 0;color:${g===p?'var(--dn)':'var(--up)'}">${g===p?'Placar empatado — confira':(g>p?nA:nB)+' venceu'}</div>`;
+      previa=`<div style="text-align:center;font:700 16px var(--f-ui);margin:14px 0;color:${g===p?'var(--dn)':'var(--up)'}">${g===p?'Placar empatado — confira':(g>p?nA:nB)+' venceu'}</div>`;
     }
-    body=`<div style="font:700 17px system-ui;margin-bottom:2px">Placar do organizador</div>
+    body=`<div style="font:700 17px var(--f-ui);margin-bottom:2px">Placar do organizador</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:10px"><b>${nA}</b> × ${nB} — games de <b>${nA}</b> primeiro. Ex: <b>6-3 6-4</b></div>
       <input id="net-sc" value="${_on.placarTxt||''}" oninput="_net.digitou(this.value)" placeholder="6-3 6-4"
-        style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 18px system-ui;text-align:center;letter-spacing:.05em" autocomplete="off"/>
+        style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 18px var(--f-ui);text-align:center;letter-spacing:.05em" autocomplete="off"/>
       ${previa}
       <div style="display:flex;gap:8px;margin-top:8px">${_btn('Voltar','_net.fechar()')}${sets?_btn('Confirmar placar','_net.orgEnviar()','ok'):''}</div>
       <div style="font-size:11px;color:var(--ink3);margin-top:10px;text-align:center">Vale na hora, sem confirmação dos jogadores. Fica registrado que o organizador lançou.</div>`;
@@ -2634,19 +2646,19 @@ function netRenderBusca(){
         <div style="font-size:11px;color:var(--ink2)">Classe ${div} · Nível ${p.nivel}${amigo?' · <span style="color:var(--up)">✔ amigo</span>':''}</div></div>
       <div style="display:flex;flex-direction:column;gap:5px">
         ${amigo?''
-          : mePediu?`<button onclick="_net.aceitarAmizade('${p.id}')" style="padding:7px 10px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>`
-          : jaPedi?`<div style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink3);font:600 12px system-ui;text-align:center">⏳ pedido enviado</div>`
-          : `<button onclick="_net.addAmigo('${p.id}','${nomeEsc}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer">Pedir amizade</button>`}
-        <button onclick="_net.desafiarUid('${p.id}','${nomeEsc}',${p.nivel},${p.nivelb||1200})" style="padding:7px 10px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Desafiar</button>
+          : mePediu?`<button onclick="_net.aceitarAmizade('${p.id}')" style="padding:7px 10px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Aceitar</button>`
+          : jaPedi?`<div style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink3);font:600 12px var(--f-ui);text-align:center">⏳ pedido enviado</div>`
+          : `<button onclick="_net.addAmigo('${p.id}','${nomeEsc}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Pedir amizade</button>`}
+        <button onclick="_net.desafiarUid('${p.id}','${nomeEsc}',${p.nivel},${p.nivelb||1200})" style="padding:7px 10px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Desafiar</button>
       </div></div>`;
   }).join('') || (_busca.termo?`<p style="color:var(--ink2);font-size:13px;margin-top:12px">Ninguém encontrado por “${_busca.termo}”.</p>`:'');
   _sheet('net-busca', `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font:700 17px system-ui">Buscar amigos</div>
+      <div style="font:700 17px var(--f-ui)">Buscar amigos</div>
       <button onclick="_net.fecharBusca()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Por nome, email ou ID (o seu é ${netId(MEU_UID)}). Amigo você desafia em qualquer classe.</div>
     <input id="net-bq" value="${_busca.termo}" oninput="_net.buscar(this.value)" placeholder="nome, email ou #ID"
-      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="off"/>
-    <button onclick="_net.convidarAmigo()" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Convidar amigo por link</button>
+      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui)" autocomplete="off"/>
+    <button onclick="_net.convidarAmigo()" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:10px">🔗 Convidar amigo por link</button>
     <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:5px">Manda no WhatsApp — quem abrir te manda um pedido de amizade.</div>
     ${linhas}`);
   const bq=document.getElementById('net-bq'); if(bq){ bq.focus(); bq.setSelectionRange(bq.value.length,bq.value.length); }
@@ -3003,8 +3015,8 @@ async function netAbrirGrupos(){
     if(fora){
       const st=pedido[g.id];
       acao = st==='pendente' ? '<span style="color:var(--gold);font-size:11px">pedido enviado</span>'
-        : st==='recusado' ? `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 11px system-ui;cursor:pointer">Não rolou · pedir de novo</button>`
-        : `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Pedir pra entrar</button>`;
+        : st==='recusado' ? `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 11px var(--f-ui);cursor:pointer">Não rolou · pedir de novo</button>`
+        : `<button onclick="event.stopPropagation();_net.pedirEntrar('${g.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Pedir pra entrar</button>`;
     }
     return `<div onclick="_net.verGrupo('${g.id}')" style="display:flex;align-items:center;gap:11px;padding:13px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;cursor:pointer">
       <div style="width:34px;height:34px;border-radius:9px;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px">▣</div>
@@ -3013,16 +3025,16 @@ async function netAbrirGrupos(){
       ${acao}</div>`;
   };
   const meusH = meus.length? meus.map(g=>card(g,false)).join('') : `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Você ainda não está em nenhuma comunidade.</p>`;
-  const abH = abertos.length? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Comunidades abertas</div>`+abertos.map(g=>card(g,true)).join('') : '';
+  const abH = abertos.length? `<div style="font:700 12px var(--f-ui);color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Comunidades abertas</div>`+abertos.map(g=>card(g,true)).join('') : '';
   _sheet('net-comunidades', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Comunidades</div>
+      <div style="font:700 17px var(--f-ui)">Comunidades</div>
       <button onclick="_net.fecharGrupos()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     ${_quemSou()}
-    <button onclick="_net.criarGrupo()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 14px system-ui;cursor:pointer;margin-top:10px">+ Criar comunidade</button>
+    <button onclick="_net.criarGrupo()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:10px">+ Criar comunidade</button>
     <input oninput="_net.buscarGrupos(this.value)" placeholder="Buscar comunidade pelo nome (achou, pede pra entrar)"
-      style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:10px" autocomplete="off"/>
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:10px" autocomplete="off"/>
     <div id="gg-res"></div>
-    <div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Suas comunidades</div>
+    <div style="font:700 12px var(--f-ui);color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Suas comunidades</div>
     ${meusH}${abH}`);
 }
 function netFecharGrupos(){ const el=document.getElementById('net-comunidades'); if(el) el.remove(); }
@@ -3469,25 +3481,25 @@ async function _cinturaoTentarPassar(m){
      dois é enfeite, e sumir com eles seria trocar função por semelhança. */
 function netCriarGrupoUI(){
   _gnew = _gnew || { nome:'', regras:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', aberto:false };
-  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid ${_gnew[campo]==v?'var(--acc)':'var(--linha2)'};font:600 13px system-ui;cursor:pointer;background:${_gnew[campo]==v?'var(--acc)':'var(--sup2)'};color:${_gnew[campo]==v?'var(--acc-ink)':'#fff'}">${n}</button>`).join('');
+  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid ${_gnew[campo]==v?'var(--acc)':'var(--linha2)'};font:600 13px var(--f-ui);cursor:pointer;background:${_gnew[campo]==v?'var(--acc)':'var(--sup2)'};color:${_gnew[campo]==v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
   _sheet('net-gnew', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Criar grupo</div>
+      <div style="font:700 17px var(--f-ui)">Criar grupo</div>
       <button onclick="_net.fecharGnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Nome do grupo</div>
-    <input id="gn-nome" value="${(_gnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.gset('nome',this.value)" maxlength="60" placeholder="Panela do sábado" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="off"/>
+    <input id="gn-nome" value="${(_gnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.gset('nome',this.value)" maxlength="60" placeholder="Panela do sábado" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui)" autocomplete="off"/>
 
     <div style="display:flex;gap:10px;margin-top:16px;align-items:flex-start">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Foto de capa</div>
         <div style="aspect-ratio:1/1;border:1px dashed var(--marca);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center">
-          <div style="font:300 26px/1 system-ui;color:var(--marca)">+</div>
-          <div style="font:600 9px system-ui;color:var(--marca);letter-spacing:.06em">SEM DADO REAL</div>
+          <div style="font:300 26px/1 var(--f-ui);color:var(--marca)">+</div>
+          <div style="font:600 9px var(--f-ui);color:var(--marca);letter-spacing:.06em">SEM DADO REAL</div>
         </div>
         <div style="font-size:10px;color:var(--ink3);margin-top:5px;line-height:1.4">Foto de grupo depende de Storage, que o app ainda não tem. O cartão usa a inicial do nome até lá.</div>
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Descrição do grupo</div>
-        <textarea oninput="_net.gset('regras',this.value)" maxlength="400" rows="5" placeholder="Como funciona: dia, quadra, quem entra." style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:400 12.5px/1.5 system-ui;resize:none;box-sizing:border-box">${(_gnew.regras||'').replace(/</g,'&lt;')}</textarea>
+        <textarea oninput="_net.gset('regras',this.value)" maxlength="400" rows="5" placeholder="Como funciona: dia, quadra, quem entra." style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:400 12.5px/1.5 var(--f-ui);resize:none;box-sizing:border-box">${(_gnew.regras||'').replace(/</g,'&lt;')}</textarea>
         <div style="font-size:12px;color:var(--ink2);margin:15px 0 6px">Privacidade</div>
         <div style="display:flex;gap:7px">${seg('aberto',[[true,'Público'],[false,'Privado']])}</div>
       </div>
@@ -3495,11 +3507,11 @@ function netCriarGrupoUI(){
 
     <div style="font-size:11px;color:var(--ink3);margin-top:14px">Público = aparece na lista e qualquer um pode <b>pedir</b> pra entrar; você aprova. Privado = só entra pelo link de convite.</div>
     <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Link de convite</div>
-    <input disabled value="gerado depois de criar o grupo" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha);background:var(--sup);color:var(--ink3);font:600 13px system-ui;box-sizing:border-box"/>
+    <input disabled value="gerado depois de criar o grupo" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha);background:var(--sup);color:var(--ink3);font:600 13px var(--f-ui);box-sizing:border-box"/>
     <div style="font-size:11px;color:var(--ink3);margin-top:5px">O link carrega o id do grupo — ele só existe depois que o grupo existe. Está no detalhe, em "Copiar link de convite".</div>
     <div style="font-size:12px;color:var(--ink2);margin:16px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
     ${(_locais&&_locais.length)?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">📍 Onde joga <span style="color:var(--ink3)">(opcional)</span></div>
-    <select onchange="_net.gset('local_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">
+    <select onchange="_net.gset('local_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)">
       <option value="" ${!_gnew.local_id?'selected':''}>Sem casa fixa</option>
       ${_locais.map(l=>`<option value="${l.id}" ${_gnew.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
     </select>`:''}
@@ -3508,7 +3520,7 @@ function netCriarGrupoUI(){
             `pe` do _sheet e não no corpo. 51% da largura: cheio ele lê como
             "salvar formulário"; estreito e centrado lê como o ato que fecha a
             tela. */
-         pe:`<button onclick="_net.gcriar()" style="width:51%;min-width:200px;padding:11px 0;border-radius:var(--rp);border:none;background:var(--marca);color:var(--marca-ink);font:700 14px system-ui;cursor:pointer;margin-top:12px">Criar novo grupo</button>` });
+         pe:`<button onclick="_net.gcriar()" style="width:51%;min-width:200px;padding:11px 0;border-radius:var(--rp);border:none;background:var(--marca);color:var(--marca-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:12px">Criar novo grupo</button>` });
   const el=document.getElementById('gn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
 /* os campos de TEXTO não repintam a folha: repintar a cada tecla recria o
@@ -3615,9 +3627,9 @@ async function netVerGrupo(gid){
     let acoes='';
     if(p.player_id!==MEU_UID && !ehDono){
       if(souDono) acoes += p.papel==='admin'
-        ? `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','membro')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px system-ui;cursor:pointer">tirar admin</button>`
-        : `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','admin')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px system-ui;cursor:pointer">virar admin</button>`;
-      if(souGestor && p.papel!=='admin') acoes += ` <button onclick="_net.removerMembro('${gid}','${p.player_id}')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink2);font:600 10px system-ui;cursor:pointer">remover</button>`;
+        ? `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','membro')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px var(--f-ui);cursor:pointer">tirar admin</button>`
+        : `<button onclick="_net.mudarPapel('${gid}','${p.player_id}','admin')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink2);font:600 10px var(--f-ui);cursor:pointer">virar admin</button>`;
+      if(souGestor && p.papel!=='admin') acoes += ` <button onclick="_net.removerMembro('${gid}','${p.player_id}')" style="padding:5px 8px;border-radius:8px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink2);font:600 10px var(--f-ui);cursor:pointer">remover</button>`;
     }
     /* as colunas da 39. `st` ausente é gente que nunca teve partida confirmada
        neste esporte — a linha diz só pontos e Nível, como sempre disse, em vez
@@ -3631,7 +3643,7 @@ async function netVerGrupo(gid){
       ? `<div style="font-size:11px;color:var(--ink2)"><b style="color:var(--up)">${st.vitorias}V</b> <b style="color:var(--dn)">${st.derrotas}D</b> · games ${st.sets_pro>=st.sets_contra?'+':''}${st.sets_pro-st.sets_contra}${ultimas}</div>`
       : '';
     return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
-      <div style="width:22px;text-align:center;font:700 12px system-ui;color:${i===0?'var(--gold)':'var(--ink2)'};flex:0 0 22px">${i+1}º</div>
+      <div style="width:22px;text-align:center;font:700 12px var(--f-ui);color:${i===0?'var(--gold)':'var(--ink2)'};flex:0 0 22px">${i+1}º</div>
       ${_discoUid(p.player_id, 28)}
       <div style="flex:1;min-width:0"><b>${_nomeDe(p.player_id)}</b>
         ${ehDono?'<span style="color:var(--gold);font-size:11px"> dono</span>':p.papel==='admin'?'<span style="color:var(--up);font-size:11px"> admin</span>':''}
@@ -3645,11 +3657,11 @@ async function netVerGrupo(gid){
     const ps=(await sb.from('grupo_pedidos').select('player_id,estado').eq('grupo_id',gid).eq('estado','pendente')).data||[];
     if(ps.length){
       if(window.aplicarJogadoresReais && ps.some(p=>!S.jogadores[_chaveLocal(p.player_id)])){ try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){} }
-      pedidosH = `<div style="font:700 12px system-ui;color:var(--gold);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">Pedidos pra entrar</div>`
+      pedidosH = `<div style="font:700 12px var(--f-ui);color:var(--gold);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">Pedidos pra entrar</div>`
         + ps.map(p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
             <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.player_id)}</span></div>
-            <button onclick="_net.aceitarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Aceitar</button>
-            <button onclick="_net.recusarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 12px system-ui;cursor:pointer">Recusar</button>
+            <button onclick="_net.aceitarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Aceitar</button>
+            <button onclick="_net.recusarPedido('${gid}','${p.player_id}')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Recusar</button>
           </div>`).join('')
         + `<div style="font-size:11px;color:var(--ink3);margin-top:6px">Recusar não custa nada — quem pediu só vê que não rolou, sem aviso nem motivo.</div>`;
     }
@@ -3660,20 +3672,20 @@ async function netVerGrupo(gid){
     const pd=(await sb.from('grupo_pedidos').select('estado').eq('grupo_id',gid).eq('player_id',MEU_UID).maybeSingle()).data;
     entrar = (pd&&pd.estado==='pendente')
       ? `<div style="text-align:center;color:var(--gold);font-size:13px;margin-top:14px">Pedido enviado — aguardando o gestor aprovar.</div>`
-      : `<button onclick="_net.pedirEntrar('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">${(pd&&pd.estado==='recusado')?'Não rolou · pedir de novo':'Pedir pra entrar'}</button>`;
+      : `<button onclick="_net.pedirEntrar('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:14px">${(pd&&pd.estado==='recusado')?'Não rolou · pedir de novo':'Pedir pra entrar'}</button>`;
   }
   /* 18/08 (mig 37): a conversa. Vem ANTES dos patches de propósito — é o que
      traz a pessoa de volta à comunidade no dia em que ela não jogou, e a folha
      se lê de cima pra baixo. Só membro vê o botão porque só membro atravessa a
      policy: oferecer a porta pra quem a fechadura vai negar é oferecer um erro. */
   const nrec = netRecadosDe('grupo', gid);   // (51) "· N novas" traz de volta quem não jogou
-  const chatBtn = meu ? `<button onclick="_net.abrirChat('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid ${nrec?'var(--up)':'var(--linha2)'};background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:14px">💬 Conversa da comunidade${nrec?` · <b style="color:var(--up)">${nrec} nova${nrec===1?'':'s'}</b>`:''}</button>` : '';
+  const chatBtn = meu ? `<button onclick="_net.abrirChat('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid ${nrec?'var(--up)':'var(--linha2)'};background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:14px">💬 Conversa da comunidade${nrec?` · <b style="color:var(--up)">${nrec} nova${nrec===1?'':'s'}</b>`:''}</button>` : '';
   // patches da comunidade (migração 22) — todo membro cria e manda
-  const patchesBtn = meu ? `<button onclick="_net.abrirPatches('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">◈ Patches da comunidade — criar e mandar</button>` : '';
-  const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
-  const link = souGestor ? `<button onclick="_net.copiarLinkGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
+  const patchesBtn = meu ? `<button onclick="_net.abrirPatches('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:10px">◈ Patches da comunidade — criar e mandar</button>` : '';
+  const sair = (meu && !souDono) ? `<button onclick="_net.sairGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:14px">Sair da comunidade</button>` : '';
+  const link = souGestor ? `<button onclick="_net.copiarLinkGrupo('${gid}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
     <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">O link é o seu convite: quem abrir entra direto, sem pedido.</div>
-    ${souDono?`<button onclick="_net.revogarLink('${gid}')" style="width:100%;padding:10px;border-radius:11px;border:none;background:none;color:var(--ink2);font:600 12px system-ui;cursor:pointer;margin-top:4px;text-decoration:underline">Revogar link (o antigo para de funcionar)</button>`:''}` : '';
+    ${souDono?`<button onclick="_net.revogarLink('${gid}')" style="width:100%;padding:10px;border-radius:11px;border:none;background:none;color:var(--ink2);font:600 12px var(--f-ui);cursor:pointer;margin-top:4px;text-decoration:underline">Revogar link (o antigo para de funcionar)</button>`:''}` : '';
   /* ---- cinturão ----
      O reinado só significa alguma coisa se estiver na cara: quem tem, há
      quanto tempo e quantas defesas. Regra que só existe no documento não muda
@@ -3698,7 +3710,7 @@ async function netVerGrupo(gid){
         border-radius:12px;border:1px solid ${est.congelado?'var(--linha2)':'var(--gold-bg)'};background:${est.congelado?'var(--sup)':'var(--gold-bg)'}">
       <div style="font-size:26px;line-height:1;flex:0 0 auto;filter:${est.congelado?'grayscale(1) opacity(.6)':'none'}">🥇</div>
       <div style="flex:1;min-width:0">
-        <div style="font:700 13px system-ui;color:${selo}">${souEu?'Você tem o cinturão':_nomeDe(est.dono)}</div>
+        <div style="font:700 13px var(--f-ui);color:${selo}">${souEu?'Você tem o cinturão':_nomeDe(est.dono)}</div>
         <div style="font-size:11px;color:var(--ink2);margin-top:2px">${etiqueta}</div>
       </div></div>
       <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">
@@ -3706,11 +3718,11 @@ async function netVerGrupo(gid){
         ${est.congelado?'Aos 30 dias parado o cinturão vai pro 1º da comunidade.':'Parar 14 dias congela o reinado.'}</div>`;
   } else if(g.cinturao){
     cinturaoH = `<div style="margin:12px 0;padding:12px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup)">
-      <div style="font:700 13px system-ui;color:var(--gold)">🥇 Cinturão vago</div>
+      <div style="font:700 13px var(--f-ui);color:var(--gold)">🥇 Cinturão vago</div>
       <div style="font-size:11px;color:var(--ink2);margin-top:3px">Ninguém tem. O gestor precisa entregar pra alguém.</div></div>`;
   } else if(souGestor){
     cinturaoH = `<button onclick="_net.ligarCinturao('${gid}')" style="width:100%;padding:11px;border-radius:11px;
-        border:1px dashed var(--gold-bg);background:var(--sup);color:var(--gold);font:600 13px system-ui;cursor:pointer;margin:12px 0 4px">
+        border:1px dashed var(--gold-bg);background:var(--sup);color:var(--gold);font:600 13px var(--f-ui);cursor:pointer;margin:12px 0 4px">
         🥇 Ligar o cinturão da comunidade</button>
       <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">
         Um por comunidade, no ${g.esporte==='beach'?'beach':'tênis'}. Nasce com você e passa pra quem te vencer.</div>`;
@@ -3721,12 +3733,12 @@ async function netVerGrupo(gid){
   const casaH = (souGestor && _locais && _locais.length) ? `
     <div style="display:flex;align-items:center;gap:8px;margin:0 0 12px">
       <span style="font-size:12px;color:var(--ink2);flex:0 0 auto">📍 Casa</span>
-      <select onchange="_net.gcasa('${gid}',this.value)" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 12px system-ui">
+      <select onchange="_net.gcasa('${gid}',this.value)" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 12px var(--f-ui)">
         <option value="" ${!g.local_id?'selected':''}>Sem casa fixa</option>
         ${_locais.map(l=>`<option value="${l.id}" ${g.local_id===l.id?'selected':''}>${l.nome}</option>`).join('')}
       </select></div>` : '';
   _sheet('net-gver', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">${g.nome}</div>
+      <div style="font:700 17px var(--f-ui)">${g.nome}</div>
       <button onclick="_net.fecharGver()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${g.esporte==='beach'?'Beach':'Tênis'} · ${ms.length} membros · ${g.aberto?'aberto':'fechado'}${g.local_id&&_locNome(g.local_id)?' · 📍 '+_locNome(g.local_id):''}</div>
     ${casaH}
@@ -4531,18 +4543,18 @@ function _propCard(){
        validações que a `contraproposta_por` cobra. Ter dois formulários pro
        mesmo combinado é como eles passam a divergir — foi o que aconteceu com
        a ficha do jogador até 26/08. */
-    return cx(`<div style="font:700 15px system-ui;color:var(--acc)">Preencher proposta de partida</div>
+    return cx(`<div style="font:700 15px var(--f-ui);color:var(--acc)">Preencher proposta de partida</div>
       <div style="font-size:11.5px;color:var(--ink2);margin-top:5px;line-height:1.5">Data, horário, local, simples ou duplas e o tipo de quadra. ${nome0} responde aqui mesmo.</div>
-      <button onclick="_net.abrirContra('${m.id}')" style="width:100%;margin-top:12px;padding:11px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px system-ui;cursor:pointer">Enviar proposta de jogo</button>`);
+      <button onclick="_net.abrirContra('${m.id}')" style="width:100%;margin-top:12px;padding:11px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px var(--f-ui);cursor:pointer">Enviar proposta de jogo</button>`);
   }
 
   if(meu){
     // tela 71:289 — a minha proposta está na mesa
-    return cx(`<div style="font:700 15px system-ui;color:var(--acc)">Proposta de jogo enviada</div>
+    return cx(`<div style="font:700 15px var(--f-ui);color:var(--acc)">Proposta de jogo enviada</div>
       <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">Agora é só aguardar ${nome0} aceitar o desafio.</div>
       ${pin}
       ${_podeContrapor(m) ? `<div style="display:flex;gap:8px;margin-top:12px">
-        <button onclick="_net.abrirContra('${m.id}')" style="flex:1;padding:9px;border-radius:999px;border:1px solid var(--linha2);background:none;color:var(--ink);font:600 12px system-ui;cursor:pointer">Editar proposta</button>
+        <button onclick="_net.abrirContra('${m.id}')" style="flex:1;padding:9px;border-radius:999px;border:1px solid var(--linha2);background:none;color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Editar proposta</button>
       </div>` : ''}`);
   }
 
@@ -4550,11 +4562,11 @@ function _propCard(){
      eles moram no inbox, com o resumo do que está em jogo e a contagem do
      anti-farm. Duplicar o ato de aceitar em duas telas é como as duas passam a
      discordar sobre o que ele faz. */
-  return cx(`<div style="font:700 15px system-ui;color:var(--acc)">${nome0} propôs um jogo</div>
+  return cx(`<div style="font:700 15px var(--f-ui);color:var(--acc)">${nome0} propôs um jogo</div>
     ${pin}
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button onclick="_net.abrirInbox()" style="flex:1;padding:9px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 12px system-ui;cursor:pointer">Ver proposta</button>
-      ${_podeContrapor(m) ? `<button onclick="_net.abrirContra('${m.id}')" style="flex:1;padding:9px;border-radius:999px;border:1px solid var(--linha2);background:none;color:var(--ink);font:600 12px system-ui;cursor:pointer">Propor outro dia</button>` : ''}
+      <button onclick="_net.abrirInbox()" style="flex:1;padding:9px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 12px var(--f-ui);cursor:pointer">Ver proposta</button>
+      ${_podeContrapor(m) ? `<button onclick="_net.abrirContra('${m.id}')" style="flex:1;padding:9px;border-radius:999px;border:1px solid var(--linha2);background:none;color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Propor outro dia</button>` : ''}
     </div>`);
 }
 
@@ -4570,7 +4582,7 @@ function netRenderChat(){
     return `<div style="display:flex;flex-direction:column;align-items:${meu?'flex-end':'flex-start'};margin-top:${mostraNome?'12px':'4px'}">
       ${mostraNome?`<div style="font-size:10.5px;color:var(--ink3);margin:0 0 3px 10px">${_admEsc(_nomeDe(m.autor_id))}</div>`:''}
       <div style="max-width:82%;padding:9px 12px;border-radius:14px;
-                  background:${meu?'#2C5A00':'var(--sup2)'};color:${meu?'#fff':'var(--ink)'};
+                  background:${meu?'var(--acc)':'var(--sup2)'};color:${meu?'var(--acc-ink)':'var(--ink)'};
                   font-size:13.5px;line-height:1.42;word-break:break-word;white-space:pre-wrap">${_admEsc(m.texto)}</div>
       <div style="font-size:10px;color:var(--ink3);margin:3px 8px 0">${_chatHora(m.criado_em)}${
         podeApagar(m)?` · <span onclick="_net.chatApagar('${m.id}')" style="cursor:pointer;text-decoration:underline">apagar</span>`:''}</div>
@@ -4588,8 +4600,8 @@ function netRenderChat(){
     <div style="display:flex;gap:8px;align-items:flex-end">
       <textarea id="net-chat-in" rows="1" maxlength="500" placeholder="${ehPartida?'Tô chegando, atrasei 10, leva bola…':'Enviar mensagem'}"
         oninput="_net.chatDigitou(this.value);this.style.height='auto';this.style.height=Math.min(96,this.scrollHeight)+'px'"
-        style="flex:1;padding:12px 16px;border-radius:999px;border:1px solid var(--linha2);background:var(--bg);color:#fff;
-               font:400 13.5px system-ui;resize:none;max-height:96px;line-height:1.4">${_admEsc(_chat.rascunho||'')}</textarea>
+        style="flex:1;padding:12px 16px;border-radius:999px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);
+               font:400 13.5px var(--f-ui);resize:none;max-height:96px;line-height:1.4">${_admEsc(_chat.rascunho||'')}</textarea>
       <button onclick="_net.chatEnviar()" aria-label="Enviar" style="flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:none;background:var(--acc);color:var(--acc-ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center">➤</button>
     </div>`
   : `<div style="font-size:11.5px;color:var(--ink3);text-align:center;padding:10px 0 2px">A partida encerrou — a conversa fica, mas não recebe mais mensagem.</div>`;
@@ -4608,7 +4620,7 @@ function netRenderChat(){
       <button onclick="_net.fecharChat()" aria-label="Voltar" style="width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--linha3);background:none;color:var(--ink2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center">‹</button>
       ${face}
       <div style="flex:1;min-width:0">
-        <div style="font:700 16px system-ui;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_admEsc(_chat.nome||'')}</div>
+        <div style="font:700 16px var(--f-ui);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_admEsc(_chat.nome||'')}</div>
         <div style="font-size:11.5px;margin-top:1px;color:var(--ink2)">${sub}</div>
       </div>
     </div>
@@ -4812,11 +4824,11 @@ async function netEscolherCategoria(t){
     const sub = (c.esporte==='beach'?'Beach':'Tênis')+' · '+((c.classes&&c.classes.length)?'divisões '+c.classes.join('/'):'todas as divisões')+' · '+n+'/'+tam;
     return `<div style="display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--linha);border-radius:12px;margin-top:8px;opacity:${ok?1:.45}">
       <div style="flex:1;min-width:0"><b>${c.nome}</b><div style="font-size:11px;color:var(--ink2)">${sub}${motivo}</div></div>
-      ${ok?`<button onclick="_net.entrarTorneio('${t.id}','${c.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:''}
+      ${ok?`<button onclick="_net.entrarTorneio('${t.id}','${c.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Entrar</button>`:''}
     </div>`;
   }).join('');
   _sheet('net-tcat', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">${t.nome} — categorias</div>
+      <div style="font:700 17px var(--f-ui)">${t.nome} — categorias</div>
       <button onclick="document.getElementById('net-tcat').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:6px 0 4px">Escolha a sua categoria. Cada uma tem chave e campeão próprios.</div>
     ${rows||'<p style="color:var(--ink2);font-size:13px">Este torneio ainda não tem categorias.</p>'}`);
@@ -4872,7 +4884,7 @@ function _torneioQuando(t){
 function _faseSelo(t){
   const f = _FASES[t.status] || _FASES['inscricoes'];
   return `<span style="flex:0 0 auto;padding:2px 8px;border-radius:99px;background:var(--sup2);`
-       + `color:${f[1]};font:700 9.5px system-ui;letter-spacing:.06em;text-transform:uppercase">${f[0]}</span>`;
+       + `color:${f[1]};font:700 9.5px var(--f-ui);letter-spacing:.06em;text-transform:uppercase">${f[0]}</span>`;
 }
 
 async function netAbrirTorneios(){
@@ -4887,7 +4899,7 @@ async function netAbrirTorneios(){
         <div style="display:flex;align-items:center;gap:7px"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.nome}</b>${_faseSelo(t)}</div>
         ${_torneioQuando(t)}
         <div style="font-size:11px;color:var(--ink2);margin-top:2px">${esp} · mata-mata · ${n}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos${regra} · ${t.aberto?'aberto':'fechado'}</div></div>
-      ${entrar?`<button onclick="event.stopPropagation();_net.entrarTorneio('${t.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:#2C5A00;color:#fff;font:600 12px system-ui;cursor:pointer">Entrar</button>`:'<span style="color:var(--ink2)">›</span>'}
+      ${entrar?`<button onclick="event.stopPropagation();_net.entrarTorneio('${t.id}')" style="padding:7px 12px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:600 12px var(--f-ui);cursor:pointer">Entrar</button>`:'<span style="color:var(--ink2)">›</span>'}
     </div>`;
   };
   /* 18/08: "Seus torneios" era uma pilha só, do inscrição ao concluído, e a fase
@@ -4907,7 +4919,7 @@ async function netAbrirTorneios(){
       return 0;                       // os dois sem data: mantém a ordem que veio
     });
   const grupo = (rot, lista, entrar)=> lista.length
-    ? `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">${rot}</div>`
+    ? `<div style="font:700 12px var(--f-ui);color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">${rot}</div>`
       + lista.map(t=>card(t,entrar)).join('')
     : '';
   const meusH = meus.length
@@ -4917,11 +4929,11 @@ async function netAbrirTorneios(){
     : `<p style="color:var(--ink2);font-size:13px;margin-top:8px">Você não está em nenhum torneio ainda.</p>`;
   const abH = grupo('Torneios abertos', abertos, true);
   _sheet('net-torneios', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">Torneios</div>
+      <div style="font:700 17px var(--f-ui)">Torneios</div>
       <button onclick="_net.fecharTorneios()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     ${_quemSou()}
-    <button onclick="_net.criarTorneio()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 14px system-ui;cursor:pointer;margin-top:10px">+ Criar torneio</button>
-    <div style="font:700 12px system-ui;color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Seus torneios</div>
+    <button onclick="_net.criarTorneio()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:10px">+ Criar torneio</button>
+    <div style="font:700 12px var(--f-ui);color:var(--ink2);margin-top:16px;text-transform:uppercase;letter-spacing:.08em">Seus torneios</div>
     ${meusH}${abH}`);
 }
 function netFecharTorneios(){ const el=document.getElementById('net-torneios'); if(el) el.remove(); }
@@ -4929,8 +4941,8 @@ function netFecharTorneios(){ const el=document.getElementById('net-torneios'); 
 // -- UI: criar torneio --
 function netCriarTorneioUI(){
   _tnew = _tnew || { nome:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', tamanho:8, aberto:false, tipo:'aberto', classes:[], cats:[] };
-  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.tset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;background:${_tnew[campo]==v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
-  const chip=(d,on,click)=>`<button onclick="${click}" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:700 13px system-ui;cursor:pointer;background:${on?'#2C5A00':'var(--sup2)'};color:#fff">${d}</button>`;
+  const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.tset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--linha2);font:600 13px var(--f-ui);cursor:pointer;background:${_tnew[campo]==v?'var(--acc)':'var(--sup2)'};color:${_tnew[campo]==v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
+  const chip=(d,on,click)=>`<button onclick="${click}" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:700 13px var(--f-ui);cursor:pointer;background:${on?'var(--acc)':'var(--sup2)'};color:${on?'var(--acc-ink)':'var(--ink)'}">${d}</button>`;
   // bloco extra conforme o tipo escolhido
   let extra='';
   if(_tnew.tipo==='restrito'){
@@ -4940,7 +4952,7 @@ function netCriarTorneioUI(){
   if(_tnew.tipo==='multi'){
     const catRow=(c,i)=>`<div style="border:1px solid var(--linha);border-radius:12px;padding:11px;margin-top:8px">
       <div style="display:flex;gap:8px;align-items:center">
-        <input value="${(c.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tcatset(${i},'nome',this.value)" placeholder="Nome da categoria (ex.: C masculino)" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui" autocomplete="off"/>
+        <input value="${(c.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tcatset(${i},'nome',this.value)" placeholder="Nome da categoria (ex.: C masculino)" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui)" autocomplete="off"/>
         <button onclick="_net.tcatdel(${i})" style="background:none;border:none;color:var(--ink2);font-size:19px;cursor:pointer">×</button></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         ${chip('Tênis',c.esporte!=='beach',`_net.tcatset(${i},'esporte','tenis')`)}${chip('Beach',c.esporte==='beach',`_net.tcatset(${i},'esporte','beach')`)}</div>
@@ -4951,12 +4963,12 @@ function netCriarTorneioUI(){
     </div>`;
     extra = `<div style="font-size:12px;color:var(--ink2);margin:14px 0 2px">Categorias (cada uma tem chave e campeão próprios)</div>
       ${_tnew.cats.map(catRow).join('')}
-      <button onclick="_net.tcatadd()" style="width:100%;padding:11px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:8px">+ Adicionar categoria</button>`;
+      <button onclick="_net.tcatadd()" style="width:100%;padding:11px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:8px">+ Adicionar categoria</button>`;
   }
   _sheet('net-tnew', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">${_tnew.id?'Editar regras':'Criar torneio'}</div>
+      <div style="font:700 17px var(--f-ui)">${_tnew.id?'Editar regras':'Criar torneio'}</div>
       <button onclick="_net.fecharTnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <input id="tn-nome" value="${(_tnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tset('nome',this.value)" placeholder="Nome do torneio" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
+    <input id="tn-nome" value="${(_tnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tset('nome',this.value)" placeholder="Nome do torneio" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui);margin-top:12px" autocomplete="off"/>
     ${_tnew.tipo!=='multi'?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>`:''}
     ${_tnew.tipo!=='multi'?`<div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Tamanho da chave</div><div style="display:flex;gap:8px">${seg('tamanho',[[4,'4'],[8,'8'],[16,'16']])}</div>`:''}
     <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem joga</div><div style="display:flex;gap:8px">${seg('tipo',[['aberto','Todas as divisões'],['restrito','Só algumas'],['multi','Categorias']])}</div>
@@ -4972,19 +4984,19 @@ function netCriarTorneioUI(){
       <div style="flex:1">
         <div style="font-size:10.5px;color:var(--ink3);margin-bottom:4px">Começa</div>
         <input type="date" value="${_tnew.comeca_em||''}" onchange="_net.tset('comeca_em',this.value)"
-          style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;color-scheme:dark"/>
+          style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);color-scheme:dark"/>
       </div>
       <div style="flex:1">
         <div style="font-size:10.5px;color:var(--ink3);margin-bottom:4px">Termina</div>
         <input type="date" value="${_tnew.termina_em||''}" min="${_tnew.comeca_em||''}" onchange="_net.tset('termina_em',this.value)"
-          style="width:100%;padding:11px;border-radius:11px;border:1px solid ${(_tnew.comeca_em&&_tnew.termina_em&&_tnew.termina_em<_tnew.comeca_em)?'var(--dn)':'var(--linha2)'};background:var(--bg);color:#fff;font:600 13px system-ui;color-scheme:dark"/>
+          style="width:100%;padding:11px;border-radius:11px;border:1px solid ${(_tnew.comeca_em&&_tnew.termina_em&&_tnew.termina_em<_tnew.comeca_em)?'var(--dn)':'var(--linha2)'};background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);color-scheme:dark"/>
       </div>
     </div>
     ${(_tnew.comeca_em&&_tnew.termina_em&&_tnew.termina_em<_tnew.comeca_em)
       ? '<div style="font-size:11px;color:var(--dn);margin-top:6px">O fim está antes do começo — o banco vai recusar.</div>'
       : '<div style="font-size:11px;color:var(--ink3);margin-top:6px">Só o dia. A hora de cada partida é combinada dentro do torneio.</div>'}
     ${_tnew.id?'<div style="font-size:11px;color:var(--ink3);margin-top:10px">As regras podem mudar enquanto as inscrições estão abertas. Quando a chave montar, congelam.</div>':''}
-    <button onclick="_net.tcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:18px">${_tnew.id?'Salvar regras':'Criar torneio'}</button>`);
+    <button onclick="_net.tcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:18px">${_tnew.id?'Salvar regras':'Criar torneio'}</button>`);
   const el=document.getElementById('tn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
 function _tset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; if(campo==='tamanho')v=+v; _tnew[campo]=v; if(campo!=='nome') netCriarTorneioUI(); }
@@ -5228,9 +5240,9 @@ async function netVerTorneio(id){
     lista=cats.map(c=>{
       const dentro=ps.filter(p=>p.categoria===c.id), tam=_tamCat(c);
       const podeMontar = t.dono_id===MEU_UID && !c.montada && dentro.length>=tam;
-      return `<div style="font:700 12px system-ui;color:var(--ink2);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome} · ${dentro.length}/${tam}${c.montada?' · em jogo':''}</div>`
+      return `<div style="font:700 12px var(--f-ui);color:var(--ink2);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome} · ${dentro.length}/${tam}${c.montada?' · em jogo':''}</div>`
         + (dentro.map(linha).join('')||'<p style="color:var(--ink3);font-size:12px;margin:6px 0">Ninguém ainda.</p>')
-        + (podeMontar?`<button onclick="_net.montarChave('${id}','${c.id}')" style="width:100%;padding:11px;border-radius:11px;border:none;background:var(--gold-bg);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">⚔️ Montar a chave de ${c.nome}</button>`:'');
+        + (podeMontar?`<button onclick="_net.montarChave('${id}','${c.id}')" style="width:100%;padding:11px;border-radius:11px;border:none;background:var(--gold-bg);color:var(--ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:8px">⚔️ Montar a chave de ${c.nome}</button>`:'');
     }).join('');
   } else {
     lista=ps.map(linha).join('');
@@ -5270,12 +5282,12 @@ async function netVerTorneio(id){
           if(c.m&&c.m.status==='pendente') acaoC=`<div style="font-size:10px;color:var(--gold);padding:0 9px 6px">placar lançado · falta confirmar</div>`;
           else if(souJog){
             const adv=MEU_UID===c.a?c.b:c.a;
-            acaoC=`<button onclick="_net.torneioPlacar('${id}',${r},${i},'${adv}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:none;background:#2C5A00;color:#fff;font:600 11px system-ui;cursor:pointer">Lançar placar</button>`;
+            acaoC=`<button onclick="_net.torneioPlacar('${id}',${r},${i},'${adv}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:none;background:var(--acc);color:var(--acc-ink);font:600 11px var(--f-ui);cursor:pointer">Lançar placar</button>`;
           }
           // rede de segurança: o dono lança por cima em confronto ALHEIO (vale na
           // hora) — cobre jogador sem celular, sumido ou placar pendente travado
           if(!souJog && t.dono_id===MEU_UID){
-            acaoC+=`<button onclick="_net.torneioPlacarOrg('${id}',${r},${i},'${c.a}','${c.b}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:1px solid var(--gold-bg);background:var(--sup2);color:var(--gold);font:600 11px system-ui;cursor:pointer">Placar (org.)</button>`;
+            acaoC+=`<button onclick="_net.torneioPlacarOrg('${id}',${r},${i},'${c.a}','${c.b}'${catId?",'"+catId+"'":''})" style="margin:2px 9px 8px;padding:6px 10px;border-radius:8px;border:1px solid var(--gold-bg);background:var(--sup2);color:var(--gold);font:600 11px var(--f-ui);cursor:pointer">Placar (org.)</button>`;
           }
         }
         return `<div style="border:1px solid var(--linha);border-radius:10px;background:var(--sup);margin-top:8px;min-width:132px;font-size:13px">
@@ -5284,7 +5296,7 @@ async function netVerTorneio(id){
       };
       return (k.campeao?`<div style="text-align:center;padding:11px;border:1px solid var(--gold-bg);border-radius:12px;background:var(--sup2);margin-top:10px">🏆 <b>Campeão: ${_nomeDe(k.campeao)}</b></div>`:'')
         + `<div style="display:flex;gap:10px;overflow-x:auto;padding:10px 0 4px">`
-        + k.confs.slice(1).map((cs,idx)=>`<div style="flex:0 0 auto"><div style="font:700 11px system-ui;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em">${rotulo(idx+1)}</div>${cs.map((c,i)=>confHTML(c,idx+1,i)).join('')}</div>`).join('')
+        + k.confs.slice(1).map((cs,idx)=>`<div style="flex:0 0 auto"><div style="font:700 11px var(--f-ui);color:var(--ink2);text-transform:uppercase;letter-spacing:.06em">${rotulo(idx+1)}</div>${cs.map((c,i)=>confHTML(c,idx+1,i)).join('')}</div>`).join('')
         + `</div>`;
     };
     if(t.tipo==='multi'){
@@ -5293,7 +5305,7 @@ async function netVerTorneio(id){
       chaveH = cats.filter(c=>c.montada).map(c=>{
         const k=montar(ps.filter(p=>p.categoria===c.id), _tamCat(c), c.id);
         if(k.campeao && camp[c.id]!==k.campeao){ camp[c.id]=k.campeao; mudou=true; }
-        return `<div style="font:700 12px system-ui;color:var(--gold);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome}</div>`+pintar(k,c.id);
+        return `<div style="font:700 12px var(--f-ui);color:var(--gold);margin-top:14px;text-transform:uppercase;letter-spacing:.08em">${c.nome}</div>`+pintar(k,c.id);
       }).join('');
       // final confirmada → o dono grava o campeão da categoria; o torneio só
       // conclui quando TODAS as categorias montaram e todas têm campeão
@@ -5315,23 +5327,23 @@ async function netVerTorneio(id){
   const acao = !inscricoesAbertas
     ? ''
     : souParticipante
-      ? `<button onclick="_net.sairTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:14px">Sair do torneio</button>`
-      : `<button onclick="_net.entrarTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:#2C5A00;color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:14px">Entrar</button>`;
+      ? `<button onclick="_net.sairTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--dn-bg);background:var(--dn-bg);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:14px">Sair do torneio</button>`
+      : `<button onclick="_net.entrarTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:14px">Entrar</button>`;
   // no multi o botão de montar vive dentro de cada categoria (na lista), porque
   // cada uma enche e monta no seu próprio ritmo
   const donoMonta = (t.tipo!=='multi' && t.dono_id===MEU_UID && cheio && t.status==='inscricoes')
-    ? `<button onclick="_net.montarChave('${id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--gold-bg);color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:10px">⚔️ Montar a chave</button>`
+    ? `<button onclick="_net.montarChave('${id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--gold-bg);color:var(--ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:10px">⚔️ Montar a chave</button>`
     : '';
   _sheet('net-tver', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">${t.nome}</div>
+      <div style="font:700 17px var(--f-ui)">${t.nome}</div>
       <button onclick="_net.fecharTver()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${t.tipo==='multi'?(t.categorias||[]).length+' categorias':(t.esporte==='beach'?'Beach':'Tênis')} · mata-mata · ${ps.length}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos · ${t.aberto?'aberto':'fechado'}${t.tipo==='restrito'&&t.classes?' · divisões '+t.classes.join('/'):''}${t.tipo==='aberto'?' · todas as divisões':''}</div>
     ${chaveH}
     ${lista||'<p style="color:var(--ink2);font-size:13px">Ninguém inscrito ainda.</p>'}
     ${acao}${donoMonta}
-    ${inscricoesAbertas?`<button onclick="_net.copiarLinkTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
+    ${inscricoesAbertas?`<button onclick="_net.copiarLinkTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
     <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">Quem abrir o link entra direto, sem aprovação.</div>`:''}
-    ${(t.dono_id===MEU_UID && t.status==='inscricoes')?`<button onclick="_net.editarTorneio('${id}')" style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 13px system-ui;cursor:pointer;margin-top:8px">⚙️ Editar regras</button>`:''}`);
+    ${(t.dono_id===MEU_UID && t.status==='inscricoes')?`<button onclick="_net.editarTorneio('${id}')" style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:8px">⚙️ Editar regras</button>`:''}`);
 }
 function netFecharTver(){ const el=document.getElementById('net-tver'); if(el) el.remove(); }
 
@@ -5359,33 +5371,33 @@ function netAbrirLogin(){
     <div style="display:flex;align-items:center;gap:14px;margin:6px 0 26px">
       <img src="../marcas/ranket-r.png" alt="" style="width:39px;height:auto;display:block">
       <div>
-        <div style="font:800 22px var(--f-disp),system-ui;color:#fff;line-height:1.1">Bem-vindo ao Ranket</div>
-        <div style="font:400 14px system-ui;color:var(--ink2);margin-top:3px">Faça o login e acesse sua conta.</div>
+        <div style="font:800 22px var(--f-disp);color:var(--ink);line-height:1.1">Bem-vindo ao Ranket</div>
+        <div style="font:400 14px var(--f-ui);color:var(--ink2);margin-top:3px">Faça o login e acesse sua conta.</div>
       </div>
     </div>
 
     <input id="nl-email" type="email" placeholder="E-mail"
-      style="width:100%;padding:14px 18px;border-radius:14px;border:1px solid rgba(255,254,253,.55);background:transparent;color:#fff;font:400 15px system-ui"
+      style="width:100%;padding:14px 18px;border-radius:14px;border:1px solid rgba(255,254,253,.55);background:transparent;color:var(--ink);font:400 15px var(--f-ui)"
       autocomplete="email" inputmode="email" autocapitalize="off"/>
 
     <div style="position:relative;margin-top:12px">
       <input id="nl-senha" type="password" placeholder="Senha"
-        style="width:100%;padding:14px 52px 14px 18px;border-radius:14px;border:1px solid rgba(255,254,253,.55);background:transparent;color:#fff;font:400 15px system-ui"
+        style="width:100%;padding:14px 52px 14px 18px;border-radius:14px;border:1px solid rgba(255,254,253,.55);background:transparent;color:var(--ink);font:400 15px var(--f-ui)"
         autocomplete="current-password"/>
       <button onclick="_net.olhoSenha('nl-senha',this)" aria-label="Mostrar senha"
         style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink2);padding:12px;cursor:pointer;display:flex;align-items:center"><svg viewBox="0 0 35 23" width="19" height="13" fill="none" aria-hidden="true" style="display:block"><path d="M2.65 14.61C5.79 17.71 11.27 22 17.5 22s11.71-4.29 14.85-7.39c.83-.82 1.24-1.23 1.51-2.03.19-.57.19-1.6 0-2.17-.27-.8-.68-1.21-1.51-2.03C29.21 5.29 23.73 1 17.5 1S5.79 5.29 2.65 8.39c-.83.82-1.24 1.23-1.51 2.03-.19.57-.19 1.6 0 2.17.27.8.68 1.21 1.51 2.02Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.97 11.5c0 1.93 1.58 3.5 3.53 3.5s3.53-1.57 3.53-3.5S19.45 8 17.5 8s-3.53 1.57-3.53 3.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
 
     <button onclick="_net.esqueciSenha(document.getElementById('nl-email').value)"
-      style="background:none;border:none;color:#fff;font:400 12px system-ui;text-decoration:underline;cursor:pointer;padding:12px 0 0">Esqueci minha senha</button>
+      style="background:none;border:none;color:var(--ink);font:400 12px var(--f-ui);text-decoration:underline;cursor:pointer;padding:12px 0 0">Esqueci minha senha</button>
 
     <button onclick="_net.enviarLogin(document.getElementById('nl-email').value, document.getElementById('nl-senha').value)"
-      style="width:100%;padding:16px;border-radius:14px;border:none;background:var(--marca);color:var(--marca-ink);font:800 15px system-ui;cursor:pointer;margin-top:18px">Entrar</button>
+      style="width:100%;padding:16px;border-radius:14px;border:none;background:var(--marca);color:var(--marca-ink);font:800 15px var(--f-ui);cursor:pointer;margin-top:18px">Entrar</button>
 
     <button onclick="document.getElementById('net-login').remove(); if(window.abrirCadastro) abrirCadastro();"
-      style="width:100%;padding:16px;border-radius:14px;border:none;background:#121212;color:var(--ink2);font:400 15px system-ui;cursor:pointer;margin-top:12px">Ainda não tem conta? <b style="color:var(--ink2)">Cadastre-se</b></button>
+      style="width:100%;padding:16px;border-radius:14px;border:none;background:var(--sup);color:var(--ink2);font:400 15px var(--f-ui);cursor:pointer;margin-top:12px">Ainda não tem conta? <b style="color:var(--ink2)">Cadastre-se</b></button>
 
-    <p style="text-align:center;color:#fff;font:400 11px system-ui;margin:22px 0 2px;opacity:.75">O Ranket é somente para maiores de 18 anos.</p>`);
+    <p style="text-align:center;color:var(--ink);font:400 11px var(--f-ui);margin:22px 0 2px;opacity:.75">O Ranket é somente para maiores de 18 anos.</p>`);
   const el=document.getElementById('nl-email'); if(el) el.focus();
 }
 /* O olho: alterna o tipo do campo e o próprio ícone. Preserva a posição do
@@ -5439,11 +5451,11 @@ async function netEsqueciSenha(email){
 }
 
 function netAbrirNovaSenha(){
-  _sheet('net-nova-senha', `<div style="font:700 17px system-ui">Definir uma nova senha</div>
+  _sheet('net-nova-senha', `<div style="font:700 17px var(--f-ui)">Definir uma nova senha</div>
     <div style="font-size:12px;color:var(--ink2);margin:8px 0 12px">Escolha a senha nova. Depois disso você já entra direto.</div>
-    <input id="ns-1" type="password" placeholder="nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui" autocomplete="new-password"/>
-    <input id="ns-2" type="password" placeholder="repita a nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:10px" autocomplete="new-password"/>
-    <button onclick="_net.salvarNovaSenha(document.getElementById('ns-1').value, document.getElementById('ns-2').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:12px">Salvar senha</button>`);
+    <input id="ns-1" type="password" placeholder="nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui)" autocomplete="new-password"/>
+    <input id="ns-2" type="password" placeholder="repita a nova senha" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui);margin-top:10px" autocomplete="new-password"/>
+    <button onclick="_net.salvarNovaSenha(document.getElementById('ns-1').value, document.getElementById('ns-2').value)" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:12px">Salvar senha</button>`);
   const el=document.getElementById('ns-1'); if(el) el.focus();
 }
 
@@ -5696,7 +5708,7 @@ function netRenderMeusLocais(){
   const linhas=(_locaisMarcaveis()).map(l=>{
     const on=_loc.sel.includes(l.id), pr=_loc.principal===l.id;
     return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--sup2)">
-      <button onclick="_net.locToggle('${l.id}')" style="width:24px;height:24px;border-radius:7px;border:1px solid ${on?'#2C5A00':'var(--linha2)'};background:${on?'#2C5A00':'var(--bg)'};color:#fff;font:700 13px system-ui;cursor:pointer;flex:0 0 24px">${on?'✓':''}</button>
+      <button onclick="_net.locToggle('${l.id}')" style="width:24px;height:24px;border-radius:7px;border:1px solid ${on?'var(--acc)':'var(--linha2)'};background:${on?'var(--acc)':'var(--bg)'};color:${on?'var(--acc-ink)':'var(--ink)'};font:700 13px var(--f-ui);cursor:pointer;flex:0 0 24px">${on?'✓':''}</button>
       <!-- 18/08: o nome virou porta pro perfil do clube (item 30). O toque no
            nome NÃO pode marcar/desmarcar — quem quer ver o clube não quer mudar
            onde joga, e o checkbox continua sendo o único jeito de marcar. -->
@@ -5704,19 +5716,19 @@ function netRenderMeusLocais(){
         <b style="font-size:14px">${l.nome}</b> <span style="color:var(--ink3);font-size:11px">›</span>
         <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+l.cidade:''}</div>
         ${l.endereco?`<div style="font-size:10.5px;color:var(--ink3)">${l.endereco}</div>`:''}</div>
-      ${on?`<button onclick="_net.locPrincipal('${l.id}')" style="padding:6px 10px;border-radius:9px;border:1px solid ${pr?'var(--gold-bg)':'var(--linha2)'};background:${pr?'var(--gold-bg)':'var(--sup2)'};color:${pr?'var(--gold)':'var(--ink2)'};font:600 11px system-ui;cursor:pointer">${pr?'★ principal':'tornar principal'}</button>`:''}
+      ${on?`<button onclick="_net.locPrincipal('${l.id}')" style="padding:6px 10px;border-radius:9px;border:1px solid ${pr?'var(--gold-bg)':'var(--linha2)'};background:${pr?'var(--gold-bg)':'var(--sup2)'};color:${pr?'var(--gold)':'var(--ink2)'};font:600 11px var(--f-ui);cursor:pointer">${pr?'★ principal':'tornar principal'}</button>`:''}
     </div>`;
   }).join('');
   _sheet('net-locais', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">📍 Onde você joga</div>
+      <div style="font:700 17px var(--f-ui)">📍 Onde você joga</div>
       <button onclick="_net.fecharLocais()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:4px 0 8px">Marque os lugares onde você costuma jogar. O <b>principal</b> vira o endereço dos seus desafios e diz sua cidade — dá pra jogar em mais de um. Toque no nome pra ver o clube por dentro.</div>
     ${linhas || '<p style="color:var(--ink2);font-size:13px;margin:14px 0">Nenhum clube cadastrado ainda. Fala com o ADM do app pra incluir o seu — ou cadastre sua quadra aqui embaixo.</p>'}
     <!-- 18/08 (item 31): a quadra particular tinha coluna, fechadura e policies
          desde a migração 25 e nunca teve porta. Aqui é o lugar dela: quem abre
          "onde você joga" e não acha o próprio lugar é exatamente quem precisa. -->
-    <button onclick="_net.criarQuadra()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 13px system-ui;cursor:pointer;margin-top:14px">+ Cadastrar minha quadra</button>
-    <button onclick="_net.locSalvar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:8px">Salvar</button>`);
+    <button onclick="_net.criarQuadra()" style="width:100%;padding:13px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:14px">+ Cadastrar minha quadra</button>
+    <button onclick="_net.locSalvar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:8px">Salvar</button>`);
 }
 
 /* =========================================================================
@@ -5742,7 +5754,7 @@ function netVerLocal(id){
   const telLink = tel ? `<a href="tel:${_admEsc(tel.replace(/[^\d+]/g,''))}" style="color:var(--lime);text-decoration:none">${_admEsc(tel)}</a>` : '';
   _sheet('net-local', `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div style="min-width:0">
-        <div style="font:700 17px system-ui">${_admEsc(l.nome)}</div>
+        <div style="font:700 17px var(--f-ui)">${_admEsc(l.nome)}</div>
         <div style="font-size:12px;color:var(--ink2);margin-top:2px">${TIPO[l.tipo]||'Quadra'}${l.cidade?' · '+_admEsc(l.cidade):''}${l.regiao?' · '+_admEsc(l.regiao):''}</div>
       </div>
       <button onclick="_net.fecharLocal()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer;flex:0 0 auto">×</button></div>
@@ -5841,9 +5853,9 @@ function netRenderCriarQuadra(){
   const q=_qnova; if(!q) return;
   const TIPOS=[['condominio','Condomínio'],['clube','Clube'],['publico','Pública'],['academia','Academia'],['outro','Outra']];
   const pronto = q.nome.trim() && q.endereco.trim() && q.cidade_id;
-  const seg = TIPOS.map(([v,n])=>`<button onclick="_net.qset('tipo','${v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px system-ui;cursor:pointer;background:${q.tipo===v?'#2C5A00':'var(--sup2)'};color:#fff">${n}</button>`).join('');
+  const seg = TIPOS.map(([v,n])=>`<button onclick="_net.qset('tipo','${v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px var(--f-ui);cursor:pointer;background:${q.tipo===v?'var(--acc)':'var(--sup2)'};color:${q.tipo===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
   _sheet('net-qnova', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">${q.id?'Editar minha quadra':'Cadastrar minha quadra'}</div>
+      <div style="font:700 17px var(--f-ui)">${q.id?'Editar minha quadra':'Cadastrar minha quadra'}</div>
       <button onclick="_net.fecharQnova()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${q.id
       ? 'Corrigir aqui muda o endereço pra quem já foi desafiado também — é a mesma linha que eles leem.'
@@ -5851,19 +5863,19 @@ function netRenderCriarQuadra(){
 
     <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">Nome</div>
     <input id="q-nome" value="${_admEsc(q.nome)}" oninput="_net.qset('nome',this.value,this.selectionStart)" placeholder="Ex.: Quadra do Ed. Aurora" maxlength="60"
-      style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui" autocomplete="off"/>
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)" autocomplete="off"/>
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Tipo</div>
     <div style="display:flex;gap:6px">${seg}</div>
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Endereço <span style="color:var(--dn)">— obrigatório</span></div>
     <input id="q-endereco" value="${_admEsc(q.endereco)}" oninput="_net.qset('endereco',this.value,this.selectionStart)" placeholder="Rua, número e bairro" maxlength="160"
-      style="width:100%;padding:12px;border-radius:12px;border:1px solid ${q.endereco.trim()?'var(--linha2)':'var(--dn)'};background:var(--bg);color:#fff;font:600 14px system-ui" autocomplete="off"/>
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid ${q.endereco.trim()?'var(--linha2)':'var(--dn)'};background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)" autocomplete="off"/>
 
     <div style="display:flex;gap:10px;margin-top:12px">
       <div style="flex:1">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Cidade</div>
-        <select onchange="_net.qset('cidade_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui">
+        <select onchange="_net.qset('cidade_id',this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui)">
           ${_cidades.map(c=>`<option value="${c.id}" ${q.cidade_id===c.id?'selected':''}>${_admEsc(c.nome)}/${_admEsc(c.uf)}</option>`).join('')
             || '<option value="">nenhuma cidade cadastrada</option>'}
         </select>
@@ -5871,7 +5883,7 @@ function netRenderCriarQuadra(){
       <div style="flex:0 0 96px">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Quadras</div>
         <input type="number" min="1" max="20" value="${q.quadras}" oninput="_net.qset('quadras',this.value)"
-          style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui"/>
+          style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)"/>
       </div>
     </div>
 
@@ -6156,7 +6168,7 @@ function netTelaBanido(row){
   const p = (n)=>String(n).padStart(2,'0');
   const quando = q ? `${p(q.getDate())}/${p(q.getMonth()+1)}/${q.getFullYear()}` : '';
   const el = _sheet('net-banido', `
-    <div style="font:700 17px system-ui;margin-bottom:2px">Sua conta foi suspensa</div>
+    <div style="font:700 17px var(--f-ui);margin-bottom:2px">Sua conta foi suspensa</div>
     <div style="font-size:12.5px;color:var(--ink2);margin-bottom:14px;line-height:1.5">
       O ADM do Ranket suspendeu esta conta${quando?' em <b>'+quando+'</b>':''}. Enquanto estiver assim,
       o app não abre pra você — nem pra ver, nem pra jogar.
@@ -6164,7 +6176,7 @@ function netTelaBanido(row){
     <div style="font-size:11.5px;color:var(--ink3);margin-bottom:16px;line-height:1.5">
       Suas partidas e seu histórico continuam guardados. Se achar que foi engano, fale com quem administra o app.
     </div>
-    <button onclick="_net.sairBanido()" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:none;color:#fff;font:700 14px system-ui;cursor:pointer">Sair da conta</button>`);
+    <button onclick="_net.sairBanido()" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--linha2);background:none;color:var(--ink);font:700 14px var(--f-ui);cursor:pointer">Sair da conta</button>`);
   el.onclick = null;
 }
 async function _sairBanido(){
@@ -6174,12 +6186,12 @@ async function _sairBanido(){
 
 function netPedirIdade(){
   const el = _sheet('net-idade', `
-    <div style="font:700 17px system-ui;margin-bottom:2px">Uma pergunta que faltou</div>
+    <div style="font:700 17px var(--f-ui);margin-bottom:2px">Uma pergunta que faltou</div>
     <div style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Sua conta foi criada antes de o app pedir a data de nascimento. O Ranket marca jogo presencial entre pessoas que não se conhecem, então a conta é só para maiores de 18 — falta registrar o seu.</div>
     <input id="net-idade-in" type="date" max="${new Date().toISOString().slice(0,10)}"
-      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;color-scheme:dark"/>
+      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui);color-scheme:dark"/>
     <div style="font-size:11px;color:var(--ink3);margin-top:6px">Ela não aparece pra ninguém — nem no seu perfil.</div>
-    <button onclick="_net.idadeConfirmar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:14px">Confirmar</button>`);
+    <button onclick="_net.idadeConfirmar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:14px">Confirmar</button>`);
   // sem fechar clicando fora: a pergunta não é opcional — fechar sem responder
   // deixaria a conta exatamente no estado que esta folha existe pra acabar
   el.onclick = null;
@@ -6307,25 +6319,25 @@ function netRenderPatches(){
         <div style="font-size:20px">◈</div>
         <div style="flex:1;min-width:0"><b style="font-size:14px">${p.nome}</b>${p.revisao?' <span style="color:var(--gold);font-size:10px">em revisão</span>':''}
           <div style="font-size:11px;color:var(--ink2)">por ${_nomeDe(p.criado_por)} · ${nEnvios(p.id)} envio${nEnvios(p.id)===1?'':'s'}</div></div>
-        <button onclick="_net.patMandando('${p.id}')" style="padding:8px 12px;border-radius:10px;border:none;background:${aberto?'var(--sup2)':'#2C5A00'};color:#fff;font:600 12px system-ui;cursor:pointer">${aberto?'fechar':'mandar'}</button>
+        <button onclick="_net.patMandando('${p.id}')" style="padding:8px 12px;border-radius:10px;border:none;background:${aberto?'var(--sup2)':'var(--acc)'};color:${aberto?'var(--ink)':'var(--acc-ink)'};font:600 12px var(--f-ui);cursor:pointer">${aberto?'fechar':'mandar'}</button>
       </div>
       ${aberto?`<div style="margin-top:10px;border-top:1px solid var(--sup2);padding-top:8px">
-        ${alvos.length?alvos.map(u=>`<button onclick="_net.patMandar('${p.id}','${u}')" style="display:block;width:100%;text-align:left;padding:9px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:600 12px system-ui;cursor:pointer;margin-top:5px">${_nomeDe(u)} <span style="font-weight:400;color:var(--ink3);font-size:10px">${ehMembro.has(u)?'da comunidade':'✔ amigo'}</span></button>`).join('')
+        ${alvos.length?alvos.map(u=>`<button onclick="_net.patMandar('${p.id}','${u}')" style="display:block;width:100%;text-align:left;padding:9px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer;margin-top:5px">${_nomeDe(u)} <span style="font-weight:400;color:var(--ink3);font-size:10px">${ehMembro.has(u)?'da comunidade':'✔ amigo'}</span></button>`).join('')
           :'<p style="color:var(--ink2);font-size:12px;margin:4px 0 0">Comunidade e amigos — todo mundo já tem esse patch.</p>'}
       </div>`:''}
     </div>`;
   }).join('') || '<p style="color:var(--ink2);font-size:13px;margin-top:10px">Nenhum patch ainda — cria o primeiro aí embaixo.</p>';
   _sheet('net-patches', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px system-ui">◈ Patches · ${_pat.nome}</div>
+      <div style="font:700 17px var(--f-ui)">◈ Patches · ${_pat.nome}</div>
       <button onclick="_net.fecharPatches()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="font-size:12px;color:var(--ink2);margin:4px 0 6px">Patch é identidade, não mérito: nasce na comunidade e vai pra qualquer membro ou amigo seu — sem exigir partida. Autoria sempre visível.</div>
     ${linhas}
     <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Criar um patch novo</div>
     <input id="pat-in" value="${(_pat.texto||'').replace(/"/g,'&quot;')}" oninput="_net.patDigitou(this.value)" maxlength="24" placeholder="Texto — até 24 caracteres"
-      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:7px" autocomplete="off"/>
+      style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui);margin-top:7px" autocomplete="off"/>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:4px"><span>${f.key!=='vazio'?`<span style="color:${corF}">${f.ic} ${f.t}</span> — ${f.d}`:''}</span><span>${(_pat.texto||'').length}/24</span></div>
     <button onclick="_net.patCriar()" ${bloqueado||!(_pat.texto||'').trim()?'disabled style="opacity:.4;cursor:default;"':''}
-      style="width:100%;padding:13px;border-radius:12px;border:none;background:#2C5A00;color:#fff;font:700 14px system-ui;cursor:pointer;margin-top:10px">${f.key==='gray'?'Criar e marcar pra revisão':'Criar patch'}</button>`);
+      style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:10px">${f.key==='gray'?'Criar e marcar pra revisão':'Criar patch'}</button>`);
   const el=document.getElementById('pat-in'); if(el && _pat.mandando===null){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
 
@@ -6749,8 +6761,8 @@ async function _admSalvarEndereco(localId, valor){
 
 function netRenderAdm(){
   const abaBtn=(id,txt)=>`<button onclick="_net.admAba('${id}')" style="flex:1;padding:10px;border-radius:10px;
-    border:1px solid var(--linha2);font:600 13px system-ui;cursor:pointer;
-    background:${_adm.aba===id?'var(--up-bg)':'var(--sup2)'};color:${_adm.aba===id?'var(--up)':'#fff'}">${txt}</button>`;
+    border:1px solid var(--linha2);font:600 13px var(--f-ui);cursor:pointer;
+    background:${_adm.aba===id?'var(--up-bg)':'var(--sup2)'};color:${_adm.aba===id?'var(--up)':'var(--ink)'}">${txt}</button>`;
 
   let corpo='';
 
@@ -6776,7 +6788,7 @@ function netRenderAdm(){
             <div style="font-size:11px;color:var(--ink2)">${_admEsc(t.etiqueta||'—')}${t.temporada?` · temporada ${t.temporada}`:''}</div>
           </div>
           <button onclick="_net.admApagar('${t.id}','${_admEsc(rotulo.replace(/'/g,'’'))}')"
-            style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--dn-bg);color:#fff;font:600 12px system-ui;cursor:pointer">Apagar</button>
+            style="padding:7px 10px;border-radius:9px;border:1px solid var(--linha2);background:var(--dn-bg);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Apagar</button>
         </div>`;
       }).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:8px">Nenhum troféu ainda.</p>`;
 
@@ -6785,34 +6797,34 @@ function netRenderAdm(){
 
       painel = `
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)">
-          <div style="font:700 15px system-ui">${_admEsc(_adm.sel.nome)}</div>
+          <div style="font:700 15px var(--f-ui)">${_admEsc(_adm.sel.nome)}</div>
           ${lista}
           <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Dar um troféu novo</div>
           <input id="adm-tn" value="${_admEsc(_adm.novo.nome)}" oninput="_net.admSet('nome',this.value)"
             placeholder="Nome do troféu (ex.: Campeão Interclubes 2026)"
-            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:7px" autocomplete="off"/>
           <input value="${_admEsc(_adm.novo.etiqueta)}" oninput="_net.admSet('etiqueta',this.value)"
             placeholder="Linha de baixo (opcional) — ex.: Clube Bahiano · 32 jogadores"
-            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:7px" autocomplete="off"/>
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);margin-top:7px" autocomplete="off"/>
           <select onchange="_net.admSet('grupo_id',this.value)"
-            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:7px">${ops}</select>
-          <button onclick="_net.admDar()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px system-ui;cursor:pointer;margin-top:11px">🏅 Entregar troféu</button>
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);margin-top:7px">${ops}</select>
+          <button onclick="_net.admDar()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px var(--f-ui);cursor:pointer;margin-top:11px">🏅 Entregar troféu</button>
           <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Mandar um patch do app <span style="color:var(--ink3)">(reusa o molde se o texto já existir)</span></div>
           <input value="${_admEsc(_adm.novo.patch||'')}" oninput="_net.admSet('patch',this.value)" maxlength="24"
             placeholder="Texto do patch — até 24 (ex.: Fundador)"
-            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
-          <button onclick="_net.admDarPatch()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">◈ Mandar patch</button>
+            style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:7px" autocomplete="off"/>
+          <button onclick="_net.admDarPatch()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:8px">◈ Mandar patch</button>
 
           <!-- 18/08 (mig 41): MODERAÇÃO. Vem por ÚLTIMO e separada por uma
                linha porque é a parte do painel que faz mal — troféu e patch
                dão; isto tira. Ordem na tela = ordem de gravidade. -->
           <div style="margin-top:22px;padding-top:14px;border-top:1px dashed var(--dn-bg)">
-            <div style="font:700 11px system-ui;color:var(--dn);text-transform:uppercase;letter-spacing:.08em">Moderação</div>
+            <div style="font:700 11px var(--f-ui);color:var(--dn);text-transform:uppercase;letter-spacing:.08em">Moderação</div>
 
             ${_adm.banido
               ? `<div style="margin-top:9px;padding:10px 12px;border-radius:11px;background:var(--dn-bg);font-size:12.5px"><b>⛔ Conta suspensa.</b> O app não abre pra ${_admEsc(_adm.sel.nome)} e ela não aparece no radar nem na busca.</div>
-                 <button onclick="_net.admBanir(false)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:#fff;font:700 13px system-ui;cursor:pointer;margin-top:8px">Reativar a conta</button>`
-              : `<button onclick="_net.admBanir(true)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:700 13px system-ui;cursor:pointer;margin-top:9px">⛔ Suspender a conta</button>
+                 <button onclick="_net.admBanir(false)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:8px">Reativar a conta</button>`
+              : `<button onclick="_net.admBanir(true)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:700 13px var(--f-ui);cursor:pointer;margin-top:9px">⛔ Suspender a conta</button>
                  <div style="font-size:10.5px;color:var(--ink3);margin-top:5px">Some do radar e da busca; o app para de abrir. As partidas ficam. Dá pra desfazer.</div>`}
 
             <div style="margin-top:16px;font-size:12px;color:var(--ink2)">Anular partida <span style="color:var(--ink3)">(volta Nível e estorna pontos — não apaga)</span></div>
@@ -6824,7 +6836,7 @@ function netRenderAdm(){
                   <div style="flex:1;min-width:0;font-size:12px"><b>${_admEsc(rot)}</b>
                     <div style="font-size:10.5px;color:var(--ink3)">${m.status}${m.esporte==='beach'?' · beach':''}</div></div>
                   <button onclick="_net.admAnular('${m.id}','${_admEsc(rot.replace(/'/g,'’'))}')"
-                    style="padding:7px 10px;border-radius:9px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:600 11px system-ui;cursor:pointer">Anular</button>
+                    style="padding:7px 10px;border-radius:9px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:600 11px var(--f-ui);cursor:pointer">Anular</button>
                 </div>`;
               }).join('')
               || `<p style="color:var(--ink3);font-size:11.5px;margin-top:6px;line-height:1.45">Nenhuma partida visível. Por enquanto só aparecem as partidas dessa pessoa <b>contra você</b> ou de torneio — a fechadura de leitura de partidas não abre pro ADM ainda (mig 43).</p>`}
@@ -6833,7 +6845,7 @@ function netRenderAdm(){
             ${_adm.grupos.map(g=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--linha);border-radius:11px;margin-top:6px">
                 <div style="flex:1;min-width:0;font-size:12.5px"><b>${_admEsc(g.nome)}</b></div>
                 <button onclick="_net.admTirarDoGrupo('${g.id}','${_admEsc((g.nome||'').replace(/'/g,'’'))}')"
-                  style="padding:7px 10px;border-radius:9px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:600 11px system-ui;cursor:pointer">Tirar</button>
+                  style="padding:7px 10px;border-radius:9px;border:1px solid var(--dn-bg);background:none;color:var(--dn);font:600 11px var(--f-ui);cursor:pointer">Tirar</button>
               </div>`).join('')
               || `<p style="color:var(--ink3);font-size:11.5px;margin-top:6px">Não está em nenhuma comunidade.</p>`}
           </div>
@@ -6842,14 +6854,14 @@ function netRenderAdm(){
 
     corpo = `
       <input id="adm-q" value="${_admEsc(_adm.q)}" oninput="_net.admBuscar(this.value)" placeholder="Buscar jogador por nome"
-        style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 15px system-ui;margin-top:12px" autocomplete="off"/>
+        style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui);margin-top:12px" autocomplete="off"/>
       ${achados}${painel}`;
 
   } else {
     const cid = _adm.cidades.map(c=>`<option value="${c.id}"${_adm.loc.cidade_id===c.id?' selected':''}>${_admEsc(c.nome)}/${_admEsc(c.uf)}</option>`).join('')
       || '<option value="">Nenhuma cidade — rode a migração 19</option>';
     const seg = [['clube','Clube'],['condominio','Condomínio'],['publico','Público'],['academia','Academia']]
-      .map(([v,n])=>`<button onclick="_net.admLocSet('tipo','${v}')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:600 12px system-ui;cursor:pointer;background:${_adm.loc.tipo===v?'var(--up-bg)':'var(--sup2)'};color:${_adm.loc.tipo===v?'var(--up)':'#fff'}">${n}</button>`).join('');
+      .map(([v,n])=>`<button onclick="_net.admLocSet('tipo','${v}')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:600 12px var(--f-ui);cursor:pointer;background:${_adm.loc.tipo===v?'var(--up-bg)':'var(--sup2)'};color:${_adm.loc.tipo===v?'var(--up)':'var(--ink)'}">${n}</button>`).join('');
     /* Opções de região, reusadas no formulário e em cada linha da lista. O
        `sel` chega de fora porque cada linha tem a sua região marcada. */
     const regOps = (sel)=>['<option value="">Sem região</option>']
@@ -6864,7 +6876,7 @@ function netRenderAdm(){
         <div style="flex:1;min-width:0"><b style="font-size:13px">${_admEsc(r.nome)}</b>
           <span style="font-size:11px;color:var(--ink2)"> · ${n} ${n===1?'clube':'clubes'}</span></div>
         <button onclick="_net.admApagarRegiao('${r.id}','${_admEsc(r.nome.replace(/'/g,'’'))}')"
-          style="padding:6px 9px;border-radius:8px;border:1px solid var(--linha2);background:var(--dn-bg);color:#fff;font:600 11px system-ui;cursor:pointer">Apagar</button>
+          style="padding:6px 9px;border-radius:8px;border:1px solid var(--linha2);background:var(--dn-bg);color:var(--ink);font:600 11px var(--f-ui);cursor:pointer">Apagar</button>
       </div>`;
     }).join('') || `<p style="color:var(--ink2);font-size:12px;margin-top:6px">Nenhuma região ainda. Enquanto não houver, o radar dessa cidade só filtra por clube.</p>`;
 
@@ -6881,10 +6893,10 @@ function netRenderAdm(){
              e sem marcação ele se esconde numa lista longa. -->
         <input value="${_admEsc(l.endereco||'')}" placeholder="Endereço — aonde ir pra quem não conhece"
           onchange="_net.admSalvarEndereco('${l.id}', this.value)"
-          style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.endereco?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.endereco?'#fff':'var(--gold)'};font:600 12px system-ui;margin-top:7px">`
+          style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.endereco?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.endereco?'var(--ink)':'var(--gold)'};font:600 12px var(--f-ui);margin-top:7px">`
         : `<div style="font-size:11px;color:var(--ink3);margin-top:7px">📍 endereço protegido — só o dono edita</div>`}
         <select onchange="_net.admLocalRegiao('${l.id}',this.value)"
-          style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.regiao_id?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.regiao_id?'#fff':'var(--gold)'};font:600 12px system-ui;margin-top:7px">${regOps(l.regiao_id)}</select>
+          style="width:100%;padding:8px;border-radius:9px;border:1px solid ${l.regiao_id?'var(--linha2)':'var(--gold-bg)'};background:var(--bg);color:${l.regiao_id?'var(--ink)':'var(--gold)'};font:600 12px var(--f-ui);margin-top:7px">${regOps(l.regiao_id)}</select>
       </div>`).join('')
       /* 13/08: "não carregou" e "cidade vazia" eram o mesmo pixel, e é assim
          que um erro de consulta se disfarça de estado legítimo. */
@@ -6897,36 +6909,36 @@ function netRenderAdm(){
     corpo = `
       <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Cidade</div>
       <select onchange="_net.admLocSet('cidade_id',this.value)"
-        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui">${cid}</select>
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)">${cid}</select>
 
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Regiões dessa cidade <span style="color:var(--ink3)">— zona dentro da cidade (Barra, Pituba), não macrorregião</span></div>
       ${chipsReg}
       <div style="display:flex;gap:6px;margin-top:8px">
         <input id="adm-rn" value="${_admEsc(_adm.regNova||'')}" oninput="_net.admRegSet(this.value)" placeholder="Nome da região — ex.: Barra"
-          style="flex:1;min-width:0;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui" autocomplete="off"/>
-        <button onclick="_net.admCriarRegiao()" style="padding:11px 14px;border-radius:11px;border:none;background:var(--up-bg);color:var(--up);font:700 13px system-ui;cursor:pointer;white-space:nowrap">+ Criar</button>
+          style="flex:1;min-width:0;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui)" autocomplete="off"/>
+        <button onclick="_net.admCriarRegiao()" style="padding:11px 14px;border-radius:11px;border:none;background:var(--up-bg);color:var(--up);font:700 13px var(--f-ui);cursor:pointer;white-space:nowrap">+ Criar</button>
       </div>
 
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Locais dessa cidade${semReg?` <span style="color:var(--gold)">— ${semReg} sem região</span>`:''}</div>
       ${jaTem}
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);font-size:12px;color:var(--ink2)">Cadastrar um local novo</div>
       <input id="adm-ln" value="${_admEsc(_adm.loc.nome)}" oninput="_net.admLocSet('nome',this.value)" placeholder="Nome do clube"
-        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;margin-top:7px" autocomplete="off"/>
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:7px" autocomplete="off"/>
       <input id="adm-le" value="${_admEsc(_adm.loc.endereco||'')}" oninput="_net.admLocSet('endereco',this.value)" placeholder="Endereço — ex.: Av. Sete de Setembro, 3222 — Barra"
-        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:8px" autocomplete="off"/>
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);margin-top:8px" autocomplete="off"/>
       <div style="display:flex;gap:6px;margin-top:8px">${seg}</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
         <div style="font-size:12px;color:var(--ink2);flex:1">Quantas quadras</div>
         <input type="number" min="1" max="60" value="${_adm.loc.quadras}" oninput="_net.admLocSet('quadras',this.value)"
-          style="width:84px;padding:10px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 14px system-ui;text-align:center"/>
+          style="width:84px;padding:10px;border-radius:10px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);text-align:center"/>
       </div>
       <select onchange="_net.admLocSet('regiao_id',this.value)"
-        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:#fff;font:600 13px system-ui;margin-top:8px">${regOps(_adm.loc.regiao_id)}</select>
-      <button onclick="_net.admSalvarLocal()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px system-ui;cursor:pointer;margin-top:12px">📍 Cadastrar local</button>`;
+        style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);margin-top:8px">${regOps(_adm.loc.regiao_id)}</select>
+      <button onclick="_net.admSalvarLocal()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--up-bg);color:var(--up);font:700 14px var(--f-ui);cursor:pointer;margin-top:12px">📍 Cadastrar local</button>`;
   }
 
   _sheet('net-adm', `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font:700 17px system-ui">ADM do aplicativo</div>
+      <div style="font:700 17px var(--f-ui)">ADM do aplicativo</div>
       <button onclick="_net.fecharAdm()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
     <div style="display:flex;gap:7px">${abaBtn('trofeus','🏅 Troféus')}${abaBtn('locais','📍 Locais')}</div>
     ${corpo}`);
