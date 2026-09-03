@@ -2322,7 +2322,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788450422"></script>
+<script src="net.js?v=1788459723"></script>
 
 <script>
 /* =========================================================================
@@ -3741,7 +3741,13 @@ function cascaNota(texto){
 
 // avatar: boneco recortado + aro na cor da camisa. classe extra: '', 'g' (52) ou 'gg' (76)
 function avatar(id, tam){
-  const j=S.jogadores[id];
+  /* 03/09 — GUARDA. `S.jogadores[id]` pode nao existir: a lista de amigos
+     guarda UIDs (mig 16) e o elenco local so tem quem ja apareceu em alguma
+     tela. Sem esta linha, `j.cor` de undefined derrubava a tela INTEIRA que
+     chamasse avatar() com alguem ainda nao carregado — buraco teorico que so
+     vira real quando um caminho novo o exercita, e a tela de amigos e esse
+     caminho. Um objeto vazio cai no mesmo ramo de quem nao tem cor nem boneco. */
+  const j=S.jogadores[id] || {};
   const cls = 'av'+(tam?' '+tam:'')+(id===EU?' eu':'');
   const aro = j.cor ? `style="--camisa:${corAro(j.cor)}"` : '';
   /* 15/08: usava `bonecos/{bon}-parado.png` com fallback pra `bonecos-t/{bon}.png`.
@@ -3753,7 +3759,10 @@ function avatar(id, tam){
      cada sprite em vez de um deslocamento fixo — que é a lei que o resto do app
      já segue pro escudo, pro patrocinador e pro seletor do vestiário. */
   const img = j.bon ? `<i class="ro" style="${estiloRosto(j.bon)}"></i>` : '';
-  return `<div class="${cls}" ${aro}>${img || j.ap}</div>`;
+  /* 03/09: `j.ap` tambem pode faltar em quem nao esta no elenco local, e
+     `${undefined}` imprime a PALAVRA undefined dentro do disco. A inicial do
+     nome e o ultimo recurso; o ponto medio e pra quem nao tem nem nome. */
+  return `<div class="${cls}" ${aro}>${img || j.ap || (j.nome ? String(j.nome).trim().charAt(0).toUpperCase() : '·')}</div>`;
 }
 const CTX_NOME={amistoso:'Amistoso',copa_panela:'Copa da comunidade',copa_circuito:'Copa de circuito',publico:'Circuito aberto',oficial:'Open'};
 
@@ -3765,12 +3774,37 @@ function movimento(atual, antes){
 
 /* ===== 25/08: disponibilidades — helpers do radar novo ===== */
 const DIAS_PT=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+/* 03/09: os pedidos de amizade, no molde do dispCarregar — lazy, guarda o
+   proprio estado e repinta quando chega. Sem isso a tela de amigos nasceria
+   sem os pedidos e so os mostraria no proximo render, que pode nunca vir. */
+/* 03/09: desfazer amizade PERGUNTA antes, e a pergunta diz o que muda em vez
+   de um "tem certeza?" que nao informa nada: ser amigo libera desafio em
+   qualquer classe, e desfazer devolve os dois a janela de uma classe. */
+function amigoDesfazer(uid){
+  const n = (typeof _nomeDe === 'function' ? _nomeDe(uid) : null) || 'essa pessoa';
+  const primeiro = String(n).split(' ')[0];
+  if(!confirm('Desfazer amizade com ' + primeiro + '?\n\nVocês voltam a só poder se desafiar dentro da janela de uma classe.')) return;
+  if(window._net && _net.desfazerAmizade) _net.desfazerAmizade(uid);
+}
+function amigosCarregar(){
+  if(window.__amigosLoad) return;
+  window.__amigosLoad = true;
+  if(!(window.netCarregarPedidosAmizade && window.netCarregarPedidosEnviados)) return;
+  Promise.all([netCarregarPedidosAmizade(true), netCarregarPedidosEnviados(true)])
+    /* a rota atual e o topo da pilha — nao existe variavel global `rota`;
+       ela e so o parametro de ir(). */
+    .then(()=>{ const topo = pilha[pilha.length-1]; if(topo && topo.rota === 'amigos') render(); })
+    .catch(()=>{});
+}
 function dispCarregar(){
   if(window.__dispLoad) return;
   window.__dispLoad=true;
   if(!(window._net && _net.dispMinhas)) return;
   Promise.all([_net.dispMinhas(), _net.dispTodas()])
-    .then(([m,t])=>{ window.__dispMinhas=m; window.__dispTodas=t; if(aba==='radar') render(); })
+    /* 03/09: a ficha tambem mostra o resumo de disponibilidade, entao o
+       repinte deixou de valer so pro radar — sem isso o bloco da ficha
+       nasceria dizendo "nenhum horario" e so corrigiria no proximo render. */
+    .then(([m,t])=>{ window.__dispMinhas=m; window.__dispTodas=t; if(aba==='radar'||aba==='ficha') render(); })
     .catch(()=>{ window.__dispMinhas=window.__dispMinhas||[]; window.__dispTodas=window.__dispTodas||{}; });
 }
 /* 29/08 (migs 79 e 81) — o que o perfil do oponente precisa buscar.
@@ -4392,36 +4426,14 @@ async function dispSalvar(){
   toast('Disponibilidade marcada — você aparece no radar da sua faixa.');
   voltar();
 }
-/* 29/08 (board, node 120:390) — o atalho de UM TOQUE do radar: hoje, no
-   período escolhido. Não reaproveita dispSalvar() por duas razões: aquele
-   exige data e hora exatas (aqui são períodos) e termina em voltar(), que no
-   radar não tem pra onde voltar — é aba, a pilha está vazia.
-   As horas de cada período são âncoras, não promessa: quem quer 07h30 usa o
-   formulário completo, que continua ali e é linkado logo abaixo do bloco. */
-const DISP_PERIODO = { manha:['08:00','manhã'], tarde:['14:00','tarde'], noite:['19:00','noite'] };
-async function dispHoje(){
-  const d = window.__dispDraft || {};
-  if(!d.periodo){ alert('Escolha um período: manhã, tarde ou noite.'); return; }
-  const [hora, rotulo] = DISP_PERIODO[d.periodo];
-  const hoje = new Date();
-  const quando = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(),
-                          +hora.slice(0,2), +hora.slice(3,5), 0, 0);
-  /* o servidor recusa disponibilidade no passado, e com razão. Melhor dizer
-     isso aqui, com o motivo, do que deixar o erro genérico subir de lá. */
-  if(!(quando > new Date())){
-    alert('A ' + rotulo + ' de hoje já passou.\n\nEscolha outro período, ou abra o formulário completo pra marcar outro dia.');
-    return;
-  }
-  const r = window._net && _net.dispCriar ? await _net.dispCriar({
-    quando: quando.toISOString(),
-    uf:(d.uf||'').trim()||null, cidade:(d.cidade||'').trim()||null, bairro:(d.bairro||'').trim()||null,
-    tipo:d.tipo||'simples', esporte:d.esporte||S.esporte||'tenis', quadra:d.quadra||null,
-  }) : {erro:'sem rede'};
-  if(r.erro){ alert('Não deu pra marcar: '+r.erro); return; }
-  window.__dispLoad=false;                          // força recarregar a régua
-  toast('Você aparece no radar da sua faixa hoje à ' + rotulo + '.');
-  render();
-}
+/* 29/08 (board, node 120:390) — havia aqui um `dispHoje()` e a tabela
+   `DISP_PERIODO` (manhã=08h, tarde=14h, noite=19h), que marcavam disponibilidade
+   de hoje num período em vez de hora exata.
+   03/09: saíram junto com o bloco compacto do radar que os chamava. Não era um
+   atalho — era um segundo formulário escrevendo na mesma tabela, pela mesma
+   função, sobre o mesmo rascunho, e sem nenhuma capacidade que `dispSalvar()`
+   já não tivesse. As horas-âncora eram a única ideia própria dele, e eram uma
+   aproximação pior do que a hora que a pessoa digita. */
 async function dispRemover(id){
   if(window._net && _net.dispApagar) await _net.dispApagar(id);
   window.__dispLoad=false; render();
@@ -5202,12 +5214,25 @@ inicio(){
         <!-- 29/08 (board): o convite pra entrar no radar. Só aparece pra quem
              ainda não marcou disponibilidade: pedir o que já foi feito é
              moldura, não convite. -->
-        ${(window.__disp||[]).some(d=>d.player_id===MEU_UID) ? '' : `
+        ${(()=>{
+          /* 03/09 — ESTE CARD APARECIA PRA TODO MUNDO, PARA SEMPRE.
+             `window.__disp` não existe: é a única ocorrência do nome no
+             projeto inteiro, e é esta LEITURA. Os globais reais são
+             `__dispMinhas`, `__dispTodas` e `__dispDraft`. O teste dava
+             sempre falso, então o convite era mostrado inclusive a quem já
+             tinha marcado — exatamente o "pedir o que já foi feito é
+             moldura, não convite" que o comentário acima diz evitar.
+             Some agora pelos DOIS caminhos de estar disponível: slot na
+             tabela ou o `livre_ate` do dia, porque o card pede uma coisa só
+             e as duas a satisfazem. */
+          const temSlot = (window.__dispMinhas||[]).length > 0;
+          const temFlag = !!(eu.livreAte && new Date(eu.livreAte) > new Date());
+          return (temSlot || temFlag) ? '' : `
         <div class="hlets">
           <img class="lets" src="fig/lets-ranket.svg" alt="Let's Ranket">
           <p>Adicione sua disponibilidade para que os outros jogadores no radar vejam você.</p>
           <button onclick="trocarAba('radar'); ir('dispForm')">Adicionar disponibilidade</button>
-        </div>`}
+        </div>`; })()}
         </div><!-- /hcol -->
 
         <div class="palco">
@@ -5607,12 +5632,22 @@ radar(){
   const hoje0=new Date(); hoje0.setHours(0,0,0,0);
   const dias=[...Array(7)].map((_,k)=>{ const d=new Date(hoje0.getTime()+k*86400e3); return d; });
   const meusSlots=(minhas||[]);
-  const colDia=(d)=>{
+  /* 03/09 — A RÉGUA MENTIA NO DIA DE HOJE. Ela lia só a tabela
+     `disponibilidades` e ignorava o `livre_ate`, enquanto o radar dos OUTROS
+     honra o flag (ver `dispClasse`). Quem tocava "Tô livre hoje" olhava aqui,
+     via OFF e concluía que não tinha funcionado — o app dizia duas coisas
+     diferentes sobre o mesmo estado, e a que a pessoa via era a errada.
+     O `k` vem do próprio `map`, então só hoje (k===0) pode acender por flag. */
+  const colDia=(d,k)=>{
     const ini=d.getTime(), fimD=ini+86400e3;
     const sl=meusSlots.filter(x=>{ const t=new Date(x.quando).getTime(); return t>=ini&&t<fimD; });
     const pill=sl.slice(0,3).map(x=>{ const dt=new Date(x.quando);
       return `<span class="dsl">${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}</span>`; }).join('');
-    return `<div class="dcol ${sl.length?'tem':''}">${pill||'<span class="doff">OFF</span>'}<b>${DIAS_PT[d.getDay()]}</b></div>`;
+    /* sem hora marcada, mas com bola na mão: o dia acende com a bola em vez
+       do horário — é o que o flag significa, dia inteiro e sem hora. */
+    const soFlag = (k===0 && euLivre && !sl.length);
+    const dentro = pill || (soFlag ? '<span class="dsl">🎾</span>' : '<span class="doff">OFF</span>');
+    return `<div class="dcol ${sl.length||soFlag?'tem':''}">${dentro}<b>${DIAS_PT[d.getDay()]}</b></div>`;
   };
 
   const nFiltros=['classe','tipo','quadra','per','lugar'].filter(k=>F[k]).length+(F.dia!=null?1:0)+(F.livresAgora?1:0);
@@ -5646,9 +5681,14 @@ radar(){
 
   return {titulo:'Encontrar', dir:`±1 classe`, html: seletor + `
     <div class="sec">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <b style="font-family:var(--f-disp);font-size:17px;flex:1">Está livre para jogar?</b>
-        <button class="rajuste" onclick="ir('dispForm')">Ajuste sua disponibilidade para os oponentes no radar</button>
+      <!-- 03/09: o botao laranja "Ajuste sua disponibilidade" saiu daqui. Ele
+           chamava ir('dispForm') — exatamente a mesma acao do botao "Marcar dia
+           e hora" logo abaixo. Tirar o bloco compacto deixou os dois lado a
+           lado e a duplicacao ficou obvia: eram tres chamadas para duas acoes.
+           Sobram as duas que de fato existem, e sao coisas diferentes: o flag
+           do dia (sem hora) e o horario marcado. -->
+      <div style="margin-bottom:10px">
+        <b style="font-family:var(--f-disp);font-size:17px">Está livre para jogar?</b>
       </div>
       <div class="card dcard" onclick="ir('dispEditar')" title="editar disponibilidades">
         <div class="rot" style="margin-bottom:8px">Suas disponibilidades ${minhas===null?'<span>carregando…</span>':''}</div>
@@ -5662,32 +5702,25 @@ radar(){
         ${euLivre?'🎾 Você está com bola na mão hoje — tocar desliga':'🎾 Tô livre hoje (sem hora marcada)'}</button>
     </div>
 
-    <!-- 29/08 (board): a disponibilidade deixou de ser SÓ uma tela à parte e
-         ganhou este atalho no topo do radar. A tela cheia (dispForm) continua,
-         com data, hora e localidade — aqui é o caminho de um toque: hoje, no
-         período escolhido. O board não desenha botão de confirmar; sem ele não
-         haveria como marcar, então ele existe e diz o que faz. -->
+    <!-- 29/08 (board): a disponibilidade ganhou um atalho no topo do radar.
+         03/09 - O ATALHO ERA UM SEGUNDO FORMULARIO, nao um atalho. dispHoje()
+         e dispSalvar() chamavam a MESMA funcao (dispCriar) com o MESMO
+         payload, e os dois liam e escreviam no MESMO rascunho (__dispDraft):
+         mexer num pill aqui mudava o que o formulario completo abria
+         pre-selecionado. E o bloco nao tinha NENHUMA capacidade exclusiva -
+         periodo e um subconjunto pior de data+hora, e quadra e tipo existiam
+         identicos nos dois lugares. Sob o mesmo cabecalho "Esta livre para
+         jogar?", isso dava quatro superficies pedindo a mesma coisa. Agora e
+         um botao: um toque leva ao formulario, que ja nasce no dia de hoje.
+         (Sem crase e sem cifrao-chave neste comentario de proposito: ele vive
+         DENTRO de uma template literal, e os dois a fechariam no meio.) -->
     <div class="sec">
-      <div class="rot">Sua disponibilidade de jogo hoje</div>
-      ${(()=>{ const d=window.__dispDraft = window.__dispDraft||{tipo:'simples', esporte:S.esporte||'tenis', quadra:'saibro', uf:'BA'};
-        const pill=(k,v,n)=>`<button class="${d[k]===v?'on':''}" onclick="dispSet('${k}','${v}')">${n}</button>`;
-        return `<div class="dhoje">
-          <div class="dfig">${bonecoImg(S.jogadores[EU], false)}</div>
-          <div class="col">
-            <div class="cab"><i>◔</i><b>Horário</b></div>
-            ${pill('periodo','manha','Manhã')}${pill('periodo','tarde','Tarde')}${pill('periodo','noite','Noite')}
-          </div>
-          <div class="col">
-            <div class="cab"><i>▤</i><b>Tipo de quadra</b></div>
-            ${pill('quadra','saibro','Saibro')}${pill('quadra','dura','Dura')}${pill('quadra','rapida','Rápida')}
-          </div>
-          <div class="col">
-            <div class="cab"><i>◎</i><b>Tipo de Jogo</b></div>
-            ${pill('tipo','simples','Simples')}${pill('tipo','duplas','Duplas')}
-          </div>
-        </div>
-        <button class="btn" style="margin-top:12px" onclick="dispHoje()">Marcar disponibilidade de hoje</button>
-        <p class="nota" style="margin-top:8px">Quer marcar outro dia, com horário e bairro? <a onclick="ir('dispForm')" style="color:var(--acc);cursor:pointer">Abrir o formulário completo</a></p>`; })()}
+      <button class="btn sec2" onclick="ir('dispForm')"
+        style="width:100%;padding:14px;border-radius:var(--rp);cursor:pointer;
+               font:700 13px var(--f-ui);border:1px solid var(--acc);
+               background:none;color:var(--acc)">
+        Marcar dia e hora que você joga</button>
+      <p class="nota" style="margin-top:8px">Com hora, quadra e bairro — quem está na sua faixa vê e te chama.</p>
     </div>
 
     <div class="sec">
@@ -5718,6 +5751,17 @@ radar(){
 /* ------- 25/08: ajustar disponibilidade (telas novas) ------- */
 dispForm(){
   const d=window.__dispDraft = window.__dispDraft||{tipo:'simples', esporte:S.esporte||'tenis', quadra:'saibro', uf:'BA'};
+  /* 03/09 — HOJE PELO RELÓGIO DAQUI, não pelo de Greenwich.
+     O `min` deste formulário era `new Date().toISOString().slice(0,10)`, que é
+     UTC: em Salvador (UTC-3), das 21h em diante o ISO já virou o dia seguinte,
+     e o campo passava a RECUSAR a data de hoje — justo no horário em que se
+     marca jogo pra hoje à noite. A data local resolve os dois usos: o piso do
+     campo e o valor com que ele nasce. */
+  const hojeLocal = (()=>{ const n=new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+  /* nasce em hoje: o botão do radar que traz pra cá diz "marcar dia e hora", e
+     o dia mais provável é o de hoje — quem quer outro troca num toque. */
+  if(!d.data) d.data = hojeLocal;
   const seg=(k,v,n)=>`<button class="${d[k]===v?'on':''}" onclick="dispSet('${k}','${v}')">${n}</button>`;
   return {titulo:'Radar', html:`
     <div class="pad">
@@ -5726,7 +5770,7 @@ dispForm(){
         <p class="nota" style="margin:4px 0 14px">Cada horário marcado aparece pros oponentes da sua faixa no radar. Passou a hora, expira sozinho.</p>
         <div class="rot">Data e hora</div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <input class="onb-input" style="margin:0;flex:1" type="date" value="${d.data||''}" min="${new Date().toISOString().slice(0,10)}" onchange="dispSet('data',this.value,true)">
+          <input class="onb-input" style="margin:0;flex:1" type="date" value="${d.data||''}" min="${hojeLocal}" onchange="dispSet('data',this.value,true)">
           <input class="onb-input" style="margin:0;flex:0 0 118px" type="time" value="${d.hora||''}" onchange="dispSet('hora',this.value,true)">
         </div>
         <div class="rot">Localidade</div>
@@ -6686,6 +6730,11 @@ grupo(p){
 /* ---------------- FICHA ---------------- */
 ficha(){
   const eu=S.jogadores[EU];
+  /* 03/09: a ficha passou a mostrar o resumo de disponibilidade, entao ela
+     precisa pedir os slots como o radar ja pedia. `dispCarregar` e lazy e
+     guarda o proprio estado, entao chamar aqui nao custa uma segunda ida ao
+     banco quando a pessoa vem do radar. */
+  dispCarregar();
   /* 16/08: o histórico passou a receber partidas que NÃO aconteceram (W.O. e
      cancelamento em cima da hora). Elas precisam aparecer — o Ponto sai do
      saldo e sumir sem linha é o oposto de livro-caixa — mas não podem contar
@@ -6729,6 +6778,49 @@ ficha(){
         <div><div class="v">${v}</div><div class="k">Vitórias</div></div>
         <div><div class="v">${jogadas.length?Math.round(v/jogadas.length*100):0}%</div><div class="k">Aprov.</div></div>
       </div>
+    </div>
+
+    <!-- 03/09 - DADOS ESPORTIVOS. O app PERGUNTAVA mao dominante e tempo de
+         pratica no passo 3 do cadastro, gravava no aparelho (eu.mao,
+         eu.tempoPratica), mandava pro banco (net.js, mao e tempo_pratica) e
+         nunca mostrava em lugar nenhum: um grep por .mao no index inteiro
+         devolvia so a linha que ESCREVE. Perguntar e nao devolver e pior do
+         que nao perguntar — a pessoa preenche, procura, nao acha, e da de
+         ombros pro proximo campo que voce pedir.
+         A disponibilidade entra como RESUMO com atalho, nao como segunda
+         regua: duplicar a do radar seria repetir o erro que acabou de sair
+         dali. (Sem crase neste comentario: ele vive dentro de um template
+         literal.) -->
+    <div class="sec">
+      <div class="rot">Dados esportivos</div>
+      <div class="card">
+        <div class="linha-item" style="padding:10px 0">
+          <div class="txt"><b>Mão dominante</b></div>
+          <div style="color:${eu.mao?'var(--ink)':'var(--ink3)'};font:600 13px var(--f-ui)">${
+            eu.mao==='E' ? 'Esquerda' : eu.mao==='D' ? 'Direita' : 'não informada'}</div>
+        </div>
+        <div class="linha-item" style="padding:10px 0;border-top:1px solid var(--linha4)">
+          <div class="txt"><b>Tempo de prática</b></div>
+          <div style="color:${eu.tempoPratica?'var(--ink)':'var(--ink3)'};font:600 13px var(--f-ui)">${
+            eu.tempoPratica || 'não informado'}</div>
+        </div>
+        <div class="linha-item clic" style="padding:10px 0;border-top:1px solid var(--linha4);cursor:pointer"
+             onclick="trocarAba('radar')">
+          <div class="txt"><b>Disponibilidade</b><small>${(()=>{
+            const sl = (window.__dispMinhas||[]).filter(x=> new Date(x.quando) > new Date());
+            const livre = !!(eu.livreAte && new Date(eu.livreAte) > new Date());
+            if(livre && !sl.length) return 'Com bola na mão hoje, sem hora marcada';
+            if(!sl.length) return 'Nenhum horário marcado — toque pra marcar no radar';
+            const prox = sl.sort((a,b)=> new Date(a.quando)-new Date(b.quando))[0];
+            const d = new Date(prox.quando);
+            const hh = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+            return sl.length + (sl.length>1?' horários marcados':' horário marcado') + ' · próximo ' + DIAS_PT[d.getDay()] + ' ' + hh;
+          })()}</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+      ${(eu.mao && eu.tempoPratica) ? '' :
+        '<p class="nota" style="margin-top:8px">O que está em branco você respondeu no cadastro ou pode responder depois — ainda não dá pra editar por aqui.</p>'}
     </div>
 
     <!-- 01/09 (mig 90): o estilo de jogo, DECLARADO. Fica na ficha e não no
@@ -6790,6 +6882,27 @@ ficha(){
     <!-- 25/08 (Fase B): convites. O contador de convertidos é o dado que a
          reunião pediu pra gamificar depois ("quem mais gerar convite
          convertido..."). Carrega lazy, como as outras seções de rede. -->
+    <!-- 03/09: a porta dos AMIGOS. Fica aqui, colada em "Seus convites",
+         porque as duas sao sobre a mesma coisa — quem voce trouxe e com quem
+         voce joga. A barra de baixo nao ganha item: ela tem cinco e a decisao
+         de 29/08 ja resolveu esse teto tirando Notificacoes e Perfil dela. -->
+    <div class="sec">
+      <div class="rot">Amigos</div>
+      <div class="card clic" onclick="ir('amigos')">
+        <div class="linha-item">
+          <div class="av">◍</div>
+          <div class="txt"><b>Meus amigos</b><small>${(()=>{
+            const n = (eu.amigos||[]).length;
+            const p = (window.netPedidosAmizade ? netPedidosAmizade() : []).length;
+            if(p) return n + (n===1?' amigo':' amigos') + ' · ' + p + (p===1?' pedido esperando':' pedidos esperando');
+            return n ? n + (n===1?' amigo — desafiar em qualquer classe':' amigos — desafiar em qualquer classe')
+                     : 'Ninguém ainda — amigo pode te desafiar em qualquer classe';
+          })()}</small></div>
+          <div class="seta">›</div>
+        </div>
+      </div>
+    </div>
+
     <div class="sec">
       <div class="rot">Seus convites <span>${convUsados()} ${convUsados()===1?'amigo entrou':'amigos entraram'} por você</span></div>
       ${convHTML()}
@@ -6893,6 +7006,107 @@ ficha(){
    ⚠️ Não há EMPATE aqui, e o board mostra um (5-5, +15pts). O app não tem:
    `venceu_criador` é booleano. Entrar com empate é mexer no motor de
    pontuação, não numa tela — ficou pendente com o Nuno. */
+/* =========================================================================
+   AMIGOS (03/09) — pedido do Nuno: "pagina para ver meus amigos e desafiar,
+   conversar".
+
+   Ate aqui amizade so existia como FLAG e como ordenacao dentro de outras
+   telas: ordenava o radar, virava o rotulo "· amigo" num select, acendia um
+   selo no VS. O unico lugar do app que ENUMERAVA os amigos era o dropdown de
+   parceiro do Registrar Atividade — num select. Quem sao os seus amigos era
+   uma pergunta que o app sabia responder e nao tinha onde.
+
+   Nenhuma migracao: `amizades` (mig 16) e `amizade_pedidos` (mig 25) existem
+   desde agosto, com RLS pros dois lados. Faltava a tela.
+
+   CONVERSAR: o botao so aparece quando ha partida VIVA entre os dois. O app
+   nao tem conversa 1:1 — tem conversa de grupo e conversa de partida —, e
+   inventar uma tabela de mensagem direta era o item mais caro da lista. A
+   conversa nascer do jogo tambem e a lei do produto, entao a restricao virou
+   desenho em vez de remendo.
+   ========================================================================= */
+amigos(){
+  amigosCarregar();
+  const eu = S.jogadores[EU];
+  const meus = (eu.amigos || []);
+  const recebidos = window.netPedidosAmizade ? netPedidosAmizade() : [];
+  const enviados  = window.netPedidosEnviados ? netPedidosEnviados() : [];
+  const nomeDe = (uid)=> (typeof _nomeDe === 'function' ? _nomeDe(uid) : null) || nome(uid) || 'Jogador';
+
+  /* mesma leitura de classe e posicao da TELA DE MATCH GAME: o numero que
+     aparece aqui tem de ser o mesmo que aparece la, senao o app diz duas
+     coisas sobre a mesma pessoa. */
+  const T = tabelaPontos();
+  const ord = ordena((T && T.comunidade) || {});
+  const linha = (uid)=>{
+    const j = S.jogadores[uid];
+    const p = ord.indexOf(uid);
+    const cl = j ? divDe(j) + categoriaDe(nivelDe(j), divDe(j)) : null;
+    const par = (window.netPartidaCom ? netPartidaCom(uid) : null);
+    /* 03/09: as acoes vao numa LINHA PROPRIA, nao na coluna da direita como
+       no radar. La sao dois botoes; aqui sao tres, e empilhados eles espremem
+       o nome ate ele quebrar em duas linhas e a classe em tres. */
+    return `
+    <div class="card oc">
+      <div class="linha-item" style="align-items:center">
+        ${avatar(uid,'g')}
+        <div class="txt">
+          <b style="font-size:15px">${nomeDe(uid)}</b>
+          ${cl ? `<small>▦ Classe ${cl}${p >= 0 ? ' · ' + (p+1) + 'º na comunidade' : ''}</small>` : ''}
+          ${par ? `<small style="color:var(--acc)">🎾 voc&ecirc;s t&ecirc;m uma partida marcada</small>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="oconv" style="flex:1" onclick="netDesafiar('${uid}')">Desafiar</button>
+        ${par ? `<button class="operf" style="flex:1" onclick="_net.abrirChatPartida('${par.id}')">Conversar</button>`
+              : `<button class="operf" style="flex:1" onclick="netVerJogador('${uid}')">Ver perfil</button>`}
+        <button class="operf" style="flex:0 0 auto;color:var(--ink3)"
+                onclick="amigoDesfazer('${uid}')" title="Desfazer amizade">&times;</button>
+      </div>
+    </div>`;
+  };
+
+  return {titulo:'Amigos', dir: meus.length ? String(meus.length) : '', html:`
+    <div class="pad">
+      ${recebidos.length ? `
+      <div class="sec">
+        <div class="rot">Querem ser seus amigos</div>
+        ${recebidos.map(r=>`
+          <div class="card oc">
+            <div class="linha-item">
+              ${avatar(r.de,'g')}
+              <div class="txt"><b style="font-size:15px">${nomeDe(r.de)}</b><small>pediu pra ser seu amigo</small></div>
+              <div class="odir">
+                <button class="oconv" onclick="netAceitarAmizade('${r.de}')">Aceitar</button>
+                <button class="operf" onclick="netRecusarAmizade('${r.de}')">Recusar</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
+
+      <div class="sec">
+        <div class="rot">Seus amigos ${meus.length ? '<span>' + meus.length + '</span>' : ''}</div>
+        ${meus.length
+          ? meus.map(linha).join('')
+          : `<div class="card"><p class="nota">Voc&ecirc; ainda n&atilde;o tem amigos no app. Amigo pode te desafiar em <b>qualquer classe</b> — sem isso, o desafio s&oacute; vale dentro da janela de uma classe.</p></div>`}
+        <button class="btn sec2" onclick="_net.abrirBusca()"
+          style="width:100%;margin-top:12px;padding:14px;border-radius:var(--rp);cursor:pointer;
+                 font:700 13px var(--f-ui);border:1px solid var(--acc);background:none;color:var(--acc)">
+          Buscar jogadores</button>
+      </div>
+
+      ${enviados.length ? `
+      <div class="sec">
+        <div class="rot">Voc&ecirc; pediu, esperando resposta</div>
+        <div class="card">
+          ${enviados.map(u=>`<div class="linha-item" style="padding:8px 0">
+            ${avatar(u)}<div class="txt"><b>${nomeDe(u)}</b></div>
+            <small style="color:var(--ink3)">aguardando</small></div>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>`};
+},
+
 historico(){
   const uid = (window._net && _net.uid && _net.uid()) || null;
   const todas = ((window.__minhasPartidas)||[]).filter(m=>m.status==='confirmada' && m.confirmed_at);

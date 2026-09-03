@@ -503,6 +503,10 @@ async function netCarregarPedidosEnviados(force){
   return _pedidosEnviados;
 }
 const netJaPedi = (uid)=> (_pedidosEnviados||[]).includes(uid);
+/* 03/09: quem PEDIU e ainda espera. Até agora esta lista só alimentava o
+   estado de um botão na busca — ninguém via os próprios pedidos em lugar
+   nenhum, e pedido enviado que some da vista parece pedido que não foi. */
+window.netPedidosEnviados = ()=> _pedidosEnviados || [];
 window.netCarregarPedidosEnviados = netCarregarPedidosEnviados;
 window.netJaPedi = netJaPedi;
 window.netPedirAmizade = netPedirAmizade;
@@ -532,6 +536,42 @@ async function netAceitarAmizade(uid){
   if(window.toast) toast('Amigos. Agora <b>os dois</b> podem se desafiar em qualquer classe.');
 }
 window.netAceitarAmizade = netAceitarAmizade;
+
+/* ── DESFAZER AMIZADE (03/09) ───────────────────────────────────────────────
+   A RLS permite desde a migração 16 ("os dois lados veem e os dois podem
+   desfazer") e nenhum botão nunca chamou. Enquanto não havia tela de amigos
+   isso passava; com a lista na frente da pessoa, uma relação que só entra e
+   nunca sai é uma porta que só abre.
+   ⚠️ Não é só cosmético: ser amigo LIBERA desafio em qualquer classe (é o que
+   o toast do aceite promete). Desfazer devolve os dois à janela de ±1 classe,
+   e por isso a confirmação diz isso em vez de perguntar um "tem certeza?" que
+   não informa nada. */
+async function netDesfazerAmizade(uid){
+  if(!MEU_UID || uid === MEU_UID) return;
+  const [a, b] = _par(MEU_UID, uid);
+  const { error } = await sb.from('amizades').delete().eq('a', a).eq('b', b);
+  if(error){
+    console.error('[net] desfazer amizade', error);
+    if(window.toast) toast('Não deu pra desfazer agora. Tente de novo.');
+    return;
+  }
+  const meus = _meusAmigos();
+  const i = meus.indexOf(uid); if(i >= 0){ meus.splice(i, 1); salvar(); }
+  if(window.render) render();
+  if(window.toast) toast('Amizade desfeita.');
+}
+window.netDesfazerAmizade = netDesfazerAmizade;
+
+/* A partida VIVA que eu tenho com alguém, se houver. É o que decide se o botão
+   "Conversar" aparece na lista de amigos: o app não tem conversa 1:1 — tem
+   conversa de GRUPO e conversa de PARTIDA. Em vez de inventar uma tabela de
+   mensagem direta, a conversa nasce do jogo, que é a lei do produto. Sem
+   partida entre os dois, não há o que conversar ainda. */
+function netPartidaCom(uid){
+  if(typeof _advId !== 'function') return null;
+  return (_inbox || []).find(m => _advId(m) === uid) || null;
+}
+window.netPartidaCom = netPartidaCom;
 
 async function netRecusarAmizade(uid){
   if(!MEU_UID) return;
@@ -7086,6 +7126,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   cancelarDesafio:netCancelarDesafio,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
   atividadeCriar:netAtividadeCriar, atividadesResumo:netAtividadesResumo,
+  desfazerAmizade:netDesfazerAmizade, partidaCom:netPartidaCom,
   /* (30/08) `trofeusDe` já existia desde 18/08, escrita com este uso em mente
      — o comentário dela diz "a ficha do outro jogador precisa dos troféus
      dele". Ficou fora da ponte, e por isso a aba Conquistas do oponente passou
