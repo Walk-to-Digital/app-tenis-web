@@ -2322,7 +2322,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788449078"></script>
+<script src="net.js?v=1788450422"></script>
 
 <script>
 /* =========================================================================
@@ -3385,7 +3385,7 @@ function adsHTML(){
    já mascarou verificação neste projeto em 18/08. */
 async function adsCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788449078"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v="]')||{}).src||'';
     const r = await fetch('anunciantes.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -3517,7 +3517,7 @@ function noticiasHTML(){
 
 async function noticiasCarregar(){
   try{
-    const v = (document.querySelector('script[src*="net.js?v=1788449078"]')||{}).src||'';
+    const v = (document.querySelector('script[src*="net.js?v="]')||{}).src||'';
     const r = await fetch('noticias.json?v=' + (v.split('?v=')[1]||'0'), {cache:'no-cache'});
     if(!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
@@ -4900,7 +4900,7 @@ async function profPedir(id, aulaId){
 function equipCarregar(){
   if(window.__eqLoad) return;
   window.__eqLoad=true;
-  const v=(document.querySelector('script[src*="net.js?v=1788449078"]')||{}).src||'';
+  const v=(document.querySelector('script[src*="net.js?v="]')||{}).src||'';
   const q=(v.match(/v=(\d+)/)||[])[1]||'';
   fetch('equipamentos.json'+(q?('?v='+q):''),{cache:'no-cache'})
     .then(r=>r.ok?r.json():{itens:[]})
