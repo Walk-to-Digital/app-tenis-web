@@ -572,11 +572,15 @@ async function netDesfazerAmizade(uid){
 }
 window.netDesfazerAmizade = netDesfazerAmizade;
 
-/* A partida VIVA que eu tenho com alguém, se houver. É o que decide se o botão
-   "Conversar" aparece na lista de amigos: o app não tem conversa 1:1 — tem
-   conversa de GRUPO e conversa de PARTIDA. Em vez de inventar uma tabela de
-   mensagem direta, a conversa nasce do jogo, que é a lei do produto. Sem
-   partida entre os dois, não há o que conversar ainda. */
+/* A partida VIVA que eu tenho com alguém, se houver.
+   ⚠️ 04/09 — ESTA CASCA MUDOU. Ela dizia "o app não tem conversa 1:1, e sem
+   partida entre os dois não há o que conversar ainda". Deixou de valer com a
+   mig 99: existe a sala de AMIGOS, e conversar não depende mais de jogo
+   marcado. O que a 99 preservou foi a razão de fundo das migs 37 e 40 —
+   ninguém te escreve sem que você tenha topado algo antes —, trocando o
+   convite "partida" pelo convite "amizade".
+   O que esta função decide hoje é QUAL das duas salas o botão abre: havendo
+   partida viva, a dela, que é onde a proposta e o placar moram. */
 function netPartidaCom(uid){
   if(typeof _advId !== 'function') return null;
   return (_inbox || []).find(m => _advId(m) === uid) || null;
@@ -3950,7 +3954,32 @@ let _chat = null;
 const _SALAS = {
   grupo:   { tabela:'grupo_mensagens',   coluna:'grupo_id', titulo:'Conversa' },
   partida: { tabela:'partida_mensagens', coluna:'match_id', titulo:'Combinar' },
+  /* (99) a sala de amigos e a UNICA endereçada por um PAR, nao por uma coluna.
+     `par:true` e o que os tres pontos de acesso (carregar, enviar, apagar)
+     leem pra escolher o endereço — e e o unico lugar em que as tres salas
+     deixam de ser iguais. */
+  amigo:   { tabela:'amigo_mensagens',   par:true,          titulo:'Conversa' },
 };
+
+/* (99) O PAR CANONICO. A tabela guarda (a,b) com a < b, igual a `amizades`, e
+   a constraint recusa o que vier fora de ordem — entao quem monta o endereço e
+   o cliente, sempre pelo mesmo caminho.
+   A comparacao de string bate com a do banco: uuid canonico e hex minusculo com
+   os hifens nas mesmas posicoes, e '0'-'9' < 'a'-'f' tanto em ASCII quanto nos
+   bytes que o Postgres compara. */
+function _parDe(outro){
+  return (MEU_UID < outro) ? { a:MEU_UID, b:outro } : { a:outro, b:MEU_UID };
+}
+/* o filtro do endereço, pros tres usos */
+function _salaOnde(q){
+  return _chat.sala.par ? q.eq('a', _chat.par.a).eq('b', _chat.par.b)
+                        : q.eq(_chat.sala.coluna, _chat.id);
+}
+/* e as chaves do insert, do mesmo endereço */
+function _salaChaves(){
+  return _chat.sala.par ? { a:_chat.par.a, b:_chat.par.b }
+                        : { [_chat.sala.coluna]: _chat.id };
+}
 
 async function netAbrirChat(gid){
   if(!MEU_UID){ alert('Ainda conectando…'); return; }
@@ -3985,14 +4014,56 @@ async function netAbrirChatPartida(matchId){
   await _chatCarregar();
 }
 
+/* (99) A CONVERSA COM UM AMIGO. Nao recebe id de sala porque sala nao existe
+   como linha: o endereço e o par, montado aqui e em lugar nenhum mais.
+   Nao confere a amizade antes de abrir — quem confere e o BANCO, na policy de
+   insert. Conferir aqui tambem seria uma segunda regra pra manter em dia, e a
+   do cliente e a que envelhece: a pessoa desfaz a amizade noutro aparelho e
+   este ainda acharia que pode. Ler o historico continua valendo mesmo sem
+   amizade, por desenho da 99 — entao abrir e legitimo; escrever e que falha,
+   com a mensagem do banco. */
+async function netAbrirChatAmigo(uid){
+  if(!MEU_UID){ alert('Ainda conectando…'); return; }
+  if(uid === MEU_UID) return;
+  _chat = { sala:_SALAS.amigo, par:_parDe(uid), id:uid, advId:uid,
+            nome:_nomeDe(uid), msgs:[], rascunho:'', carregando:true,
+            aberta:true, dono_id:null, match:null };
+  netRenderChat();
+  await _chatCarregar();
+}
+window.netAbrirChatAmigo = netAbrirChatAmigo;
+
+/* (99) O DESAFIO NASCENDO DA CONVERSA — o motivo da migracao existir.
+   Abre a MESMA folha do desafio, com o adversario preenchido. Nao redesenha o
+   formulario: dois formularios pro mesmo combinado e como eles passam a
+   divergir, e e o que ja aconteceu com a ficha do jogador ate 26/08. */
+function _amigoCard(){
+  if(!_chat || _chat.sala !== _SALAS.amigo) return '';
+  const nome0 = (_chat.nome||'').split(' ')[0];
+  const bt = (rot, acao)=> `<button onclick="${acao}"
+      style="width:100%;margin-top:10px;padding:11px;border-radius:999px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px var(--f-ui);cursor:pointer">${rot}</button>`;
+  const cx = (txt, botao)=> `<div style="border:1px solid var(--linha2);border-radius:16px;padding:14px;margin:2px 0 10px">
+    <div style="font-size:11.5px;color:var(--ink2);line-height:1.5">${txt}</div>${botao}</div>`;
+
+  /* já existe partida entre os dois? Então o botão NÃO desafia de novo: manda
+     pra sala dela. Duas partidas vivas com a mesma pessoa nascem de um botão
+     que finge que a primeira não existe — e é lá, não aqui, que moram a
+     proposta, o placar e o relógio das 72h. */
+  const par = (typeof netPartidaCom==='function') ? netPartidaCom(_chat.advId) : null;
+  if(par) return cx(`Vocês já têm uma partida em aberto. O combinado e o placar moram na conversa dela.`,
+                    bt(`Abrir a conversa da partida`, `_net.abrirChatPartida('${par.id}')`));
+
+  return cx(`Combinou o jogo por aqui? Marque — o desafio entra no ranking dos dois.`,
+            bt(`Desafiar ${_admEsc(nome0)}`, `_net.fecharChat();netDesafiar('${_chat.advId}')`));
+}
+
 /* Busca as mais NOVAS e inverte pra desenhar: a conversa se lê de cima pra
    baixo, mas o que interessa é o fim. Pedir `criado_em asc` com limit traria as
    50 PRIMEIRAS mensagens da sala — as de meses atrás. */
 async function _chatCarregar(){
   if(!_chat) return;
-  const r = await sb.from(_chat.sala.tabela)
-    .select('id,autor_id,texto,criado_em')
-    .eq(_chat.sala.coluna, _chat.id)
+  const r = await _salaOnde(sb.from(_chat.sala.tabela)
+    .select('id,autor_id,texto,criado_em'))
     .order('criado_em', {ascending:false})
     .limit(50);
   if(!_chat) return;                       // fechou enquanto a consulta voltava
@@ -4035,10 +4106,15 @@ async function _salaCarimbar(c){
   if(!c || !MEU_UID || !c.msgs || !c.msgs.length) return;
   const ultima = c.msgs[c.msgs.length-1].criado_em;
   try{
+    /* (100) na sala de amigos o `sala_id` e o uid do OUTRO, nao um id de sala:
+       a chave (player_id, sala, sala_id) ja diz "eu li a conversa com fulano".
+       O check da 100 e quem aceita 'amigo' — sem ela este upsert e recusado, e
+       como o erro morre aqui dentro o ponto de nao-lida acenderia pra sempre. */
+    const ehAmigo = c.sala===_SALAS.amigo;
     const { error } = await sb.from('sala_lida').upsert({
       player_id: MEU_UID,
-      sala: c.sala===_SALAS.grupo ? 'grupo' : 'partida',
-      sala_id: c.id,
+      sala: c.sala===_SALAS.grupo ? 'grupo' : ehAmigo ? 'amigo' : 'partida',
+      sala_id: ehAmigo ? c.advId : c.id,
       lido_em: ultima,
     });
     if(!error) netAvisos();   // o ponto apaga vindo do banco, não daqui
@@ -4054,7 +4130,7 @@ async function netAvisos(){
   if(!MEU_UID) return;
   const { data, error } = await sb.rpc('avisos_salas');
   if(error){ console.error('[net] avisos', error); return; }   // mantém o último valor
-  const av = { grupo:{}, partida:{} };
+  const av = { grupo:{}, partida:{}, amigo:{} };   // (101) a terceira metade
   (data||[]).forEach(r=>{ if(av[r.sala]) av[r.sala][r.sala_id] = r.nao_lidas; });
   _avisos = av;
   if(window.render) render();
@@ -4063,8 +4139,8 @@ async function netAvisos(){
 function netRecadosDe(tipo, id){ return (_avisos && _avisos[tipo] && _avisos[tipo][id]) || 0; }
 function netTemRecado(tipo){
   if(!_avisos) return false;
-  return (tipo ? [tipo] : ['grupo','partida'])
-    .some(t=> Object.values(_avisos[t]).some(n=> n>0));
+  return (tipo ? [tipo] : ['grupo','partida','amigo'])
+    .some(t=> Object.values(_avisos[t]||{}).some(n=> n>0));
 }
 
 /* 25/08 (mig 66): AULAS — a REGRA, não a lista.
@@ -4596,7 +4672,21 @@ async function netChatHub(){
   const partidas = (_inbox||[])
     .filter(m=> ['aceito','pendente','contestada'].includes(m.status))
     .map(m=> ({id:m.id, nome:(typeof _nomeDe==='function'? _nomeDe(_advId(m)) : 'Partida')}));
-  return {grupos, partidas};
+  /* (99) as conversas com amigos. A lista sai da AMIZADE, nao das mensagens:
+     amigo com quem nunca se falou tem de aparecer, senao nao ha por onde
+     começar a primeira conversa — e o hub viraria espelho do passado em vez de
+     porta. Quem ordena e o aviso: quem falou primeiro aparece em cima. */
+  let amigos=[];
+  try{
+    const r = await sb.from('amizades').select('a,b').or(`a.eq.${MEU_UID},b.eq.${MEU_UID}`);
+    amigos = (r.data||[])
+      .map(x=> x.a===MEU_UID ? x.b : x.a)
+      .filter(uid=> uid && uid!==MEU_UID)
+      .map(uid=> ({id:uid, nome:(typeof _nomeDe==='function'? _nomeDe(uid) : 'Amigo'),
+                   novas: netRecadosDe('amigo', uid)}))
+      .sort((x,y)=> (y.novas-x.novas) || (x.nome||'').localeCompare(y.nome||''));
+  }catch(e){ console.error('[net] chatHub amigos', e); }
+  return {grupos, partidas, amigos};
 }
 window.netChatHub = netChatHub;
 
@@ -4608,7 +4698,7 @@ async function _chatEnviar(){
   const campo = document.getElementById('net-chat-in');
   if(campo) campo.disabled = true;                    // trava o toque duplo
   const { error } = await sb.from(_chat.sala.tabela)
-    .insert({ [_chat.sala.coluna]:_chat.id, autor_id:MEU_UID, texto:txt });
+    .insert({ ..._salaChaves(), autor_id:MEU_UID, texto:txt });
   if(campo) campo.disabled = false;
   if(error){ alert('Não deu pra enviar: '+error.message); return; }
   _chat.rascunho = '';
@@ -4768,9 +4858,13 @@ function netRenderChat(){
 
   const corpo = _chat.carregando ? `<div style="color:var(--ink3);font-size:12.5px;padding:18px 0;text-align:center">Carregando a conversa…</div>`
     : _chat.erro ? `<div style="color:var(--dn);font-size:12.5px;padding:18px 0;text-align:center">Não deu pra ler a conversa.<br><span style="color:var(--ink3);font-size:11px">${_admEsc(_chat.erro)}</span></div>`
-    : (_propCard() + bolhas + _propEventos()) || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
+    : (_propCard() + _amigoCard() + bolhas + _propEventos()) || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
 
   const ehPartida = _chat.sala === _SALAS.partida;
+  const ehAmigo   = _chat.sala === _SALAS.amigo;
+  /* as duas salas de DUAS PESSOAS mostram a cara e o "online agora" do outro;
+     a de grupo nao tem "o outro" */
+  const temOutro  = ehPartida || ehAmigo;
   /* o campo só existe enquanto a sala está ABERTA — na partida encerrada a
      policy recusaria o insert, e campo que devolve erro não é campo */
   const entrada = _chat.aberta ? `
@@ -4785,11 +4879,12 @@ function netRenderChat(){
 
   /* O CABEÇALHO DO BOARD: volta, avatar do outro, nome e o estado. Na sala de
      GRUPO não há "o outro" — o avatar sai e o subtítulo diz o que a sala é. */
-  const visto = ehPartida && _chat.advId ? _vistoTxt(_chat.advId) : null;
-  const face  = ehPartida && _chat.advId ? _discoUid(_chat.advId, 44)
+  const visto = temOutro && _chat.advId ? _vistoTxt(_chat.advId) : null;
+  const face  = temOutro && _chat.advId ? _discoUid(_chat.advId, 44)
               : `<div style="width:44px;height:44px;border-radius:50%;background:var(--sup2);display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 44px">💬</div>`;
-  const sub   = ehPartida
-    ? (visto ? `<span style="color:${visto.on?'var(--acc)':'var(--ink3)'}">${visto.txt}</span>` : 'Conversa da partida')
+  const sub   = temOutro
+    ? (visto ? `<span style="color:${visto.on?'var(--acc)':'var(--ink3)'}">${visto.txt}</span>`
+             : ehAmigo ? 'Conversa' : 'Conversa da partida')
     : 'Conversa da comunidade';
 
   _sheet('net-chat', `
@@ -7222,6 +7317,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   editarQuadra:netEditarQuadra, apagarQuadra:netApagarQuadra,
   // 18/08: a conversa da comunidade (mig 37) e da partida (mig 40) — mesma folha
   abrirChat:netAbrirChat, abrirChatPartida:netAbrirChatPartida, fecharChat:netFecharChat,
+  abrirChatAmigo:netAbrirChatAmigo,   // (99) a terceira sala
   chatHub:netChatHub,
   agenda:netAgenda,
   adsEvento:netAdsEvento, adsRelatorio:netAdsRelatorio,

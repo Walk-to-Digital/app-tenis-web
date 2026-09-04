@@ -2327,7 +2327,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788538099"></script>
+<script src="net.js?v=1788541290"></script>
 
 <script>
 /* =========================================================================
@@ -6333,10 +6333,10 @@ chat(){
   const hub = window.__chatHub;
   if(hub===undefined && window._net && _net.chatHub){
     window.__chatHub = null;
-    _net.chatHub().then(h=>{ window.__chatHub=h||{grupos:[],partidas:[]}; if(aba==='chat') render(); })
-                  .catch(()=>{ window.__chatHub={grupos:[],partidas:[]}; if(aba==='chat') render(); });
+    _net.chatHub().then(h=>{ window.__chatHub=h||{grupos:[],partidas:[],amigos:[]}; if(aba==='chat') render(); })
+                  .catch(()=>{ window.__chatHub={grupos:[],partidas:[],amigos:[]}; if(aba==='chat') render(); });
   }
-  const h = hub || {grupos:[],partidas:[]};
+  const h = hub || {grupos:[],partidas:[],amigos:[]};
   const rec = (t,id)=> (window.netRecadosDe ? netRecadosDe(t,id) : 0);
   /* 02/09 (node 64:569) — os FILTROS do topo. Dois dos três do arquivo saem do
      dado que já existe: "Não lidas" pelo contador de recados, "Grupos" pela
@@ -6348,6 +6348,9 @@ chat(){
   const naoLidas = (t,id)=> rec(t,id) > 0;
   const grupos   = h.grupos.filter(g=> filtro==='grupos' ? true : (filtro==='naolidas' ? naoLidas('grupo',g.id) : true));
   const partidas = h.partidas.filter(pt=> filtro==='grupos' ? false : (filtro==='naolidas' ? naoLidas('partida',pt.id) : true));
+  /* (99) as conversas com amigos. O filtro "Grupos" as esconde, como esconde
+     as de partida — sao conversa de duas pessoas, nao de comunidade. */
+  const amigos = (h.amigos||[]).filter(am=> filtro==='grupos' ? false : (filtro==='naolidas' ? naoLidas('amigo',am.id) : true));
 
   /* a linha: avatar, nome com a hora do lado, subtítulo e o disco do não-lido.
      ⚠️ SEM a hora e SEM a última mensagem, que o arquivo mostra e o app não
@@ -6366,7 +6369,12 @@ chat(){
                                      `_net.abrirChat('${g.id}')`, '💬')).join('');
   const cardP = partidas.map(pt=> linha(pt.nome, 'Conversa da partida', rec('partida',pt.id),
                                         `_net.abrirChatPartida('${pt.id}')`, '🎾')).join('');
-  const vazioFiltrado = filtro!=='todas' && !(cardG+cardP);
+  /* o subtitulo diz o que a conversa E, nao quantas mensagens tem: amigo com
+     quem nunca se falou aparece igual, porque a lista sai da AMIZADE e existe
+     pra ser a porta da primeira conversa. */
+  const cardA = amigos.map(am=> linha(am.nome, 'Conversa', rec('amigo',am.id),
+                                      `_net.abrirChatAmigo('${am.id}')`, '👤')).join('');
+  const vazioFiltrado = filtro!=='todas' && !(cardG+cardP+cardA);
   return {titulo:'Chat', html:`
     <div class="sec">
       <div class="convf">
@@ -6376,7 +6384,7 @@ chat(){
       </div>
       ${hub===null ? '<div class="card"><p class="nota">Carregando…</p></div>'
         : vazioFiltrado ? `<div class="card"><p class="nota">Nenhuma conversa ${filtro==='naolidas'?'não lida':'de comunidade'} agora.</p></div>`
-        : ((cardG+cardP) || `<div class="card"><p class="nota">Sem conversas ainda. A conversa nasce junto com a comunidade e com a partida marcada — marque um jogo pelo Radar.</p></div>`)}
+        : ((cardG+cardP+cardA) || `<div class="card"><p class="nota">Sem conversas ainda. Elas nascem da comunidade, da partida marcada e de quem já é seu amigo — adicione alguém pelo Radar.</p></div>`)}
     </div>
     <div class="sec">
       <div class="card clic" onclick="netAbrirInbox()">
@@ -7053,11 +7061,14 @@ ficha(){
    Nenhuma migracao: `amizades` (mig 16) e `amizade_pedidos` (mig 25) existem
    desde agosto, com RLS pros dois lados. Faltava a tela.
 
-   CONVERSAR: o botao so aparece quando ha partida VIVA entre os dois. O app
-   nao tem conversa 1:1 — tem conversa de grupo e conversa de partida —, e
-   inventar uma tabela de mensagem direta era o item mais caro da lista. A
-   conversa nascer do jogo tambem e a lei do produto, entao a restricao virou
-   desenho em vez de remendo.
+   CONVERSAR: 04/09 — o botao passou a valer SEMPRE. Ele dizia aqui que o app
+   nao tinha conversa 1:1 e que inventar a tabela era o item mais caro da
+   lista; a mig 99 fez isso, restrita a AMIGOS. Havendo partida viva o botao
+   abre a sala DELA (onde a proposta e o placar moram); sem partida, abre a
+   conversa de amigos, e o desafio pode nascer de dentro dela.
+   O que nao mudou e a razao das migs 37 e 40: ninguem te escreve sem que voce
+   tenha topado antes. O que se topou aqui e a amizade — e desfaze-la corta a
+   escrita no mesmo instante, que e o "bloquear" sem tabela nova.
    ========================================================================= */
 amigos(){
   amigosCarregar();
@@ -7082,7 +7093,10 @@ amigos(){
        o nome ate ele quebrar em duas linhas e a classe em tres. */
     return `
     <div class="card oc">
-      <div class="linha-item" style="align-items:center">
+      <!-- 04/09: a linha inteira abre o perfil. O botao "Ver perfil" cedeu o
+           lugar pro "Conversar", que agora vale SEMPRE (mig 99) e nao so
+           quando ha partida marcada — mas ver o perfil nao podia sumir. -->
+      <div class="linha-item" style="align-items:center;cursor:pointer" onclick="netVerJogador('${uid}')">
         ${avatar(uid,'g')}
         <div class="txt">
           <b style="font-size:15px">${nomeDe(uid)}</b>
@@ -7092,8 +7106,11 @@ amigos(){
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="oconv" style="flex:1" onclick="netDesafiar('${uid}')">Desafiar</button>
+        ${/* (99) conversar deixou de depender de partida marcada. Com uma em
+              aberto a sala da PARTIDA e a certa — e onde a proposta e o placar
+              moram; sem partida, a conversa de amigos. */''}
         ${par ? `<button class="operf" style="flex:1" onclick="_net.abrirChatPartida('${par.id}')">Conversar</button>`
-              : `<button class="operf" style="flex:1" onclick="netVerJogador('${uid}')">Ver perfil</button>`}
+              : `<button class="operf" style="flex:1" onclick="_net.abrirChatAmigo('${uid}')">Conversar</button>`}
         <button class="operf" style="flex:0 0 auto;color:var(--ink3)"
                 onclick="amigoDesfazer('${uid}')" title="Desfazer amizade">&times;</button>
       </div>
