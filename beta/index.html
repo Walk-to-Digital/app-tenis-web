@@ -2115,6 +2115,11 @@ button,input,select{font:inherit;color:inherit}
    apagava a borda do botão vazado, nas duas telas. */
 #mg .mg-acoes button.mg-msg{background:var(--marca);color:var(--marca-ink)}
 #mg .mg-acoes button.mg-hora{background:none;border:1px solid var(--acc);color:var(--acc)}
+/* 04/09: a ação do DEPOIS. Linha própria, contorno neutro e texto secundário —
+   presente pra quem procura, sem disputar com as duas de cima. */
+#mg .mg-depois{margin-top:10px}
+#mg .mg-depois button.mg-placar{width:100%;padding:13px;border-radius:12px;cursor:pointer;
+  background:none;border:1px solid var(--linha2);color:var(--ink2);font:600 13px var(--f-ui)}
 
 /* =========================================================================
    NOVA PARTIDA CRIADA (03/09) — node 1:3429. O irmão da MATCH GAME: aquela
@@ -2322,7 +2327,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788531058"></script>
+<script src="net.js?v=1788538099"></script>
 
 <script>
 /* =========================================================================
@@ -3125,6 +3130,22 @@ function maisItens(){
   /* a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse; ela
      reaparece aqui — mesma superfície, um toque, outro lugar. */
   if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')", false]);
+  /* 04/09 — DUAS TELAS PRONTAS QUE NÃO TINHAM PORTA. `VISTAS.historico` e
+     `VISTAS.registrar` existem há semanas: a primeira só era alcançável por um
+     link de texto cinza no fim da ficha, a segunda só pelo botão gigante da
+     Home — e só nos momentos em que ele vira "Lançar placar". Fora desses dois
+     instantes, o app não tinha como chegar nelas. É o mesmo abrigo que a aba
+     "Minhas aulas" usa desde que saiu da barra: mesma superfície, um toque,
+     outro lugar.
+     O contador entra no SUBTÍTULO em vez de virar bolinha: aqui ele informa
+     o que se vai encontrar, e badge num item de folha fechada não é visto. */
+  const _esp = pendEsperando().length, _prop = pendPropostas().length;
+  const _sub = (_esp || _prop)
+    ? [ _esp ? `${_esp} esperando placar` : '', _prop ? `${_prop} proposta${_prop>1?'s':''}` : '' ]
+        .filter(Boolean).join(' · ')
+    : 'Desafios combinados e placares a lançar';
+  eu.push(['⏳','Partidas em aberto', _sub, "trocarAba('registrar')", false]);
+  eu.push(['📊','Meus jogos','Histórico de partidas e análise do ano', "ir('historico')", false]);
   return eu;
 }
 function abrirMais(){
@@ -8250,6 +8271,19 @@ function mostrarMatchGame(m){
       <div class="mg-acoes">
         <button class="mg-msg" onclick="fecharMatchGame();_net.abrirChatPartida('${m.id}')">${MGIC.chat}Enviar mensagem</button>
         <button class="mg-hora" onclick="fecharMatchGame();_net.abrirContra('${m.id}')">${MGIC.agenda}Propor hor&aacute;rio</button>
+      </div>
+      <!-- 04/09: a porta que faltava. Esta tela e o instante do aceite, e ate
+           hoje ela so falava do ANTES (combinar hora, conversar). Depois de
+           jogar, o caminho pro placar era voltar pra Home e esperar o botao
+           gigante virar "Lancar placar" - que so acontece quando a partida
+           entra em pendEsperando. Quem aceitou e quis registrar na hora nao
+           tinha por onde. Fica em linha propria e em contorno: e a acao do
+           DEPOIS, e competir de igual pra igual com as duas de cima mandaria
+           lancar placar de jogo que ainda nao houve.
+           SEM CRASE AQUI DENTRO: este comentario mora dentro de um template
+           literal, e uma crase o fecharia, apagando o motor sem erro visivel. -->
+      <div class="mg-depois">
+        <button class="mg-placar" onclick="fecharMatchGame();_net.lancar('${m.id}')">Lan&ccedil;ar o placar quando jogarem</button>
       </div>
     </div>`;
   el.classList.add('on');

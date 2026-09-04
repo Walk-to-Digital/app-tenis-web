@@ -4709,6 +4709,44 @@ function _propCard(){
     </div>`);
 }
 
+/* 04/09 — AS LINHAS DE SISTEMA. O arquivo (13:816) mostra o que ACONTECEU com
+   a partida dentro da própria conversa: "Seu oponente aceitou o desafio. Let's
+   ranket!". Sem isso a sala só tem o card do topo e as falas — quem aceitou num
+   aparelho e voltou no outro não vê em lugar nenhum que o desafio virou jogo.
+   Nascem DERIVADAS do estado da partida, não de linhas gravadas em
+   `partida_mensagens`. É de propósito: evento gravado é evento que pode
+   divergir do fato (a partida é recusada e a frase "aceitou" fica na sala pra
+   sempre), e daria tabela nova, policy nova e mensagem que a pessoa pode
+   apagar. Derivado, a sala nunca contradiz a partida — e some sozinho quando o
+   estado muda. O preço é não ter hora nem posição no meio da conversa: ficam
+   sempre no fim, que é onde o olho vai. */
+function _propEventos(){
+  const m = _chat && _chat.match;
+  if(!m || _chat.sala !== _SALAS.partida) return '';
+  const nome0 = (_chat.nome||'').split(' ')[0];
+  const linha = (txt)=> `<div style="text-align:center;margin:14px 0 2px">
+    <span style="display:inline-block;padding:6px 13px;border-radius:999px;background:var(--sup2);
+                 color:var(--ink2);font:600 11.5px var(--f-ui);line-height:1.4">${txt}</span></div>`;
+
+  if(m.status === 'aceito'){
+    /* quem aceitou muda a frase: "você aceitou" e "fulano aceitou" são fatos
+       diferentes, e a sala é lida pelos dois lados. Quem PROPÔS é quem espera
+       resposta, então o outro é quem aceita. */
+    const euPropus = m.prop_por ? (m.prop_por === MEU_UID) : (m.criador_id === MEU_UID);
+    return linha(euPropus ? `${_admEsc(nome0)} aceitou o desafio. Let&rsquo;s ranket!`
+                          : `Você aceitou o desafio. Let&rsquo;s ranket!`);
+  }
+  if(m.status === 'pendente'){
+    const meuPlacar = m.placar_por === MEU_UID;
+    return linha(meuPlacar ? `Placar lançado. Falta ${_admEsc(nome0)} confirmar.`
+                           : `${_admEsc(nome0)} lançou o placar. Confirme ou conteste.`);
+  }
+  if(m.status === 'confirmada') return linha('Placar confirmado. O ciclo fechou.');
+  if(m.status === 'recusado')   return linha('O desafio foi recusado.');
+  if(m.status === 'cancelado')  return linha('A partida foi cancelada.');
+  return '';
+}
+
 function netRenderChat(){
   if(!_chat) return;
   const podeApagar = (m)=> m.autor_id===MEU_UID || _chat.dono_id===MEU_UID || window.__ehAdm;
@@ -4730,7 +4768,7 @@ function netRenderChat(){
 
   const corpo = _chat.carregando ? `<div style="color:var(--ink3);font-size:12.5px;padding:18px 0;text-align:center">Carregando a conversa…</div>`
     : _chat.erro ? `<div style="color:var(--dn);font-size:12.5px;padding:18px 0;text-align:center">Não deu pra ler a conversa.<br><span style="color:var(--ink3);font-size:11px">${_admEsc(_chat.erro)}</span></div>`
-    : (_propCard() + bolhas) || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
+    : (_propCard() + bolhas + _propEventos()) || `<div style="color:var(--ink3);font-size:12.5px;padding:22px 0;text-align:center;line-height:1.5">Ninguém falou nada ainda.<br>Começa você.</div>`;
 
   const ehPartida = _chat.sala === _SALAS.partida;
   /* o campo só existe enquanto a sala está ABERTA — na partida encerrada a
