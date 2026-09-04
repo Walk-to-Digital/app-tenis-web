@@ -1160,17 +1160,41 @@ function _parceirosPossiveis(excluir){
                 || (a.j.nome||'').localeCompare(b.j.nome||''));
 }
 
+/* 04/09 — CHIP DE OPÇÃO: um só desenho pra todo botão de escolha da folha,
+   no padrão do arquivo (nodes 13:737 e 1:3252). Pill, ativo em lime CHAPADO
+   com texto escuro; inativo em contorno fino sobre transparente.
+   Antes eram TRÊS desenhos diferentes na mesma folha, e dois deles pintavam a
+   seleção com o token `--lime` — que nunca foi definido em lugar nenhum do
+   app. Property indefinida invalida a declaração inteira: o "selecionado" saía
+   com a cor herdada do pai e a borda em currentColor. Era isso que fazia a
+   escolha feita parecer escolha não feita. O token que existe, e que é
+   exatamente esse verde, é o `--acc` (#83E000). */
+function _chip(on, rot, acao, extra){
+  return `<button type="button" onclick="${acao}"
+    style="flex:1;padding:10px 8px;border-radius:999px;font:700 13px var(--f-ui);cursor:pointer;
+           border:1px solid ${on?'var(--acc)':'var(--linha2)'};
+           background:${on?'var(--acc)':'transparent'};
+           color:${on?'var(--acc-ink)':'var(--ink2)'};${extra||''}">${rot}</button>`;
+}
+/* 04/09 — o seletor de piso, usado por DUAS folhas: o desafio (onde o piso é
+   o que se combina) e o lançar na mão (onde é o que se registra do jogo que
+   já houve). Uma função só porque os três valores têm que continuar sendo os
+   mesmos nas duas: são o que a `matches_piso_ck` aceita, e uma cópia divergindo
+   viraria tela oferecendo caminho que o banco recusa.
+   O rótulo muda com o tempo verbal da folha; o resto não. */
+function _pisoBloco(rotulo){
+  return `
+      <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">${rotulo} <span style="color:var(--ink3)">(opcional)</span></div>
+      <div style="display:flex;gap:8px">${[['saibro','Saibro'],['dura','Dura'],['rapida','Rápida']].map(([v,n])=>
+        _chip(_on.piso===v, n, `_net.onPiso('${v}')`, 'font-size:12px')).join('')}</div>`;
+}
 /* O bloco Simples/Duplas — UM só, usado pela folha do desafio E pela do
    "lançar na mão" (20/08). Eram duas telas que fazem a mesma pergunta, e duas
    cópias do mesmo seletor divergem na primeira vez que uma delas muda.
    `nomeAdv` e `rodape` são o que difere: no desafio o jogo vai acontecer e os
    quatro precisam topar; na mão o jogo já aconteceu e só falta confirmar. */
 function _duplaBloco(nomeAdv, rodape){
-  const aba=(on,rot,val)=>`<button type="button" onclick="_net.onDupla(${val})"
-    style="flex:1;padding:10px;border-radius:10px;font:700 13px var(--f-ui);cursor:pointer;
-           border:1px solid ${on?'var(--lime)':'var(--linha2)'};
-           background:${on?'rgba(131,224,0,.12)':'transparent'};
-           color:${on?'var(--lime)':'var(--ink2)'}">${rot}</button>`;
+  const aba=(on,rot,val)=>_chip(on, rot, `_net.onDupla(${val})`);
   const sel=(qual,valor,excluir,rot)=>{
     const ops=_parceirosPossiveis(excluir);
     return `<div style="font-size:12px;color:var(--ink2);margin:8px 0 6px">${rot} ${valor?'':'<span style="color:var(--dn)">— escolha</span>'}</div>
@@ -1295,6 +1319,10 @@ function netAbrirMao(){
   const meu = window.__meusLocais || {};
   _on = { step:'mao', advId:'', sets:null, placarTxt:'',
           fmt:'md3', localId: meu.principal || null, quadra:null, quando:null,
+          /* (83) nasce EXPLICITAMENTE nulo, como no desafio: piso é opcional e
+             sem default, e um `undefined` aqui chegaria ao insert por `||` em
+             vez de por decisão. */
+          piso:null,
           // (20/08) duplas também se lança na mão. Nasce simples: como no
           // desafio, duplas é escolha explícita e nunca default.
           dupla:false, parCri:null, parAdv:null };
@@ -1353,6 +1381,10 @@ async function _maoEnviar(){
       placar_em: new Date().toISOString(),        // o relógio das 72h começa aqui
       quando: _on.quando || null,
       local_id: _on.localId || null, quadra: _on.quadra || null,
+      /* (83) o piso agora TEM tela aqui, então tem que viajar no insert — sem
+         esta linha o seletor seria enfeite e a partida nasceria sem piso do
+         mesmo jeito. A `matches_piso_ck` valida do lado do banco. */
+      piso: _on.piso || null,
       origem: 'mao',
     });
     if(error) throw error;
@@ -2483,12 +2515,9 @@ function netRenderOnline(){
     // 90 dias (mig 34). A tela avisa antes; o banco é quem garante.
     const agora = new Date();
     const teto  = new Date(agora.getTime() + 90*864e5);
-    const atalhos = _atalhosQuando().map(a=>`
-      <button type="button" onclick="_net.onQuandoAtalho('${_fmtLocal(a.d)}')"
-        style="flex:1;padding:9px 6px;border-radius:10px;font:600 12px var(--f-ui);cursor:pointer;
-               border:1px solid ${qv===_fmtLocal(a.d)?'var(--lime)':'var(--linha2)'};
-               background:${qv===_fmtLocal(a.d)?'rgba(131,224,0,.12)':'transparent'};
-               color:${qv===_fmtLocal(a.d)?'var(--lime)':'var(--ink2)'}">${a.rot}</button>`).join('');
+    const atalhos = _atalhosQuando().map(a=>_chip(
+      qv===_fmtLocal(a.d), a.rot, `_net.onQuandoAtalho('${_fmtLocal(a.d)}')`,
+      'padding:9px 6px;font-size:12px')).join('');
     /* (45) SIMPLES × DUPLAS. Só na criação — a trava (2) congela `dupla` no
        UPDATE, então a contraproposta NÃO oferece o toggle: mudar o formato de
        um desafio que já existe é outro desafio. Em duplas, dois seletores:
@@ -2520,11 +2549,35 @@ function netRenderOnline(){
       <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">${rotulo} <span style="color:var(--ink3)">(opcional)</span></div>
       <div style="display:flex;gap:8px">
         ${[['eu','Eu'],['ele',_on.adv.nome.split(' ')[0]]].map(([v,n])=>
-          `<button onclick="_net.${fn}('${v}')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--linha2);font:600 12px var(--f-ui);cursor:pointer;background:${atual===v?'var(--acc)':'var(--sup2)'};color:${atual===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('')}
+          _chip(atual===v, n, `_net.${fn}('${v}')`, 'font-size:12px')).join('')}
       </div>`;
     const qpH = _par('quadra', _on.quadraPor, 'onQuadraPor', '🏟 Quem reserva a quadra');
     const bpH = _par('bola',   _on.bolaPor,   'onBolaPor',   '🎾 Quem leva a bola');
-    const locH = ls.length ? `
+    /* 04/09 (mig 83) — TIPO DE QUADRA. A coluna `matches.piso`, a constraint e
+       o handler `_onPiso` existem desde 31/08, e NENHUM botão os chamava: todo
+       desafio nascido por esta folha gravava piso nulo, e o arquivo desenha o
+       campo desde sempre (13:737). Vale também na contraproposta — `prop_piso`
+       viaja nela por desenho, e sem seletor a pessoa carregava o piso da
+       proposta anterior sem poder corrigi-lo.
+       Vive DENTRO do bloco Onde (04/09), colado no local como no arquivo —
+       piso é característica da quadra, e pendurado depois do "quem reserva"
+       ficava solto. Não depende de um local ESCOLHIDO, porém: dá pra combinar
+       "saibro" antes de saber onde, e é assim que a mig 83 descreve o campo —
+       opcional, sem default, porque piso chutado apareceria como fato pra quem
+       procura quadra por piso.
+       Os três valores são os que a `matches_piso_ck` aceita; a tela não oferece
+       um quarto caminho que o banco recusaria. Reclicar limpa (`_onPiso`), que
+       é o que dá volta a uma escolha opcional. */
+    const pisoH = _pisoBloco('🧱 Tipo de quadra');
+    /* 04/09 — O BLOCO APARECE SEMPRE. Era `ls.length ? … : ''`: com a lista
+       vazia sumia o lugar inteiro da folha — sem "A combinar", sem endereço,
+       sem quem reserva —, a pessoa ficava sem NENHUMA forma de dizer onde vai
+       jogar e o desafio nascia com local nulo sem ela saber. O arquivo (13:737)
+       desenha o campo Local sempre presente, e é o certo: "a combinar" é uma
+       resposta; campo ausente não é.
+       O que segue condicionado é só o que depende de um local ESCOLHIDO — o
+       endereço, o número da quadra e quem reserva. */
+    const locH = `
       <div style="font-size:12px;color:var(--ink2);margin:2px 0 6px">📍 Onde</div>
       <select onchange="_net.onLocal(this.value)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui)">
         <option value="" ${!_on.localId?'selected':''}>A combinar</option>
@@ -2533,8 +2586,9 @@ function netRenderOnline(){
       ${_endLinha(lSel)}
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
         style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:8px">`:''}
+      ${pisoH}
       ${lSel?qpH:''}
-      <div style="height:14px"></div>` : '';
+      <div style="height:14px"></div>`;
     body = `<div style="font:700 17px var(--f-ui);margin-bottom:2px">${ehContra?`Propor outro combinado`:`Desafiar ${_on.adv.nome}`}</div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:14px">${ehContra
         ? `${_on.adv.nome.split(' ')[0]} recebe a proposta e aceita (ou propõe de volta). Dá pra ir e voltar até três vezes — depois é aceitar ou deixar pra lá.${_on.rodadas?` <b>${_on.rodadas} de 3 já foram.</b>`:''}`
@@ -2617,6 +2671,11 @@ function netRenderOnline(){
       ${_endLinha(lSel)}
       ${lSel?`<input type="number" min="1" max="${lSel.quadras}" value="${_on.quadra||''}" oninput="_net.onQuadra(this.value)" placeholder="Quadra (opcional, 1–${lSel.quadras})"
         style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 14px var(--f-ui);margin-top:8px">`:''}`:''}
+      ${/* 04/09 — FORA do `ls.length` de propósito: o piso não depende de haver
+           local cadastrado. Quem jogou em quadra que não está no app ainda sabe
+           em que piso jogou, e esse é justamente o caso que o "Não lembro /
+           outro lugar" cobre. */''}
+      ${_pisoBloco('🧱 Em que piso jogaram')}
       <div style="display:flex;gap:8px;margin-top:14px">${_btn('Cancelar','_net.fechar()')}${(_on.sets&&_on.advId)?_btn('Lançar placar','_net.maoEnviar()','ok'):''}</div>`;
   }
   else if(_on.step==='placar'){
@@ -4928,7 +4987,7 @@ async function netSairTorneio(id){
    Usar `created_at` como data do torneio seria mentir — "criado em" não é
    "acontece em". Separar futuro de passado depende de uma coluna nova. */
 const _FASES = {
-  'inscricoes':   ['Inscrições', 'var(--lime)'],
+  'inscricoes':   ['Inscrições', 'var(--acc)'],
   'em-andamento': ['Em andamento', 'var(--gold)'],
   'concluido':    ['Encerrado', 'var(--ink3)'],
 };
@@ -4958,7 +5017,7 @@ function _torneioQuando(t){
      que caduca em horas. O resto fica em cinza igual ao resto do card. */
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const dias = ini ? Math.round((ini - hoje)/864e5) : null;
-  const realce = dias===0 ? ['var(--lime)','hoje'] : dias===1 ? ['var(--gold)','amanhã'] : null;
+  const realce = dias===0 ? ['var(--acc)','hoje'] : dias===1 ? ['var(--gold)','amanhã'] : null;
   return `<div style="font-size:11px;color:${realce?realce[0]:'var(--ink2)'};margin-top:3px">🗓 ${realce?realce[1]+' · ':''}${txt}</div>`;
 }
 function _faseSelo(t){
@@ -5854,7 +5913,7 @@ function netVerLocal(id){
   /* o telefone vira link de discar: ver um número que não disca em tela de
      celular é pedir pra pessoa decorar e digitar em outro app. */
   const tel = (l.telefone||'').trim();
-  const telLink = tel ? `<a href="tel:${_admEsc(tel.replace(/[^\d+]/g,''))}" style="color:var(--lime);text-decoration:none">${_admEsc(tel)}</a>` : '';
+  const telLink = tel ? `<a href="tel:${_admEsc(tel.replace(/[^\d+]/g,''))}" style="color:var(--acc);text-decoration:none">${_admEsc(tel)}</a>` : '';
   _sheet('net-local', `${_capaLocal(l.piso)}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div style="min-width:0">
