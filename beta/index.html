@@ -148,7 +148,13 @@ body{
   display:flex;align-items:center;justify-content:center;
   -webkit-font-smoothing:antialiased;
 }
-button,input,select{font:inherit;color:inherit}
+/* 04/09: `textarea` entrou na lista. Ele estava de fora desde sempre e o
+   buraco nunca apareceu porque cada textarea do app declara a propria fonte
+   (.cp-txt, .at-c, #onb .onb-area) — o primeiro que confiou na herança, a bio
+   do editar perfil, nasceu em monospace. Consertar aqui e nao no elemento:
+   remendo de escopo deixa a mesma armadilha armada pro proximo. As tres regras
+   acima sao mais especificas e continuam valendo. */
+button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- moldura ---------- */
 #fone{
@@ -951,7 +957,21 @@ button,input,select{font:inherit;color:inherit}
              atrás da barra inferior.
    O gradiente radial vem do próprio código do node, convertido de SVG para
    CSS: mesmos quatro stops, mesmas opacidades. */
-.ini .cena{position:absolute;inset:0;z-index:0;
+/* 04/09 — A CENA PASSA A TER A ALTURA DA TELA, NÃO A DA PÁGINA.
+   Era `inset:0` dentro de `.ini`, que cresce com o conteúdo: a foto era
+   esticada sobre a página INTEIRA que rola. Cada notícia e cada patrocinador
+   que entrava lá embaixo empurrava o chão da quadra pra baixo, enquanto o
+   boneco ficava onde o fluxo o punha — os dois nunca se falaram. Medido:
+   home curta = cena de 1393px, pés a 573, chão a 571 (alinhado por sorte);
+   com +520px de conteúdo = cena de 1913px, pés nos MESMOS 573, chão a 784.
+   212px de boneco voando, e o tanto dependia de quanto conteúdo tinha embaixo.
+   O frame do Figma (1:1819) é UMA tela — 1080x1920 —, e `fundo-home.jpg` tem
+   exatamente esse aspecto (900x1600 = 0,562). Dando à cena a altura da tela, a
+   foto volta a mapear como no arquivo.
+   ⚠️ `dvh` e não `vh`: no Safari iOS a barra some e volta, e `vh` congela no
+   maior valor — a quadra saltaria ao rolar. E nada de `position:fixed` aqui: o
+   vestiário já pagou esse preço em 07/08 e o `fixed` saiu. */
+.ini .cena{position:absolute;left:0;right:0;top:0;height:100dvh;z-index:0;
   background-image:url('fig/fundo-home.jpg');
   background-size:cover;background-position:center top}
 /* O FUNDO, corrigido duas vezes e agora conferido contra a foto.
@@ -1398,7 +1418,13 @@ button,input,select{font:inherit;color:inherit}
 /* 01/09 (board 35:808): o botão tem 668 de 1080 — 62% da largura, centralizado.
    Largura total fazia dele uma barra e não uma pílula, que é a forma do board. */
 .ini .acao .big{width:min(100%,62%);min-width:280px;margin:0 auto;display:block;
-  border:0;border-radius:100px;padding:16px;background:var(--marca);color:var(--marca-ink);font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 8px 24px rgba(255,106,0,.25);cursor:pointer;font-family:var(--f-ui)}
+  /* 04/09: peso 800 -> 600. A ESPECIFICACAO-VISUAL do projeto tem linha propria
+     pra este botao ("CTA primario de tela: Figma 30 -> app 17, peso 600"), e o
+     arquivo do Figma nao tem peso 800 em no nenhum: sao cinco pesos, ate 700.
+     O 800 era mais pesado que a regra que a propria casa escreveu.
+     O tamanho segue 16 e nao os 17 da spec — trocar peso e corpo na mesma
+     mexida esconderia qual dos dois causou a diferenca. */
+  border:0;border-radius:100px;padding:16px;background:var(--marca);color:var(--marca-ink);font-weight:600;font-size:16px;letter-spacing:.01em;box-shadow:0 8px 24px rgba(255,106,0,.25);cursor:pointer;font-family:var(--f-ui)}
 .ini .acao .big small{display:block;font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.62;margin-top:3px}
 .ini .acao .big.up{background:var(--up);box-shadow:0 8px 24px rgba(198,255,61,.18)}
 .ini .acao .big.marcado{background:rgba(30,23,20,.82);color:var(--ink);border:1px solid var(--linha2);box-shadow:none;backdrop-filter:blur(6px)}
@@ -1784,6 +1810,20 @@ button,input,select{font:inherit;color:inherit}
 .seg2 button{flex:1;padding:12px 10px;border-radius:8px;background:rgba(30,23,20,.7);border:1px solid var(--linha2);
   color:var(--ink2);font-size:var(--t-label);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .seg2 button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+
+/* 04/09 (node 35:1819) — os quatro degraus do nível, em LEITURA.
+   Parecem os do arquivo, mas não são botões de propósito: o _players_guard
+   (mig 31) reescreve o nível de volta em todo update vindo do app, então um
+   controle aqui diria "salvo" e não gravaria nada. Elemento sem `cursor` e
+   sem `:hover` é o que diz, sem texto, que não há o que tocar. */
+.niv-lin{padding:11px 12px;border-radius:8px;border:1px solid var(--linha2);
+  background:rgba(30,23,20,.7);font-size:var(--t-label);color:var(--ink2)}
+.niv-lin b{color:var(--ink);font-weight:700}
+.niv-lin.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.niv-lin.on b{color:var(--acc-ink)}
+/* link de texto: ação secundária que não merece um .btn de largura inteira */
+.lk{background:none;border:0;padding:0;color:var(--ink2);font:600 12px var(--f-ui);
+  text-decoration:underline;cursor:pointer}
 
 /* ===== CADASTRO / ONBOARDING ===== */
 #onb{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:var(--bg);overflow:hidden}
@@ -2327,7 +2367,7 @@ button,input,select{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788541290"></script>
+<script src="net.js?v=1788548321"></script>
 
 <script>
 /* =========================================================================
@@ -3610,6 +3650,10 @@ function render(){
      o rascunho sobreviver à saída. Aqui ela depende da ROTA, que é o que a
      regra sempre quis dizer. */
   if(!naVest){ vestAba=null; vestDraft=null }
+  /* 04/09: mesma regra do rascunho do provador, e pela mesma razao. Sair da
+     tela sem salvar e desistir: sem isto o formulario voltaria dias depois com
+     o texto que a pessoa abandonou, por cima do que o banco tem. */
+  if(atual.rota!=='editarPerfil') window.__perfEd = undefined;
   const cenaPropria = naInicio || naVest;
   $('#fone').classList.toggle('noturno', !cenaPropria);
   // o cenário escolhido no vestiário vira o fundo da home e o ambiente das telas internas
@@ -3880,6 +3924,70 @@ async function seguirAlternar(alvo){
   if(r.erro){ alert('Não deu: '+r.erro); return }
   window.__perfCache[alvo] = undefined;             // força recarregar os números
   perfilCarregar(alvo); render();
+}
+
+/* ===== EDITAR PERFIL (04/09) — handlers das duas abas =====================
+   `quieto` existe pela mesma razão de sempre num formulário: repintar a tela a
+   cada tecla tira o foco do campo e o cursor volta pro começo. Só os seletores
+   (que mudam o desenho) pedem render. */
+/* a porta escolhe a ABA. Sem isto as duas entradas cairiam na aba que ficou
+   guardada da última visita, e quem toca em "Dados esportivos" abriria o
+   formulário de telefone e gênero. */
+function irEditarPerfil(qual){
+  S.abas = S.abas || {}; S.abas.perfEd = qual || 'pessoais'; salvar();
+  window.__perfEd = undefined;   // recarrega do banco a cada entrada
+  ir('editarPerfil');
+}
+function perfSet(k,v,quieto){
+  window.__perfEd = window.__perfEd || {};
+  /* toque no chip já escolhido APAGA. Gênero e mão dominante são opcionais, e
+     escolha sem volta vira permanente sem ninguém ter avisado — a mesma regra
+     que já vale no estilo de jogo. */
+  if(!quieto && window.__perfEd[k] === v) v = null;
+  window.__perfEd[k] = v;
+  if(!quieto) render();
+}
+async function perfSalvar(qual){
+  const d = window.__perfEd || {};
+  const fn = qual==='esportiva' ? _net.salvarEsportiva : _net.salvarPessoais;
+  const r = await fn(d);
+  if(r.erro){ alert('Não deu pra salvar: '+r.erro); return; }
+  /* o aparelho acompanha o banco: a ficha lê `S.jogadores[EU]`, e sem isto o
+     nome antigo continuaria no topo até o próximo boot. */
+  const eu = S.jogadores[EU];
+  if(eu){
+    if(qual==='esportiva'){ eu.mao = d.mao||null; eu.tempoPratica = (d.tempo||'').trim()||null; }
+    else { eu.nome = (d.nome||'').trim(); eu.bio = (d.bio||'').trim()||null; }
+    salvar();
+  }
+  /* aviso e não erro: `players` salvou: o que pode ter falhado são as duas
+     tabelas opcionais, e dizer "não salvou" sobre o conjunto seria mentir na
+     direção contrária. */
+  toast((r.avisos && r.avisos.length)
+    ? 'Salvo — mas '+r.avisos.join(' e ')+' não gravou. Tente de novo.'
+    : 'Alterações salvas.');
+  render();
+}
+async function perfFoto(input){
+  const f = input.files && input.files[0];
+  input.value = '';
+  if(!f) return;
+  toast('Subindo a foto…');
+  const r = await _net.fotoPerfilTrocar(f);
+  if(r.erro){ alert(r.erro); return; }
+  window.__perfEd = window.__perfEd || {};
+  window.__perfEd.foto = r.caminho;
+  const eu = S.jogadores[EU]; if(eu){ eu.foto = r.caminho; salvar(); }
+  toast('Foto atualizada.');
+  render();
+}
+async function perfFotoTirar(){
+  const r = await _net.fotoPerfilTirar();
+  if(r.erro){ alert(r.erro); return; }
+  if(window.__perfEd) window.__perfEd.foto = null;
+  const eu = S.jogadores[EU]; if(eu){ eu.foto = null; salvar(); }
+  toast('Foto removida — o boneco volta.');
+  render();
 }
 
 /* o estilo de jogo declarado (mig 90). `''` apaga — e apagar tem que existir,
@@ -6861,8 +6969,9 @@ ficha(){
           <div class="seta">›</div>
         </div>
       </div>
-      ${(eu.mao && eu.tempoPratica) ? '' :
-        '<p class="nota" style="margin-top:8px">O que está em branco você respondeu no cadastro ou pode responder depois — ainda não dá pra editar por aqui.</p>'}
+      <!-- 04/09: a nota que dizia "ainda nao da pra editar por aqui" saiu junto
+           com a tela que a desmentia (node 35:1819). Ela sobreviveu um dia. -->
+      <button class="btn sec" style="margin-top:10px" onclick="irEditarPerfil('esportiva')">Editar ficha esportiva</button>
     </div>
 
     <!-- 01/09 (mig 90): o estilo de jogo, DECLARADO. Fica na ficha e não no
@@ -6881,6 +6990,22 @@ ficha(){
         <p class="nota">${eu.estilo
           ? 'Aparece na sua ficha pra quem te olha. Toque de novo pra tirar.'
           : 'Opcional. O app não deduz seu estilo pelo placar — se você não disser, ninguém vê nada aqui.'}</p>
+      </div>
+    </div>
+
+    <!-- 04/09 (node 35:1739): a porta dos DADOS PESSOAIS. Ate hoje o app
+         perguntava nome, nascimento, genero e telefone no cadastro e nao
+         devolvia nenhum deles em tela nenhuma — perguntar e nao devolver e
+         pior do que nao perguntar, que e a mesma frase que trouxe o bloco de
+         dados esportivos pra ca em 03/09. -->
+    <div class="sec">
+      <div class="rot">Meus dados</div>
+      <div class="card clic" onclick="irEditarPerfil('pessoais')">
+        <div class="linha-item">
+          <div class="av">✎</div>
+          <div class="txt"><b>Dados pessoais</b><small>Foto, nome, bio, telefone e onde você mora</small></div>
+          <div class="seta">›</div>
+        </div>
       </div>
     </div>
 
@@ -7048,6 +7173,138 @@ ficha(){
    ⚠️ Não há EMPATE aqui, e o board mostra um (5-5, +15pts). O app não tem:
    `venceu_criador` é booleano. Entrar com empate é mexer no motor de
    pontuação, não numa tela — ficou pendente com o Nuno. */
+/* =========================================================================
+   EDITAR PERFIL (04/09) — nodes 35:1739 (dados pessoais) e 35:1819 (ficha
+   esportiva). Uma rota, duas abas, como no arquivo: as duas telas do Figma
+   compartilham cabeçalho, barra de abas e o mesmo botao "Salvar alteracoes".
+
+   O banco ja estava pronto desde a mig 97; o que faltava era a porta. Ate hoje
+   o app PERGUNTAVA mao dominante, tempo de pratica, genero e telefone no
+   cadastro e nao devolvia nenhum deles — e a propria ficha tinha uma nota
+   escrita dizendo "ainda nao da pra editar por aqui". A nota sai com esta tela.
+
+   ⚠️ DUAS DIVERGENCIAS DELIBERADAS COM O ARQUIVO, as duas por regra de banco:
+
+   1. NIVEL DE JOGO fica em LEITURA. O arquivo desenha os quatro degraus como
+      escolha. O _players_guard (mig 31) reescreve nivel/nivelb/cal/calibrando
+      com o valor antigo em todo update vindo do app: ele SOBRESCREVE em
+      silencio, nunca recusa. Um seletor ligado nisso diria "salvo" e nao
+      gravaria nada — a tela mentiria sem erro nenhum aparecer. Aqui ele mostra
+      onde voce esta e diz o que faz mexer: jogar.
+
+   2. NOME e SOBRENOME viram um campo so. Decisao ja escrita na mig 97: a
+      coluna `nome` guarda o nome inteiro e e lida em vinte lugares, do radar ao
+      historico. Partir em duas custaria os vinte pra ganhar um campo.
+
+   E os ESPORTES do arquivo nao entram: nao existe coluna de "quais eu jogo", e
+   o seletor que troca entre Tenis e Beach ja vive na ficha, logo acima. Duas
+   reguas pra mesma pergunta e o erro que este codigo ja evitou no radar.
+   ========================================================================= */
+editarPerfil(){
+  /* o rascunho nasce do BANCO, uma vez por entrada na tela. Telefone e genero
+     nunca estiveram no aparelho — moram em tabelas de dono — entao abrir o
+     formulario a partir do `S` mostraria campos vazios pra quem preencheu no
+     cadastro, e a pessoa reescreveria por cima do que ja estava la. */
+  if(window.__perfEd === undefined){
+    window.__perfEd = null;
+    if(window._net && _net.perfilCarregar){
+      _net.perfilCarregar().then(d=>{ window.__perfEd = d || {}; render(); });
+    } else window.__perfEd = {};
+  }
+  const d = window.__perfEd;
+  const abas = abasHtml('perfEd', [['pessoais','Dados pessoais'],['esportiva','Ficha esportiva']], 'linha');
+  if(d === null){
+    return {titulo:'Editar perfil', html:`<div class="pad">${abas}
+      <div class="card"><p class="nota">Carregando seus dados…</p></div></div>`};
+  }
+  const qual = abaDe('perfEd','pessoais');
+  const eu = S.jogadores[EU];
+  const fotoUrl = (d.foto && window._net && _net.fotoPerfilUrl) ? _net.fotoPerfilUrl(d.foto) : null;
+
+  const seg=(k,v,n)=>`<button class="${d[k]===v?'on':''}" onclick="perfSet('${k}','${v}')">${n}</button>`;
+
+  const pessoais = `
+    <div class="card" style="padding:16px">
+      <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:14px">
+        <div style="flex:0 0 96px;text-align:center">
+          <div class="rot" style="margin-bottom:8px">Foto de perfil</div>
+          <label style="display:block;cursor:pointer">
+            <input type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="perfFoto(this)">
+            ${fotoUrl
+              ? `<img src="${_attr(fotoUrl)}" alt="" style="width:96px;height:96px;border-radius:50%;object-fit:cover;display:block">`
+              : `<div style="width:96px;height:96px;border-radius:50%;background:var(--linha4);display:flex;align-items:center;justify-content:center;font-size:26px">⌾</div>`}
+          </label>
+          ${fotoUrl
+            ? `<button class="lk" style="margin-top:6px" onclick="perfFotoTirar()">Tirar foto</button>`
+            : `<p class="nota" style="margin-top:6px;font-size:11px">Sem foto, vale o boneco.</p>`}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="rot">Nome completo</div>
+          <input class="onb-input" style="margin:0 0 10px" maxlength="60"
+                 value="${_attr(d.nome)}" oninput="perfSet('nome',this.value,true)">
+          <div class="rot">Data de nascimento</div>
+          <input class="onb-input" style="margin:0" type="date"
+                 value="${_attr(d.nascimento)}" onchange="perfSet('nascimento',this.value,true)">
+        </div>
+      </div>
+
+      <div class="rot">Bio</div>
+      <textarea class="onb-input" style="margin:0 0 14px;height:92px;resize:none" maxlength="300"
+                placeholder="Golpes, horário que você joga, o que quiser"
+                oninput="perfSet('bio',this.value,true)">${_attr(d.bio)}</textarea>
+
+      <div class="rot">Gênero</div>
+      <div class="seg2" style="margin-bottom:4px">${seg('genero','f','Feminino')}${seg('genero','m','Masculino')}${seg('genero','o','Outro')}</div>
+      <p class="nota" style="margin:0 0 14px;font-size:11px">Só você e o ADM enxergam. Não aparece no radar nem no seu perfil.</p>
+
+      <div class="rot">Telefone</div>
+      <input class="onb-input" style="margin:0 0 4px" type="tel" maxlength="20" placeholder="(71) 90000-0000"
+             value="${_attr(d.telefone)}" oninput="perfSet('telefone',this.value,true)">
+      <p class="nota" style="margin:0 0 14px;font-size:11px">Guardado só pra você — ninguém no app vê.</p>
+
+      <div class="rot">Localização</div>
+      <div style="display:flex;gap:8px">
+        <input class="onb-input" style="margin:0;flex:0 0 64px" maxlength="2" placeholder="UF"
+               value="${_attr(d.uf)}" oninput="perfSet('uf',this.value.toUpperCase(),true)">
+        <input class="onb-input" style="margin:0;flex:1" placeholder="Cidade" maxlength="60"
+               value="${_attr(d.cidade)}" oninput="perfSet('cidade',this.value,true)">
+      </div>
+    </div>
+    <button class="btn" style="margin-top:14px" onclick="perfSalvar('pessoais')">Salvar alterações</button>`;
+
+  const NIVEL_ROT = {
+    A:['Nível alto','Competitivo, disputo as chaves de cima'],
+    B:['Jogo forte','Pego torneio amador, tenho tática'],
+    C:['Jogo social','Jogo toda semana, seguro um rali'],
+    D:['Estou começando','Iniciante, ainda pegando o ritmo'],
+  };
+  const minhaDiv = divDe(eu);
+  const esportiva = `
+    <div class="card" style="padding:16px">
+      <div class="rot">Mão dominante</div>
+      <div class="seg2" style="margin-bottom:14px">${seg('mao','E','Esquerda')}${seg('mao','D','Direita')}</div>
+
+      <div class="rot">Tempo em que está no esporte</div>
+      <input class="onb-input" style="margin:0 0 14px" maxlength="24" placeholder="Ex.: 2 anos"
+             value="${_attr(d.tempo)}" oninput="perfSet('tempo',this.value,true)">
+
+      <div class="rot">Nível de jogo</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${['A','B','C','D'].map(k=>`
+          <div class="niv-lin ${minhaDiv===k?'on':''}">
+            <b>${NIVEL_ROT[k][0]}</b> <span>${NIVEL_ROT[k][1]}</span>
+          </div>`).join('')}
+      </div>
+      <p class="nota" style="margin-top:8px">Aqui você não escolhe: sua classe é ${minhaDiv} e quem mexe nela é o resultado dos jogos. ${eu.calibrando?'Você ainda está calibrando — os primeiros jogos valem mais.':'Cada partida confirmada sobe ou desce o seu Nível.'}</p>
+    </div>
+    <button class="btn" style="margin-top:14px" onclick="perfSalvar('esportiva')">Salvar alterações</button>`;
+
+  return {titulo:'Editar perfil', html:`<div class="pad">
+    ${abas}
+    ${qual==='pessoais' ? pessoais : esportiva}
+  </div>`};
+},
+
 /* =========================================================================
    AMIGOS (03/09) — pedido do Nuno: "pagina para ver meus amigos e desafiar,
    conversar".
@@ -9022,6 +9279,15 @@ function completarCadastro(){
        deixou livre de propósito — `true → false` não fabrica assento nenhum. */
     if(eu.joga === false && window.netJogaDesligar){
       try{ await netJogaDesligar(); }catch(e){ console.error('[cadastro] nao consegui desligar o joga', e); }
+    }
+    /* 04/09: bio, mao dominante e tempo de pratica sairam do upsert do sync —
+       mandá-los em todo boot fazia o aparelho velho reescrever por cima do que
+       a tela EDITAR ficha esportiva (35:1819) tinha acabado de gravar no outro.
+       Aqui, no fim do cadastro, o estado local É a verdade mais nova que
+       existe, entao esta é a única hora em que escrevê-los do `eu` está certo.
+       Mesmo desenho do netJogaDesligar logo acima. */
+    if(window.netCadastroPerfil){
+      try{ await netCadastroPerfil(eu); }catch(e){ console.error('[cadastro] perfil', e); }
     }
     /* 25/08: SEGUNDA TENTATIVA do convite. A primeira roda no signUp (passo 2)
        e é a que vale; esta existe porque falha silenciosa ali deixava o código

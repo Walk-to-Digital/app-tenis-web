@@ -114,11 +114,19 @@ async function netSyncJogador(eu){
       maior_de_18: !!eu.maiorDe18,
       idade_declarada_em: eu.idadeDeclaradaEm ?? null,
     } : {}),
-    // 25/08 (telas novas, mig 54): mão dominante e tempo de prática. Mesmo
-    // padrão do nascimento — só viajam quando existem, então conta antiga
-    // não manda undefined nem quebra contra banco sem a migração.
-    ...(eu.mao ? { mao: eu.mao } : {}),
-    ...(eu.tempoPratica ? { tempo_pratica: eu.tempoPratica } : {}),
+    /* 04/09 — `mao` e `tempo_pratica` SAÍRAM DO SYNC, pela mesma razão que o
+       `joga` saiu na 28/08. Enquanto elas só existiam no cadastro, mandá-las em
+       todo boot era inofensivo: ninguém tinha como mudá-las depois, então os
+       dois lados nunca discordavam. A tela EDITAR ficha esportiva (35:1819) fez
+       o buraco virar alcançável — troco a mão no celular, e o próximo boot do
+       iPad, com o valor velho no localStorage, reescreve o antigo por cima. O
+       app diria "salvo", a coluna teria mudado, e a mudança sumiria sozinha
+       dias depois sem erro nenhum. Buraco teórico vira real quando um caminho
+       inesperado o exercita.
+       Quem escreve agora é a porta: `netSalvarEsportiva`, e o cadastro chama
+       ela explicitamente depois do sync (index.html, junto do netJogaDesligar).
+       ⚠️ E não dá pra "mandar só quando existe": era exatamente isso que o
+       spread fazia, e é o que deixa o valor VELHO de pé quando o novo é null. */
     // 25/08 (mig 66): a porta pela qual entrou. `joga` NÃO viaja aqui — ver
     // abaixo.
     ...(eu.perfil ? { perfil: eu.perfil } : {}),
@@ -170,10 +178,12 @@ async function netSyncJogador(eu){
      atualizou antes — abre em tela branca. É o defeito que este arquivo já
      documenta duas vezes: regra nova em cima de escrita velha.
      Aqui, se a coluna não existir ainda, a bio só não grava. */
-  if(eu.bio){
-    const { error: eb } = await sb.from('players').update({ bio: eu.bio }).eq('id', MEU_UID);
-    if(eb) console.error('[net] bio nao gravou', eb);
-  }
+  /* 04/09 — a BIO saiu do sync, mesma razão do `mao` e do `joga`. O `if(eu.bio)`
+     tinha o defeito na forma mais clara de todas: apagar a bio no celular e
+     abrir o app no iPad, que ainda tem a antiga no localStorage, ressuscitava
+     o texto apagado — e "só escrevo quando tem" é justamente o que impede o
+     vazio de chegar. Quem escreve agora é a tela de dados pessoais; o cadastro
+     chama `netCadastroPerfil` logo depois deste sync. */
 
   /* 29/08 (mig 78) — o GÊNERO, mesma forma e mesma razão do contato acima.
      O board coleta o dado e não o exibe em tela nenhuma: nem no perfil
@@ -3146,6 +3156,194 @@ async function netEstiloSalvar(valor){
   if(v && !['fundo','consistente','defensivo'].includes(v)) return {erro:'estilo inválido'};
   const { error } = await sb.from('players').update({ estilo:v }).eq('id',MEU_UID);
   return error ? {erro:error.message} : {ok:true};
+}
+
+/* O que o CADASTRO grava depois do sync, e que o sync deixou de mandar em todo
+   boot (bio, mão dominante e tempo de prática). Mesma forma do
+   `netJogaDesligar` na 28/08: quem sai do upsert ganha uma porta própria, e a
+   porta é chamada uma vez, de propósito, no único momento em que o estado local
+   é a verdade mais nova que existe — o fim do cadastro.
+   Falha aqui não derruba nada: são três campos opcionais, e nenhum deles
+   impede ninguém de entrar no app. */
+async function netCadastroPerfil(eu){
+  if(!MEU_UID || !eu) return;
+  const campos = {};
+  if(eu.bio)          campos.bio = eu.bio;
+  if(eu.mao)          campos.mao = eu.mao;
+  if(eu.tempoPratica) campos.tempo_pratica = eu.tempoPratica;
+  if(!Object.keys(campos).length) return;
+  const { error } = await sb.from('players').update(campos).eq('id', MEU_UID);
+  if(error) console.error('[net] cadastro: perfil nao gravou', error);
+}
+
+/* ===== EDITAR PERFIL (04/09, mig 97) — nodes 35:1739 e 35:1819 ==============
+   As duas telas do arquivo. O banco já estava pronto desde 03/09: a 97 criou
+   `genero`, `uf`, `cidade` e `foto` em `players`, o balde `perfil-foto` e a
+   tabela `players_contato`; `mao`, `tempo_pratica` e `bio` existem desde a 54
+   e a 78. Faltava só a porta.
+
+   ⚠️ GÊNERO MORA EM DOIS LUGARES, e isto é uma divergência a resolver, não uma
+   escolha desta função. A mig 78 (29/08) criou `player_privado.genero`, legível
+   SÓ pelo dono e pelo ADM, com a razão escrita: "dado que ninguém precisa ler é
+   dado que ninguém deve poder ler". A mig 97 (03/09) criou `players.genero` —
+   e `players_select` é `using (true)`, então lá ele é legível por qualquer
+   conta autenticada, direto pela API. O cabeçalho da própria 97 avisa disso ao
+   mandar o telefone pra outra mesa, e mesmo assim pôs o gênero em `players`.
+   Enquanto o Nuno não decidir, esta função grava no lugar PRIVADO — que é o
+   que o onboarding já faz (net.js:183) e o que não pode ser desfeito depois.
+   `players.genero` fica sem escrita nenhuma, de propósito.                     */
+function netFotoPerfilUrl(caminho){
+  if(!caminho) return null;
+  const { data } = sb.storage.from('perfil-foto').getPublicUrl(caminho);
+  return data ? data.publicUrl : null;
+}
+
+/* Mesma forma da capa de grupo (mig 93): nome FIXO por dono, `upsert`, e a
+   anterior sai quando a EXTENSÃO muda — senão `perfil.png` fica no balde pra
+   sempre depois que a compressão passar a devolver `perfil.jpg`. Cache curto
+   pelo mesmo motivo: o endereço se repete, então cache longo esconderia a
+   troca por um ano. */
+async function netFotoPerfilTrocar(arquivo){
+  if(!MEU_UID)  return {erro:'sem sessão'};
+  if(!arquivo)  return {erro:'escolha uma imagem'};
+  if(!FOTO_TIPOS.includes(arquivo.type)) return {erro:'a foto precisa ser JPG, PNG ou WEBP'};
+  if(arquivo.size > FOTO_MAX) return {erro:'a foto passa de 2 MB — use uma menor'};
+  const menor = await _fotoComprimir(arquivo);
+  const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  const caminho = `${MEU_UID}/perfil.${ext}`;
+  const antiga = (await sb.from('players').select('foto').eq('id',MEU_UID).maybeSingle()).data;
+  const { error: eUp } = await sb.storage.from('perfil-foto')
+    .upload(caminho, menor, { contentType: menor.type, upsert: true, cacheControl: '3600' });
+  if(eUp) return {erro:'não deu pra subir a foto: '+eUp.message};
+  /* a LINHA é a fonte da verdade: arquivo no balde sem players.foto apontando
+     pra ele é invisível e pago. Se o update falhar, o arquivo sai junto. */
+  const { error } = await sb.from('players').update({ foto: caminho }).eq('id', MEU_UID);
+  if(error){
+    await sb.storage.from('perfil-foto').remove([caminho]);
+    return {erro:error.message};
+  }
+  if(antiga && antiga.foto && antiga.foto !== caminho){
+    await sb.storage.from('perfil-foto').remove([antiga.foto]);
+  }
+  return {ok:true, caminho};
+}
+
+/* Tirar a foto devolve o boneco — e tem que existir, pela mesma razão do
+   estilo de jogo: escolha sem volta vira permanente sem ninguém ter avisado.
+   A ordem é a inversa da de subir: a linha primeiro. Apagar o arquivo e falhar
+   no update deixaria `players.foto` apontando pro vazio, que na tela é uma
+   imagem quebrada — pior que uma foto órfã, que ninguém vê. */
+async function netFotoPerfilTirar(){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const antiga = (await sb.from('players').select('foto').eq('id',MEU_UID).maybeSingle()).data;
+  const { error } = await sb.from('players').update({ foto: null }).eq('id', MEU_UID);
+  if(error) return {erro:error.message};
+  if(antiga && antiga.foto) await sb.storage.from('perfil-foto').remove([antiga.foto]);
+  return {ok:true};
+}
+
+/* DADOS PESSOAIS (node 35:1739). Três destinos numa gravação só, e cada um
+   falha por conta própria: `players` é o que a tela promete, e é o único cujo
+   erro vira recusa. Telefone e gênero são opcionais e moram em tabelas com RLS
+   de dono — se uma delas falhar, o resto já está salvo e a pessoa não perde o
+   que digitou. É a mesma forma do sync do boot (net.js:174-188), pela mesma
+   razão que está escrita lá. */
+async function netSalvarPessoais(d){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const nome = (d.nome||'').trim();
+  if(nome.length < 2) return {erro:'diga seu nome'};
+  const uf = (d.uf||'').trim().toUpperCase();
+  if(uf && !/^[A-Z]{2}$/.test(uf)) return {erro:'a UF tem duas letras (ex.: BA)'};
+  const gen = d.genero || null;
+  if(gen && !['f','m','o'].includes(gen)) return {erro:'gênero inválido'};
+
+  /* ⚠️ A DATA DE NASCIMENTO É PORTA, não campo. O app é só pra maiores de 18
+     (`maior_de_18` na mig 35), e esta tela é o primeiro lugar do app onde a
+     data pode ser TROCADA depois de declarada. Sem esta trava, editar o perfil
+     seria a porta dos fundos de quem foi barrado no cadastro. A conta não é
+     encerrada aqui — só a gravação é recusada, e a que vale continua valendo. */
+  let nasc = d.nascimento || null;
+  if(nasc){
+    const dt = new Date(nasc+'T12:00:00');
+    if(isNaN(dt)) return {erro:'confira a data de nascimento'};
+    const hoje = new Date();
+    let idade = hoje.getFullYear() - dt.getFullYear();
+    const m = hoje.getMonth() - dt.getMonth();
+    if(m < 0 || (m === 0 && hoje.getDate() < dt.getDate())) idade--;
+    if(idade > 120) return {erro:'confira a data de nascimento'};
+    if(idade < 18)  return {erro:'o Ranket é só para maiores de 18 anos'};
+  }
+
+  const { error } = await sb.from('players').update({
+    nome, bio: (d.bio||'').trim() || null,
+    ...(nasc ? { nascimento: nasc } : {}),
+    uf: uf || null, cidade: (d.cidade||'').trim() || null,
+  }).eq('id', MEU_UID);
+  if(error) return {erro:error.message};
+
+  const avisos = [];
+  if(gen !== undefined){
+    const { error: eg } = await sb.from('player_privado')
+      .upsert({ player_id: MEU_UID, genero: gen });
+    if(eg){ console.error('[net] genero nao gravou', eg); avisos.push('o gênero'); }
+  }
+  const tel = (d.telefone||'').trim();
+  if(tel.length > 20) return {erro:'telefone longo demais'};
+  const { error: et } = await sb.from('players_contato')
+    .upsert({ player_id: MEU_UID, telefone: tel || null, atualizado: new Date().toISOString() });
+  if(et){ console.error('[net] telefone nao gravou', et); avisos.push('o telefone'); }
+
+  return {ok:true, avisos};
+}
+
+/* FICHA ESPORTIVA (node 35:1819). Só duas colunas, e as duas existem desde a
+   mig 54.
+
+   ⚠️ O QUE NÃO ESTÁ AQUI, e não está de propósito: o NÍVEL DE JOGO. O arquivo
+   desenha os quatro degraus (Nível alto / Jogo Forte / Jogo Social / Estou
+   começando) como se fossem editáveis. O `_players_guard` (mig 31) reescreve
+   `nivel`, `nivelb`, `cal` e `calibrando` com o valor antigo em TODO update
+   feito pelo app — ele SOBRESCREVE, não recusa. Um seletor ligado a isso
+   gravaria "salvo" na tela e nada no banco: a tela mentiria e ninguém veria
+   erro. O nível vira o que o ranking diz, e o ranking anda jogando.
+   Fica em leitura, com a frase que explica. Decisão de produto: do Nuno.
+
+   Os ESPORTES do arquivo também ficam de fora: não existe coluna de "quais eu
+   jogo" — os dois níveis convivem desde 06/08 e a ficha já tem o seletor que
+   troca entre eles. Repetir aqui seria a segunda régua que este código já
+   evitou no radar. */
+async function netSalvarEsportiva(d){
+  if(!MEU_UID) return {erro:'sem sessão'};
+  const mao = d.mao || null;
+  if(mao && !['D','E'].includes(mao)) return {erro:'mão inválida'};
+  const tempo = (d.tempo||'').trim();
+  if(tempo.length > 24) return {erro:'resposta longa demais'};
+  const { error } = await sb.from('players').update({
+    mao, tempo_pratica: tempo || null,
+  }).eq('id', MEU_UID);
+  return error ? {erro:error.message} : {ok:true};
+}
+
+/* O que a tela precisa pra NASCER preenchida. Vem do banco e não do `S`: o
+   telefone e o gênero nunca estiveram no aparelho (moram em tabelas de dono), e
+   abrir o formulário com os campos vazios faria a pessoa achar que o que ela
+   preencheu no cadastro se perdeu — e reescrever por cima do que já estava lá. */
+async function netPerfilCarregar(){
+  if(!MEU_UID) return null;
+  const [p, pv, pc] = await Promise.all([
+    sb.from('players').select('nome,bio,nascimento,uf,cidade,foto,mao,tempo_pratica').eq('id',MEU_UID).maybeSingle(),
+    sb.from('player_privado').select('genero').eq('player_id',MEU_UID).maybeSingle(),
+    sb.from('players_contato').select('telefone').eq('player_id',MEU_UID).maybeSingle(),
+  ]);
+  if(p.error){ console.error('[net] perfil carregar', p.error); return null; }
+  const r = p.data || {};
+  return {
+    nome:r.nome||'', bio:r.bio||'', nascimento:r.nascimento||'',
+    uf:r.uf||'', cidade:r.cidade||'', foto:r.foto||null,
+    mao:r.mao||null, tempo:r.tempo_pratica||'',
+    genero:(pv.data&&pv.data.genero)||null,
+    telefone:(pc.data&&pc.data.telefone)||'',
+  };
 }
 
 /* as partidas confirmadas contra alguém que eu AINDA não avaliei — é o que a
@@ -6726,6 +6924,7 @@ async function netJogaLigar(classe){
   return r;
 }
 window.netJogaLigar = netJogaLigar; window.netJogaDesligar = netJogaDesligar;
+window.netCadastroPerfil = netCadastroPerfil;   // 04/09: o cadastro chama depois do sync
 
 async function netCheckAdm(){
   if(_admEh !== null) return _admEh;
@@ -7318,6 +7517,12 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   // 18/08: a conversa da comunidade (mig 37) e da partida (mig 40) — mesma folha
   abrirChat:netAbrirChat, abrirChatPartida:netAbrirChatPartida, fecharChat:netFecharChat,
   abrirChatAmigo:netAbrirChatAmigo,   // (99) a terceira sala
+  /* 04/09 (mig 97) — as duas telas de editar o perfil: nodes 35:1739 e 35:1819 */
+  cadastroPerfil:netCadastroPerfil,
+  perfilCarregar:netPerfilCarregar, salvarPessoais:netSalvarPessoais,
+  salvarEsportiva:netSalvarEsportiva,
+  fotoPerfilUrl:netFotoPerfilUrl, fotoPerfilTrocar:netFotoPerfilTrocar,
+  fotoPerfilTirar:netFotoPerfilTirar,
   chatHub:netChatHub,
   agenda:netAgenda,
   adsEvento:netAdsEvento, adsRelatorio:netAdsRelatorio,
