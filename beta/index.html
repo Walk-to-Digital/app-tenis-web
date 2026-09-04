@@ -619,7 +619,15 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* barra inferior */
 .nav{
   flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);
-  border-top:1px solid var(--linha);background:var(--sup);padding:8px 0 max(14px,env(safe-area-inset-bottom));z-index:3;
+  border-top:1px solid var(--linha);background:var(--sup);z-index:3;
+  /* 04/09 — a barra JÁ ESTAVA colada no fim da tela (medido: base 866, tela
+     866, sobra zero). O que o Nuno via como espaço sobrando é a safe area do
+     iPhone — ~34px de faixa da barrinha de gestos —, e descer a barra poria os
+     rótulos debaixo dela, onde o iOS intercepta o toque.
+     O que dava pra fazer é o que está aqui: o respiro era 8 em cima contra 34
+     embaixo, e essa assimetria empurrava os rótulos pra cima. Com 4 em cima o
+     conteúdo desce DENTRO da barra, sem invadir a faixa do sistema. */
+  padding:4px 0 max(14px,env(safe-area-inset-bottom));
 }
 /* 02/09 — o RÓTULO da barra pelo token de nav.
    Estava em 8,5px, abaixo do piso de 11 que a especificação fixou (§3, token
@@ -1456,10 +1464,16 @@ button,input,select,textarea{font:inherit;color:inherit}
    que faz é enfeite — o Figma dá ao "Ver perfil" a largura do texto inteiro, e
    é essa a regra que importa copiar, não o número de colunas. */
 .acoes-sec{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.acoes-sec button{min-height:44px;padding:11px 10px;border-radius:10px;cursor:pointer;
+.acoes-sec button{min-height:44px;padding:11px 12px;border-radius:10px;cursor:pointer;
   background:transparent;border:1px solid rgba(232,222,210,.22);color:var(--ink);
   font:600 var(--t-label) var(--f-ui);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;transition:.16s}
+  /* 04/09: flex com GAP no lugar do espaço que vinha dentro do texto. Com glifo
+     o respiro era um caractere de espaço — largura da fonte, sem controle. */
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  overflow:hidden;transition:.16s}
+/* o desenho não estica com o texto: corpo fixo, encolher nunca */
+.acoes-sec button svg{width:17px;height:17px;flex:0 0 17px;display:block;color:var(--ink2)}
+.acoes-sec button span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .acoes-sec button:hover{border-color:rgba(232,222,210,.38);background:rgba(232,222,210,.05)}
 .acoes-sec button:active{transform:scale(.97)}
 .ini .strip-rot{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
@@ -1612,9 +1626,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ===== VESTIÁRIO / PERSONALIZAR ===== */
 .ini .boneco{cursor:pointer}
+/* 04/09 — o chip do vestiário estava PERDIDO, e estava mesmo: 90x29px, corpo
+   de 11px no menor token do app, cinza de baixo contraste, pousado em cima dos
+   pés do boneco, que é a região mais escura da tela. Três coisas somadas contra
+   ele. Sobe pro corpo de rótulo, ganha o lime da marca no texto e no contorno,
+   e o fundo fica mais opaco pra descolar da figura. Continua discreto — não
+   vira botão de ação —, mas agora se lê. */
 .edit-hint{position:absolute;bottom:0;left:50%;transform:translateX(-50%);z-index:3;
-  background:rgba(21,16,13,.74);border:1px solid var(--linha2);border-radius:99px;
-  padding:5px 12px;font-size:var(--t-nav);letter-spacing:.06em;color:var(--ink2);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap}
+  background:rgba(21,16,13,.9);border:1px solid rgba(198,255,61,.45);border-radius:99px;
+  padding:7px 14px;font-size:var(--t-label);font-weight:600;letter-spacing:.04em;color:var(--acc);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap;
+  box-shadow:0 4px 14px rgba(0,0,0,.45)}
 /* 07/08: o vestiário virou coluna de altura fixa — palco em faixa que não sai do
    lugar, e o PAINEL é quem rola. Antes o palco era `sticky` e o painel passava
    POR BAIXO dele, tapando os controles.
@@ -2381,7 +2403,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788548847"></script>
+<script src="net.js?v=1788550205"></script>
 
 <script>
 /* =========================================================================
@@ -3237,7 +3259,29 @@ function irFeed(){
    COMUNIDADE, que é o menor dos quatro.
    Os do professor (Turma, Aulas) continuam em emoji: o board não desenhou a
    barra dele, e inventar dois ícones fora do arquivo é o oposto de paridade. */
+/* 04/09 — OS ÍCONES DO GRID DA HOME. Eram os glifos ◎ ⌕ ▣ ⇪: caractere de
+   texto não tem controle de corpo, de linha de base nem de espaço — sai do
+   jeito que a fonte entrega, e é daí que vinha o "um sobressaindo o outro".
+   Mesmo conserto que a barra de baixo levou em 02/09, e mesma linguagem:
+   traço fino, pontas e junções arredondadas, sem preenchimento, currentColor.
+   Três saem do arquivo: a BOLA é o "Organizar nova partida" (1:1882), a LUPA
+   é o Icon Frame da pílula de busca (13:1048), e a COMUNIDADE reusa o ícone
+   que a nav já traz do mesmo arquivo — desenhar um segundo pra mesma ideia
+   seria duas réguas pra mesma pergunta.
+   O CARD é o único que o arquivo não tem: desenhado aqui na mesma gramática
+   (retângulo de cantos redondos, cabeça e ombro), sem inventar traço novo.
+   ⚠️ stroke-width 1,6 num viewBox de 24 = 6,7%, contra os 5,3% da nav. É de
+   propósito: estes rendem a 17px e os da nav a 22px, e o mesmo percentual aqui
+   sumiria no aparelho. A espessura ÓPTICA é que tem de bater, não o número. */
+const ICO_HOME = {
+  bola:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="1.6"/><path d="M5.1 6.4c2.9 1.7 4.3 4.2 4.3 7.4 0 2.2-.6 4-1.8 5.6M18.9 6.4c-2.9 1.7-4.3 4.2-4.3 7.4 0 2.2.6 4 1.8 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  lupa:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.6" cy="10.6" r="6.9" stroke="currentColor" stroke-width="1.6"/><path d="M15.7 15.7 20.6 20.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  gente:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21.2 20.1c0-2-1.7-3.6-4.1-4.2M15 20.1c0-2.6-3-4.6-6.7-4.6s-6.7 2-6.7 4.6M15 11.9c2.4 0 4.4-2 4.4-4.5S17.4 3 15 3M8.3 11.9C5.9 11.9 4 9.9 4 7.4S5.9 3 8.3 3s4.4 2 4.4 4.4-2 4.5-4.4 4.5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  card:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.2" y="4.4" width="17.6" height="15.2" rx="2.6" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="10.4" r="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M6.2 16.4c.5-1.6 1.8-2.5 3.4-2.5s2.9.9 3.4 2.5M15.4 9.8h3.1M15.4 13.1h3.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+};
+
 const NAVIC = {
+
   home:`<svg viewBox="0 0 61.9553 57.4765" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10.4531 48.8409H10.4511M36.2658 48.8409H51.7546V28.37C51.7546 27.0904 51.7535 26.4502 51.5857 25.8547C51.4371 25.327 51.1931 24.8277 50.8629 24.3764C50.4903 23.8672 49.9722 23.4449 48.9342 22.6023L36.5431 12.5439C34.6158 10.9793 33.6521 10.1975 32.5676 9.89994C31.6119 9.63776 30.5933 9.63776 29.6377 9.89994C28.554 10.1973 27.5917 10.9784 25.6672 12.5405L13.2721 22.6023C12.234 23.4449 11.7162 23.8672 11.3436 24.3764C11.0134 24.8277 10.7675 25.327 10.6189 25.8547C10.4511 26.4502 10.4511 27.0904 10.4511 28.37V48.8409H25.94M25.94 48.8409H36.2658M25.94 48.8409V39.2615C25.94 36.6162 28.2515 34.4718 31.1029 34.4718C33.9543 34.4718 36.2658 36.6162 36.2658 39.2615V48.8409" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   radar:`<svg viewBox="0 0 56.7301 56.7301" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7.08978 28.366C7.08978 40.1152 16.6144 49.6398 28.3636 49.6398C40.1128 49.6398 49.6374 40.1152 49.6374 28.366C49.6374 16.6168 40.1128 7.09219 28.3636 7.09219C16.6144 7.09219 7.08978 16.6168 7.08978 28.366Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/><path d="M24.8179 24.8203L37.8186 18.911L31.9092 31.9116L18.9086 37.821L24.8179 24.8203Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   comunidade:`<svg viewBox="0 0 46.4584 40.4584" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M44.7292 38.729C44.7292 34.433 40.7407 30.7783 35.1737 29.4238M30.3959 38.7292C30.3959 33.28 23.9786 28.8626 16.0626 28.8626C8.14647 28.8626 1.72922 33.28 1.72922 38.7292M30.3959 21.4626C35.6733 21.4626 39.9514 17.0451 39.9514 11.5959C39.9514 6.14667 35.6733 1.72922 30.3959 1.72922M16.0626 21.4626C10.7852 21.4626 6.507 17.0451 6.507 11.5959C6.507 6.14667 10.7852 1.72922 16.0626 1.72922C21.3399 1.72922 25.6181 6.14667 25.6181 11.5959C25.6181 17.0451 21.3399 21.4626 16.0626 21.4626Z" stroke="currentColor" stroke-width="3.45844" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -5290,13 +5334,13 @@ inicio(){
      abas. Ficam abaixo do botão grande, discretas — o registro continua sendo
      a única ação com peso visual, porque é o elo frágil do ciclo. */
   const secundarias = `<div class="acoes-sec">
-      ${bt.t!=='Buscar oponentes' ? `<button onclick="trocarAba('radar')">◎ Marcar jogo</button>` : ''}
-      <button onclick="_net.abrirBusca&&_net.abrirBusca()">⌕ Buscar por nome</button>
-      <button onclick="trocarAba('comunidade')">▣ Minha comunidade</button>
+      ${bt.t!=='Buscar oponentes' ? `<button onclick="trocarAba('radar')">${ICO_HOME.bola}<span>Marcar jogo</span></button>` : ''}
+      <button onclick="_net.abrirBusca&&_net.abrirBusca()">${ICO_HOME.lupa}<span>Buscar por nome</span></button>
+      <button onclick="trocarAba('comunidade')">${ICO_HOME.gente}<span>Minha comunidade</span></button>
       <!-- 18/08 (item 42): o card sai do app. Fica aqui, entre as secundárias,
            e não como botão grande: compartilhar é consequência de ter jogado,
            não a ação do ciclo. -->
-      <button onclick="exportarCard()">⇪ Meu card</button>
+      <button onclick="exportarCard()">${ICO_HOME.card}<span>Meu card</span></button>
     </div>`;
 
   // faixa "o que mexeu na comunidade" — o feed real, não loot.
