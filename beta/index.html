@@ -971,9 +971,23 @@ button,input,select,textarea{font:inherit;color:inherit}
    ⚠️ `dvh` e não `vh`: no Safari iOS a barra some e volta, e `vh` congela no
    maior valor — a quadra saltaria ao rolar. E nada de `position:fixed` aqui: o
    vestiário já pagou esse preço em 07/08 e o `fixed` saiu. */
+/* 04/09, segunda passada — O ENQUADRAMENTO, que era a causa de verdade.
+   Prender a cena à tela (acima) tirou o boneco de flutuar com o conteúdo, mas
+   ele continuou pisando NA REDE — e quem está na rede aparece pequeno, lá no
+   fundo. O tamanho dele é de primeiro plano; a profundidade era de fundo.
+   Medido: em `fundo-home.jpg` a rede está a ~50% da altura e a metade de baixo
+   é quadra vazia. No node 1:1819 a rede está a ~30% e o boneco pisa à FRENTE
+   dela. O arquivo não usa a foto inteira: ele aproxima e ancora embaixo,
+   cortando o céu. Com a foto inteira na tela, a rede sobe pro meio e não há
+   onde pisar que não seja o fundo.
+   `max(100%, 80dvh)` é a largura: em tela de celular vence o 80dvh (a foto sai
+   ~1,42x mais alta que a cena, que é o que põe a rede em ~30%); em tela larga
+   vence o 100%, e a foto cobre sem faixa nas beiradas. `bottom` mantém a
+   quadra da frente sempre visível — é nela que o boneco pisa. */
 .ini .cena{position:absolute;left:0;right:0;top:0;height:100dvh;z-index:0;
   background-image:url('fig/fundo-home.jpg');
-  background-size:cover;background-position:center top}
+  background-size:max(100%, 80dvh) auto;background-position:center bottom;
+  background-repeat:no-repeat}
 /* O FUNDO, corrigido duas vezes e agora conferido contra a foto.
    1a tentativa: scrim linear PRETO (o que já existia) — escurecia, não era o
       desenho.
@@ -2367,7 +2381,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788548336"></script>
+<script src="net.js?v=1788548847"></script>
 
 <script>
 /* =========================================================================
