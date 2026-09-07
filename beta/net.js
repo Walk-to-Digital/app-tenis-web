@@ -6180,15 +6180,21 @@ function netRenderMeusLocais(){
      negar não é escolha; é um erro esperando a pessoa chegar. */
   const linhas=(_locaisMarcaveis()).map(l=>{
     const on=_loc.sel.includes(l.id), pr=_loc.principal===l.id;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--sup2)">
+    const piso=PISO_ROTULO[l.piso] || TIPO[l.tipo] || 'Local de jogo';
+    const capa=_fotoLocal(l.piso);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--sup2)">
       <button onclick="_net.locToggle('${l.id}')" style="width:24px;height:24px;border-radius:7px;border:1px solid ${on?'var(--acc)':'var(--linha2)'};background:${on?'var(--acc)':'var(--bg)'};color:${on?'var(--acc-ink)':'var(--ink)'};font:700 13px var(--f-ui);cursor:pointer;flex:0 0 24px">${on?'✓':''}</button>
       <!-- 18/08: o nome virou porta pro perfil do clube (item 30). O toque no
            nome NÃO pode marcar/desmarcar — quem quer ver o clube não quer mudar
            onde joga, e o checkbox continua sendo o único jeito de marcar. -->
-      <div onclick="_net.verLocal('${l.id}')" style="flex:1;min-width:0;cursor:pointer">
-        <b style="font-size:14px">${l.nome}</b> <span style="color:var(--ink3);font-size:11px">›</span>
-        <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+l.cidade:''}</div>
-        ${l.endereco?`<div style="font-size:10.5px;color:var(--ink3)">${l.endereco}</div>`:''}</div>
+      <div onclick="_net.verLocal('${l.id}')" style="display:flex;gap:10px;align-items:center;flex:1;min-width:0;cursor:pointer">
+        <div aria-hidden="true" style="width:72px;height:58px;flex:0 0 72px;border-radius:10px;background:linear-gradient(180deg,rgba(10,10,10,.04),rgba(10,10,10,.64)),url('${capa}') center/cover;border:1px solid var(--linha2);display:flex;align-items:flex-end;padding:6px;box-sizing:border-box">
+          <span style="padding:3px 6px;border-radius:6px;background:rgba(10,10,10,.62);color:var(--acc);font:800 8px var(--f-ui);letter-spacing:.06em;text-transform:uppercase">${_admEsc(piso)}</span>
+        </div>
+        <div style="min-width:0;flex:1"><b style="font-size:14px">${_admEsc(l.nome)}</b> <span style="color:var(--ink3);font-size:11px">›</span>
+          <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+_admEsc(l.cidade):''}</div>
+          ${l.endereco?`<div style="font-size:10.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_admEsc(l.endereco)}</div>`:''}</div>
+      </div>
       ${on?`<button onclick="_net.locPrincipal('${l.id}')" style="padding:6px 10px;border-radius:9px;border:1px solid ${pr?'var(--gold-bg)':'var(--linha2)'};background:${pr?'var(--gold-bg)':'var(--sup2)'};color:${pr?'var(--gold)':'var(--ink2)'};font:600 11px var(--f-ui);cursor:pointer">${pr?'★ principal':'tornar principal'}</button>`:''}
     </div>`;
   }).join('');
@@ -6220,16 +6226,22 @@ function netRenderMeusLocais(){
    representar "varios" ou pra tapar um buraco mostraria como fato o piso que a
    quadra talvez nem tenha, e quem procura quadra procura exatamente por isso. */
 const PISO_ROTULO = { saibro:'Saibro', cimento:'Cimento', grama:'Grama', areia:'Areia', misto:'Mais de um piso' };
+/* Todo clube precisa ser reconhecível mesmo antes de ter logo/foto própria no
+   cadastro. Piso conhecido usa a quadra correspondente; sem piso, a cena de
+   clube do Ranket evita inventar uma foto como se fosse daquele endereço. */
+function _fotoLocal(piso){
+  return (piso && piso !== 'misto') ? `../quadras/${piso}-dia.jpg` : '../vestiario/clube.jpg';
+}
 function _capaLocal(piso){
-  const img = (piso && piso !== 'misto') ? `../quadras/${piso}-dia.jpg` : null;
+  const img = _fotoLocal(piso);
   const rot = piso ? (PISO_ROTULO[piso] || '') : '';
   return `<div style="position:relative;height:132px;border-radius:var(--r);overflow:hidden;margin-bottom:14px;
-      background:${img ? `url('${img}') center/cover` : 'var(--sup2)'}">
+      background:url('${img}') center/cover">
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.15),rgba(11,11,11,.85))"></div>
     ${rot ? `<span style="position:absolute;left:12px;bottom:10px;padding:5px 11px;border-radius:var(--rp);
         background:rgba(18,18,18,.72);border:1px solid var(--acc);color:var(--acc);
         font:700 11px var(--f-ui)">${rot}</span>`
-          : `<span style="position:absolute;left:12px;bottom:10px;color:var(--ink3);font:600 11px var(--f-ui)">Piso não informado</span>`}
+          : `<span style="position:absolute;left:12px;bottom:10px;color:var(--ink);font:600 11px var(--f-ui)">Imagem ilustrativa do clube</span>`}
   </div>`;
 }
 

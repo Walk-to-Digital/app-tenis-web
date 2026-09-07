@@ -1511,10 +1511,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .strip-rot a{color:var(--ink3);text-decoration:none;cursor:pointer}
 .ini .strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .ini .strip::-webkit-scrollbar{display:none}
-/* 19/08 — notícias do esporte, fechando a home. Lista vertical e não carrossel:
-   manchete que passa de raspão não é lida, e aqui a peça É o texto. A miniatura
-   é opcional de propósito — notícia sem foto continua valendo, e exigir imagem
-   faria a curadoria travar por falta de arte. */
+/* Notícias fecham a home com uma manchete que ocupa a tela: imagem, contraste e
+   título formam uma peça editorial. As demais continuam rápidas de ler, mas
+   também carregam imagem para a seção nunca cair numa lista de texto sem vida. */
 /* 29/08 — O SEGUNDO ESCOPO. Estas quinze regras nasceram em 19/08 debaixo de
    `.ini` porque a home era o único lugar que tinha notícia. A aba Feed da
    Comunidade (board 159:2357) abre com o mesmo bloco, chamando a MESMA
@@ -1535,11 +1534,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .news-rot{font-size:var(--t-nav);letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);
   font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between}
 .ini .news,.noticias .news{display:flex;flex-direction:column;gap:8px}
-.ini .nitem,.noticias .nitem{display:flex;gap:10px;align-items:center;text-decoration:none;
-  background:rgba(30,23,20,.82);border:1px solid var(--linha);border-radius:10px;
-  padding:10px 12px;backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent}
+.ini .nitem,.noticias .nitem{display:flex;gap:12px;align-items:center;text-decoration:none;
+  background:rgba(30,23,20,.9);border:1px solid var(--linha);border-radius:13px;
+  padding:8px;backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent}
 .ini .nitem:active,.noticias .nitem:active{background:var(--sup2)}
-.ini .nthumb,.noticias .nthumb{flex:0 0 52px;width:52px;height:52px;border-radius:8px;object-fit:cover;
+.ini .nthumb,.noticias .nthumb{flex:0 0 86px;width:86px;height:66px;border-radius:9px;object-fit:cover;
   background:var(--sup2);display:block}
 .ini .ntxt,.noticias .ntxt{flex:1;min-width:0}
 .ini .ntxt b,.noticias .ntxt b{display:block;font-size:var(--t-label);color:var(--ink);font-weight:700;line-height:1.32;
@@ -1551,20 +1550,24 @@ button,input,select,textarea{font:inherit;color:inherit}
    .sec, que já a paga. Só o padding muda entre os dois escopos. */
 .noticias .news-wrap{padding:18px var(--pad-lado) 0}
 
-/* -- o cartão-herói (board 159:2357). Só existe no escopo `.heroi`, e só
-      quando a notícia tem foto — ver a nota em `noticiasHTML`. -- */
-.heroi .nheroi{position:relative;display:block;aspect-ratio:2.13/1;border-radius:11px;
+/* -- o cartão-herói editorial. A primeira notícia toma a largura toda na home
+      e no Feed quando tiver imagem; o texto nunca fica solto da fotografia. -- */
+.ini .nheroi,.noticias .nheroi{position:relative;display:block;aspect-ratio:1.48/1;border-radius:15px;
   overflow:hidden;text-decoration:none;margin-bottom:12px;background:var(--sup2);
+  border:1px solid rgba(202,255,78,.32);box-shadow:0 10px 26px rgba(0,0,0,.28);
   -webkit-tap-highlight-color:transparent}
-.heroi .nheroi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.heroi .nheroi.semfoto img{display:none}
-.heroi .nh-txt{position:absolute;left:0;right:0;bottom:0;padding:13px 14px;
-  background:linear-gradient(transparent,rgba(0,0,0,.85))}
-.heroi .nh-txt b{display:block;font:700 14.5px/1.25 var(--f-ui);color:var(--ink);
+.ini .nheroi img,.noticias .nheroi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.ini .nheroi.semfoto img,.noticias .nheroi.semfoto img{display:none}
+.ini .nheroi::after,.noticias .nheroi::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.04) 25%,rgba(0,0,0,.2) 48%,rgba(5,6,5,.94) 100%)}
+.ini .nh-txt,.noticias .nh-txt{position:absolute;z-index:1;left:0;right:0;bottom:0;padding:15px 15px 14px}
+.ini .nh-kicker,.noticias .nh-kicker{display:block;color:var(--acc);font:800 10px var(--f-ui);letter-spacing:.13em;
+  text-transform:uppercase;margin-bottom:6px}
+.ini .nh-txt b,.noticias .nh-txt b{display:block;font:700 18px/1.16 var(--f-disp);letter-spacing:-.015em;color:var(--ink);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.heroi .nh-txt small{display:block;font:400 var(--t-caption) var(--f-ui);color:var(--ink3);margin-top:4px}
-.heroi .nh-seta{position:absolute;right:11px;bottom:11px;width:24px;height:24px;border-radius:50%;
-  border:1px solid rgba(255,254,253,.5);color:var(--ink);font-size:12px;
+.ini .nh-txt small,.noticias .nh-txt small{display:block;font:400 var(--t-caption) var(--f-ui);color:rgba(255,255,255,.68);margin-top:6px}
+.ini .nh-seta,.noticias .nh-seta{position:absolute;z-index:2;right:13px;top:13px;width:28px;height:28px;border-radius:50%;
+  border:1px solid rgba(202,255,78,.72);background:rgba(7,8,7,.44);color:var(--acc);font-size:15px;
   display:flex;align-items:center;justify-content:center}
 /* 19/08 — o espaço de mídia da home (inventário próprio, no molde do Cartola:
    uma peça só, no fim do feed, vendida por nós e não sorteada por rede).
@@ -2434,7 +2437,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788819700"></script>
+<script src="net.js?v=1788820790"></script>
 
 <script>
 /* =========================================================================
@@ -3629,22 +3632,14 @@ function noticiasHTML(){
      filtra certo e diz errado. */
   const lente = (typeof S !== 'undefined' && S.esporte) ? S.esporte : 'tenis';
   const titulo = lente === 'beach' ? 'Notícias do beach tennis' : 'Notícias do tênis';
-  /* 29/08 — O CARTÃO-HERÓI DO BOARD (node 159:2357), e por que ele é
-     CONDICIONAL. O board abre a aba Feed com UMA notícia grande, foto sangrada
-     e título por cima. O app pode desenhar isso — mas só com foto: sem ela o
-     herói vira um retângulo vazio de 2,13:1 com um título dentro, que é pior
-     do que a lista que ele substitui.
-     E hoje NENHUMA das oito notícias do `noticias.json` tem `img`. O campo
-     sempre existiu e ninguém preencheu, então isto não é código faltando: é
-     curadoria. O código fica pronto e ligado; no dia em que a primeira notícia
-     ganhar foto, a tela vira a do board sozinha, sem tocar em nada aqui.
-     ⚠️ Só a PRIMEIRA vira herói, e só no escopo `.heroi` (a aba Feed). A home
-     segue com a lista de quatro — lá a notícia fecha a tela e não a abre. */
+  /* A primeira manchete é o hero editorial em toda superfície onde a curadoria
+     aparece. A imagem é obrigatória na lista atual; a guarda mantém o app
+     robusto quando uma curadoria futura ainda não tiver arte. */
   const [n0, ...resto] = lista;
   const podeHeroi = !!(n0 && n0.img);
   const heroi = podeHeroi ? `<a class="nheroi" href="${_esc(n0.link)}" target="_blank" rel="noopener noreferrer">
         <img src="../${_esc(n0.img)}" alt="" loading="lazy" onerror="this.closest('.nheroi').classList.add('semfoto')">
-        <div class="nh-txt"><b>${_esc(n0.titulo)}</b>${n0.fonte?`<small>${_esc(n0.fonte)}</small>`:''}</div>
+        <div class="nh-txt"><span class="nh-kicker">${_esc(n0.fonte||'Ranket')}</span><b>${_esc(n0.titulo)}</b>${n0.data?`<small>${_esc(n0.data)}</small>`:''}</div>
         <span class="nh-seta">›</span>
       </a>` : '';
   const demais = podeHeroi ? resto : lista;

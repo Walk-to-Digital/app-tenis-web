@@ -42,53 +42,61 @@
       "esporte": "tenis",
       "fonte": "CNN Brasil",
       "data": "01/09",
-      "ate": "2026-09-30"
+      "ate": "2026-09-30",
+      "img": "noticias/ranket-tenis-hero.png"
     },
     {
       "titulo": "Sem US Open, João Fonseca ainda terá dois Masters 1000 e defesa de título",
       "link": "https://www.cnnbrasil.com.br/esportes/tenis/sem-us-open-joao-fonseca-ainda-tera-dois-masters-1000-e-defesa-de-titulo/",
       "esporte": "tenis",
       "fonte": "CNN Brasil",
-      "data": "24/08"
+      "data": "24/08",
+      "img": "noticias/ranket-tenis-hero.png"
     },
     {
       "titulo": "João Fonseca desiste e está fora do US Open; veja o motivo",
       "link": "https://www.cnnbrasil.com.br/esportes/tenis/joao-fonseca-desiste-e-esta-fora-do-us-open-veja-o-motivo-e-o-comunicado/",
       "esporte": "tenis",
       "fonte": "CNN Brasil",
-      "data": "24/08"
+      "data": "24/08",
+      "img": "noticias/ranket-tenis-hero.png"
     },
     {
       "titulo": "João Fonseca revela o calendário até o fim do ano; veja as datas",
       "link": "https://www.cnnbrasil.com.br/esportes/tenis/tenis-joao-fonseca-revela-calendario-ate-o-fim-do-ano-veja-datas/",
       "esporte": "tenis",
       "fonte": "CNN Brasil",
-      "data": "15/07"
+      "data": "15/07",
+      "img": "noticias/ranket-tenis-hero.png"
     },
     {
       "titulo": "Cascavel recebe etapa internacional com cerca de 250 atletas de seis países, de 24 a 30/08",
       "esporte": "beach",
       "fonte": "O Paraná",
-      "link": "https://oparana.com.br/esportes/cascavel-recebe-etapa-internacional-de-beach-tennis-com-atletas-de-seis-paises/"
+      "link": "https://oparana.com.br/esportes/cascavel-recebe-etapa-internacional-de-beach-tennis-com-atletas-de-seis-paises/",
+      "img": "noticias/ranket-beach-hero.png"
     },
     {
       "titulo": "Augusto Neto é convocado para defender o Brasil no Pan-Americano, em Cuiabá",
       "esporte": "beach",
       "fonte": "Jornal Pequeno",
       "data": "13/08",
-      "link": "https://jornalpequeno.com.br/2026/08/13/augusto-neto-vai-defender-o-brasil-no-pan-americano-de-beach-tennis/"
+      "link": "https://jornalpequeno.com.br/2026/08/13/augusto-neto-vai-defender-o-brasil-no-pan-americano-de-beach-tennis/",
+      "img": "noticias/ranket-beach-hero.png"
     },
     {
       "titulo": "João Pessoa sedia o Campeonato Brasileiro Interclubes e o Circuito Paraibano",
       "esporte": "beach",
       "fonte": "Jornal da Paraíba",
-      "link": "https://jornaldaparaiba.com.br/esportes/joao-pessoa-recebe-campeonato-brasileiro-interclubes-e-circuito-paraibano-beach-tennis"
+      "link": "https://jornaldaparaiba.com.br/esportes/joao-pessoa-recebe-campeonato-brasileiro-interclubes-e-circuito-paraibano-beach-tennis",
+      "img": "noticias/ranket-beach-hero.png"
     },
     {
       "titulo": "Arena Portos do Paraná, em Caiobá, recebe um dos maiores torneios do mundo",
       "esporte": "beach",
       "fonte": "O Paraná",
-      "link": "https://oparana.com.br/esportes/arena-portos-do-parana-em-caioba-recebe-um-dos-maiores-torneios-de-beach-tennis-do-mundo/"
+      "link": "https://oparana.com.br/esportes/arena-portos-do-parana-em-caioba-recebe-um-dos-maiores-torneios-de-beach-tennis-do-mundo/",
+      "img": "noticias/ranket-beach-hero.png"
     }
   ]
 }
