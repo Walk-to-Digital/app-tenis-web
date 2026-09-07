@@ -1424,7 +1424,7 @@ button,input,select,textarea{font:inherit;color:inherit}
    de definir a sua — quem manda na altura da faixa é o conteúdo da direita,
    que é texto e não pode ser cortado. */
 .ini .htopo{display:flex;align-items:stretch;gap:2%;margin-top:10px}
-.ini .hcol{flex:1 1 51%;min-width:0;display:flex;flex-direction:column;gap:10px;order:2}
+.ini .hcol{flex:1 1 51%;min-width:0;display:flex;flex-direction:column;gap:14px;order:2}
 /* o boneco fica à ESQUERDA (order:1) e não encolhe abaixo de 44%: abaixo disso
    a figura vira um risco e o uniforme, que é o ponto do vestiário, some. */
 .ini .htopo .palco{flex:0 0 45%;order:1;position:relative;display:flex;
@@ -1451,7 +1451,7 @@ button,input,select,textarea{font:inherit;color:inherit}
    SEM preenchimento — o retângulo de trás não tem fill. O app pintava
    rgba(11,11,11,.55) por baixo, o que fechava a faixa contra a quadra em vez
    de deixá-la vazada como no desenho. */
-.ini .placa{position:relative;z-index:2;margin-top:12px;
+.ini .placa{position:relative;z-index:2;margin-top:20px;
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:12px 22px;border-radius:100px;
   border:1px solid var(--acc);background:transparent}
@@ -1466,7 +1466,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
 .ini .placa .meta b{font-family:var(--f-disp);font-size:var(--t-label);color:var(--ink)}
 .ini .placa .meta .pil2{background:var(--up);color:var(--acc-ink);font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
-.ini .acao{position:relative;z-index:2;padding:0 16px 8px}
+.ini .acao{position:relative;z-index:2;padding:20px 16px 18px}
 /* 25/08 (telas novas): a ação da home é a pílula LARANJA */
 /* 01/09 (board 35:808): o botão tem 668 de 1080 — 62% da largura, centralizado.
    Largura total fazia dele uma barra e não uma pílula, que é a forma do board. */
@@ -1494,7 +1494,7 @@ button,input,select,textarea{font:inherit;color:inherit}
    ~85px e o rótulo era cortado ("Marcar j…", "Minha c…"). Botão que não diz o
    que faz é enfeite — o Figma dá ao "Ver perfil" a largura do texto inteiro, e
    é essa a regra que importa copiar, não o número de colunas. */
-.acoes-sec{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.acoes-sec{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 .acoes-sec button{min-height:44px;padding:11px 12px;border-radius:10px;cursor:pointer;
   background:transparent;border:1px solid rgba(232,222,210,.22);color:var(--ink);
   font:600 var(--t-label) var(--f-ui);white-space:nowrap;
@@ -2437,7 +2437,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788820790"></script>
+<script src="net.js?v=1788822263"></script>
 
 <script>
 /* =========================================================================
@@ -3603,12 +3603,17 @@ function _newsValidas(){
   const hojeISO = hoje.getFullYear() + '-'
     + String(hoje.getMonth()+1).padStart(2,'0') + '-'
     + String(hoje.getDate()).padStart(2,'0');
-  return NEWS
+  const validas = NEWS
     .filter(n => n && n.titulo && _newsLinkOk(n.link))
     .filter(n => !n.esporte || n.esporte === lente)
     // `ate` é o ÚLTIMO dia em que a matéria aparece — some no dia seguinte
-    .filter(n => !n.ate || String(n.ate) >= hojeISO)
-    .slice(0, 4);
+    .filter(n => !n.ate || String(n.ate) >= hojeISO);
+  /* A home não pode ter uma "primeira" eterna: se a curadoria tem quatro
+     matérias, cada uma ganha o hero por uma hora. A ordem é determinística por
+     hora, portanto todos veem a mesma manchete naquele período. */
+  if(!validas.length) return [];
+  const primeiro = Math.floor(Date.now()/3600000) % validas.length;
+  return validas.slice(primeiro).concat(validas.slice(0,primeiro)).slice(0,4);
 }
 
 function noticiasHTML(){
@@ -3660,6 +3665,18 @@ function noticiasHTML(){
     </div>`;
 }
 
+let _newsTrocaTimer = null;
+function agendarRodizioNoticias(){
+  if(_newsTrocaTimer) clearTimeout(_newsTrocaTimer);
+  const proximaHora = 3600000 - (Date.now() % 3600000) + 80;
+  _newsTrocaTimer = setTimeout(()=>{
+    /* Não interrompe formulários: a capa troca só na home ou no feed. Ao voltar
+       para essas telas, o render já calcula a manchete certa para a hora atual. */
+    if(!document.hidden && (aba==='inicio' || aba==='comunidade')) render();
+    agendarRodizioNoticias();
+  }, proximaHora);
+}
+
 async function noticiasCarregar(){
   try{
     const v = (document.querySelector('script[src*="net.js?v="]')||{}).src||'';
@@ -3671,6 +3688,7 @@ async function noticiasCarregar(){
     NEWS = [];                               // sem notícia o app abre igual
     console.warn('[news] não carregou:', e.message);
   }
+  agendarRodizioNoticias();
   /* 02/09 — O REPINTE PRECISA COBRIR AS DUAS TELAS QUE USAM A LISTA.
      A condição era `aba === 'inicio'`, escrita quando a notícia só existia na
      home. Desde 29/08 ela também abre a aba Feed da Comunidade — e ali o
