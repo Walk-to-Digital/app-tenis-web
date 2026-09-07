@@ -1555,7 +1555,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .nheroi,.noticias .nheroi{position:relative;display:block;aspect-ratio:1.48/1;border-radius:15px;
   overflow:hidden;text-decoration:none;margin-bottom:12px;background:var(--sup2);
   border:1px solid rgba(202,255,78,.32);box-shadow:0 10px 26px rgba(0,0,0,.28);
-  -webkit-tap-highlight-color:transparent}
+  -webkit-tap-highlight-color:transparent;animation:newsEntrada .32s ease-out}
 .ini .nheroi img,.noticias .nheroi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .ini .nheroi.semfoto img,.noticias .nheroi.semfoto img{display:none}
 .ini .nheroi::after,.noticias .nheroi::after{content:'';position:absolute;inset:0;
@@ -1569,6 +1569,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .nh-seta,.noticias .nh-seta{position:absolute;z-index:2;right:13px;top:13px;width:28px;height:28px;border-radius:50%;
   border:1px solid rgba(202,255,78,.72);background:rgba(7,8,7,.44);color:var(--acc);font-size:15px;
   display:flex;align-items:center;justify-content:center}
+.ini .nh-dots,.noticias .nh-dots{position:absolute;z-index:2;left:15px;top:16px;display:flex;gap:6px;align-items:center}
+.ini .nh-dots i,.noticias .nh-dots i{display:block;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.55);transition:width .25s,background .25s}
+.ini .nh-dots i.on,.noticias .nh-dots i.on{width:18px;background:var(--acc)}
+@keyframes newsEntrada{from{opacity:.45;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 /* 19/08 — o espaço de mídia da home (inventário próprio, no molde do Cartola:
    uma peça só, no fim do feed, vendida por nós e não sorteada por rede).
 
@@ -2437,7 +2441,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788822263"></script>
+<script src="net.js?v=1788823452"></script>
 
 <script>
 /* =========================================================================
@@ -3608,73 +3612,53 @@ function _newsValidas(){
     .filter(n => !n.esporte || n.esporte === lente)
     // `ate` é o ÚLTIMO dia em que a matéria aparece — some no dia seguinte
     .filter(n => !n.ate || String(n.ate) >= hojeISO);
-  /* A home não pode ter uma "primeira" eterna: se a curadoria tem quatro
-     matérias, cada uma ganha o hero por uma hora. A ordem é determinística por
-     hora, portanto todos veem a mesma manchete naquele período. */
-  if(!validas.length) return [];
-  const primeiro = Math.floor(Date.now()/3600000) % validas.length;
-  return validas.slice(primeiro).concat(validas.slice(0,primeiro)).slice(0,4);
+  return validas.slice(0,4);
+}
+
+/* Na instalação publicada, a página fica em /beta/ e as fotos em
+   /beta/noticias/. No app normal ela fica em /app/ e as mesmas fotos vivem
+   em /noticias/. O endereço é decidido aqui para nunca depender de hotlink. */
+function _newsImagemSrc(img){
+  const arquivo = _esc(img || '');
+  return location.pathname.includes('/beta/') ? arquivo : '../' + arquivo;
 }
 
 function noticiasHTML(){
   const lista = _newsValidas();
   if(!lista.length) return '';
-  const itens = lista.map(n => {
-    const thumb = n.img
-      ? `<img class="nthumb" src="../${_esc(n.img)}" alt="" loading="lazy"
-             onerror="this.style.visibility='hidden'">`
-      : '';
-    const pe = [n.fonte, n.data].filter(Boolean).map(_esc).join(' · ');
-    return `<a class="nitem" href="${_esc(n.link)}" target="_blank" rel="noopener noreferrer">
-        ${thumb}
-        <div class="ntxt"><b>${_esc(n.titulo)}</b>${pe?`<small>${pe}</small>`:''}</div>
-        <div class="nseta">›</div>
-      </a>`;
-  }).join('');
   /* O título segue a LENTE, não o nome do app. Ficava "Notícias do tênis" em
      cima de quatro matérias de beach porque o rótulo era texto fixo — a lista
      obedecia ao esporte e o cabeçalho não, que é pior do que não filtrar:
      filtra certo e diz errado. */
   const lente = (typeof S !== 'undefined' && S.esporte) ? S.esporte : 'tenis';
   const titulo = lente === 'beach' ? 'Notícias do beach tennis' : 'Notícias do tênis';
-  /* A primeira manchete é o hero editorial em toda superfície onde a curadoria
-     aparece. A imagem é obrigatória na lista atual; a guarda mantém o app
-     robusto quando uma curadoria futura ainda não tiver arte. */
-  const [n0, ...resto] = lista;
-  const podeHeroi = !!(n0 && n0.img);
-  const heroi = podeHeroi ? `<a class="nheroi" href="${_esc(n0.link)}" target="_blank" rel="noopener noreferrer">
-        <img src="../${_esc(n0.img)}" alt="" loading="lazy" onerror="this.closest('.nheroi').classList.add('semfoto')">
+  const indice = (window.__newsCarouselIndex || 0) % lista.length;
+  const n0 = lista[indice];
+  const dots = lista.map((_, i) => `<i class="${i===indice?'on':''}" aria-hidden="true"></i>`).join('');
+  const imagem = n0.img ? `<img src="${_newsImagemSrc(n0.img)}" alt="" loading="lazy" onerror="this.closest('.nheroi').classList.add('semfoto')">` : '';
+  const heroi = `<a class="nheroi${n0.img?'':' semfoto'}" href="${_esc(n0.link)}" target="_blank" rel="noopener noreferrer">
+        ${imagem}
+        <span class="nh-dots" aria-label="Notícia ${indice + 1} de ${lista.length}">${dots}</span>
         <div class="nh-txt"><span class="nh-kicker">${_esc(n0.fonte||'Ranket')}</span><b>${_esc(n0.titulo)}</b>${n0.data?`<small>${_esc(n0.data)}</small>`:''}</div>
         <span class="nh-seta">›</span>
-      </a>` : '';
-  const demais = podeHeroi ? resto : lista;
-  const itensH = podeHeroi
-    ? demais.map(n=>{
-        const th = n.img ? `<img class="nthumb" src="../${_esc(n.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : '';
-        const p = [n.fonte, n.data].filter(Boolean).map(_esc).join(' · ');
-        return `<a class="nitem" href="${_esc(n.link)}" target="_blank" rel="noopener noreferrer">${th}
-            <div class="ntxt"><b>${_esc(n.titulo)}</b>${p?`<small>${p}</small>`:''}</div>
-            <div class="nseta">›</div></a>`;
-      }).join('')
-    : itens;
+      </a>`;
 
   return `<div class="news-wrap">
       <div class="news-rot"><span>${titulo}</span></div>
       ${heroi}
-      <div class="news">${itensH}</div>
     </div>`;
 }
 
 let _newsTrocaTimer = null;
 function agendarRodizioNoticias(){
   if(_newsTrocaTimer) clearTimeout(_newsTrocaTimer);
-  const proximaHora = 3600000 - (Date.now() % 3600000) + 80;
   _newsTrocaTimer = setTimeout(()=>{
-    /* Não interrompe formulários: a capa troca só na home ou no feed. Ao voltar
-       para essas telas, o render já calcula a manchete certa para a hora atual. */
+    const total = _newsValidas().length;
+    if(total) window.__newsCarouselIndex = ((window.__newsCarouselIndex || 0) + 1) % total;
+    /* A troca acontece apenas onde há o card. Nenhum formulário é repintado. */
     if(!document.hidden && (aba==='inicio' || aba==='comunidade')) render();
     agendarRodizioNoticias();
-  }, proximaHora);
+  }, 8000);
 }
 
 async function noticiasCarregar(){
