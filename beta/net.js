@@ -7495,7 +7495,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   torneioPlacarOrg:netTorneioPlacarOrg, orgEnviar:_onEnviarOrg, meusCampeonatos:netMeusCampeonatos,
   buscarGrupos:netBuscarGrupos, convidarAmigo:netConvidarAmigo,
   abrirLogin:netAbrirLogin, enviarLogin:netEnviarLogin,
-  esqueciSenha:netEsqueciSenha, salvarNovaSenha:netSalvarNovaSenha, olhoSenha:netOlhoSenha,
+  esqueciSenha:netEsqueciSenha, abrirNovaSenha:netAbrirNovaSenha,
+  salvarNovaSenha:netSalvarNovaSenha, olhoSenha:netOlhoSenha,
   abrirAdm:netAbrirAdm, fecharAdm:netFecharAdm, admAba:_admAba, admBuscar:_admBuscar,
   admSel:_admSel, admSet:_admSet, admDar:_admDar, admApagar:_admApagar,
   admBanir:_admBanir, admAnular:_admAnular, admTirarDoGrupo:_admTirarDoGrupo,   // 18/08 (mig 41)

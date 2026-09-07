@@ -705,6 +705,37 @@ button,input,select,textarea{font:inherit;color:inherit}
 #mais .mais-item.casca::before{content:none}
 #mais .mais-item.casca i{color:var(--marca)}
 #mais .mais-item.casca small{color:var(--marca)}
+
+/* 07/09 — PERFIL > PRIVACIDADE E SEGURANÇA (node 35:1874). A tela usa a
+   mesma gramática das rotas internas: topo do app, fundo com brilho, cartões
+   escuros e linhas de ação. A policy ainda não existe, então o estado abaixo
+   não finge ser uma configuração salva — ver VISTAS.seguranca. */
+.seg{padding:22px var(--pad-lado) calc(34px + env(safe-area-inset-bottom))}
+.seg-hero{border:1px solid var(--acc);border-radius:var(--r);padding:18px;margin-bottom:18px;
+  background:rgba(18,18,18,.5)}
+.seg-hero b{display:block;font:700 var(--t-title-s) var(--f-disp);color:var(--ink)}
+.seg-hero p{margin-top:7px;color:var(--ink2);font:400 var(--t-body)/1.5 var(--f-ui)}
+.seg-card{padding:16px;margin-bottom:16px}
+.seg-card h3{font:700 var(--t-body) var(--f-ui);color:var(--ink);margin-bottom:12px}
+.seg-card .nota{margin-bottom:12px}
+.seg-row{display:flex;align-items:center;gap:12px;width:100%;min-height:54px;padding:12px 0;
+  border:0;border-top:1px solid var(--linha4);background:none;color:var(--ink);text-align:left;cursor:pointer}
+.seg-row:first-of-type{border-top:0}
+.seg-row i{width:24px;flex:0 0 24px;color:var(--ink2);font-style:normal;font-size:18px;text-align:center}
+.seg-row span{flex:1;font:500 var(--t-body) var(--f-ui)}
+.seg-row em{font-style:normal;color:var(--ink3);font-size:20px}
+.seg-row.perigo span,.seg-row.perigo i{color:var(--marca)}
+.seg-row:disabled{cursor:default;opacity:.62}
+.seg-espera{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:var(--r);
+  background:var(--sup2);color:var(--ink2);font:400 var(--t-label)/1.45 var(--f-ui)}
+.seg-espera i{font-style:normal;color:var(--gold)}
+.seg-bloq{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--linha4)}
+.seg-bloq:first-child{border-top:0}
+.seg-bloq .txt{flex:1;min-width:0}
+.seg-bloq .txt b{display:block;font:600 var(--t-body) var(--f-ui)}
+.seg-bloq .txt small{display:block;color:var(--ink3);font:400 var(--t-label) var(--f-ui)}
+.seg-bloq button{padding:8px 10px;border-radius:9px;border:1px solid var(--linha2);background:none;
+  color:var(--ink2);font:600 var(--t-label) var(--f-ui);cursor:pointer}
 .nav button .badge{
   display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:99px;
   background:var(--up);color:var(--acc-ink);font-size:9px;font-weight:800;margin-left:3px;padding:0 4px;
@@ -2403,7 +2434,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788550205"></script>
+<script src="net.js?v=1788819700"></script>
 
 <script>
 /* =========================================================================
@@ -4558,6 +4589,41 @@ function perfilMenu(id){
     `<button class="mais-item" onclick="fecharMais(); perfilBloquear('${id}')">
        <i>⊘</i><span>Bloquear perfil<small>Vocês somem um do radar do outro</small></span></button>`;
   document.getElementById('mais').hidden = false;
+}
+/* O menu do perfil PRÓPRIO (node 35:1451) não é o do oponente. Compartilhar e
+   sair valem nos dois; bloquear só faz sentido olhando outra pessoa. */
+function perfilProprioMenu(){
+  const f = document.getElementById('mais-folha');
+  f.innerHTML = '<div class="puxador"></div>' +
+    `<button class="mais-item" onclick="fecharMais(); irEditarPerfil('pessoais')"><i>⚙</i><span>Configurações<small>Dados pessoais, ficha esportiva e personagem</small></span></button>` +
+    `<button class="mais-item" onclick="fecharMais(); perfilCompartilharMeu()"><i>⇪</i><span>Compartilhar perfil<small>Mande seu nome e classe no Ranket</small></span></button>` +
+    `<button class="mais-item" onclick="fecharMais(); ir('seguranca')"><i>⌾</i><span>Privacidade e segurança<small>Senha, bloqueios e regras da conta</small></span></button>` +
+    `<button class="mais-item" onclick="fecharMais(); sairDaConta()"><i>⇥</i><span>Sair da conta<small>Entra de novo com seu e-mail e senha</small></span></button>`;
+  document.getElementById('mais').hidden = false;
+}
+async function perfilCompartilharMeu(){
+  const eu = S.jogadores[EU]; if(!eu) return;
+  const cat = categoriaDe(nivelDe(eu), divDe(eu));
+  const texto = `${eu.nome} — Classe ${divDe(eu)}${CAT_SUFIXO[cat]||''} no Ranket.`;
+  try{
+    if(navigator.share){ await navigator.share({title:'Ranket', text:texto}); return; }
+    if(navigator.clipboard){ await navigator.clipboard.writeText(texto); toast('Copiado — é só colar.'); return; }
+    toast('Este navegador não deixa compartilhar daqui.');
+  }catch(e){ /* fechar a folha de compartilhar não é erro */ }
+}
+function segurancaBloqueiosCarregar(){
+  if(window.__segBloqueios !== undefined) return;
+  window.__segBloqueios = null;
+  if(window._net && _net.meusBloqueios){
+    _net.meusBloqueios().then(l=>{ window.__segBloqueios=l||[]; render(); })
+      .catch(()=>{ window.__segBloqueios=[]; render(); });
+  } else window.__segBloqueios=[];
+}
+async function segurancaDesbloquear(id){
+  const r = await _net.desbloquear(id);
+  if(r && r.erro){ toast('Não deu pra desbloquear: '+r.erro); return; }
+  window.__segBloqueios = (window.__segBloqueios||[]).filter(x=>x!==id);
+  toast('Jogador desbloqueado.'); render();
 }
 /* Compartilhar é a única das duas que dá pra fazer hoje, e não precisa de
    banco nenhum. `navigator.share` é o caminho do celular (é lá que a tela
@@ -6950,7 +7016,7 @@ ficha(){
      que todo o histórico anterior é. */
   const jogadas = S.historico.filter(h=>!h.tipo);
   const v=jogadas.filter(h=>h.venceu).length;
-  return {titulo:'Ficha', html:`
+  return {titulo:'Ficha', dir:`<button class="tpmenu" onclick="perfilProprioMenu()" aria-label="Mais">⋮</button>`, html:`
     <div class="hero">
       <div class="cab-hero">
         ${avatar(EU,'gg')}
@@ -7361,6 +7427,55 @@ editarPerfil(){
     ${abas}
     ${qual==='pessoais' ? pessoais : esportiva}
   </div>`};
+},
+
+/* =========================================================================
+   SEGURANÇA E PRIVACIDADE — node 35:1874
+
+   A aparência do arquivo cabe numa rota. A policy de "perfil privado" e de
+   "quem pode convidar" NÃO cabe só nela: RLS é por linha e ainda falta decidir
+   onde cada dado passa a morar. Por isso estes dois controles são declarados
+   como pendentes em vez de parecerem salvos no aparelho e deixarem a API aberta.
+   Senha e bloqueios já têm portas reais e ficam funcionais aqui.
+   ========================================================================= */
+seguranca(){
+  segurancaBloqueiosCarregar();
+  const lista = window.__segBloqueios;
+  const nomes = (lista||[]).map(id=>{
+    const j = S.jogadores[id];
+    return `<div class="seg-bloq">
+      ${j ? avatar(id) : '<div class="av">?</div>'}
+      <div class="txt"><b>${j ? nome(id) : 'Jogador bloqueado'}</b><small>Não aparece no radar nem pode falar com você</small></div>
+      <button onclick="segurancaDesbloquear('${id}')">Desbloquear</button>
+    </div>`;
+  }).join('');
+  return {titulo:'Privacidade e segurança', html:`
+    <div class="seg">
+      <div class="seg-hero">
+        <b>Perfil público</b>
+        <p>Hoje, jogadores autenticados veem os dados públicos do perfil para o radar, o ranking e o histórico funcionarem.</p>
+      </div>
+
+      <div class="card seg-card">
+        <h3>Convites e mensagens</h3>
+        <div class="seg-espera"><i>◌</i><span>A escolha de quem pode convidar ou enviar mensagem ainda depende da regra no banco. Ela será ligada junto com a proteção real, não só nesta tela.</span></div>
+      </div>
+
+      <div class="card seg-card">
+        <h3>Sua conta</h3>
+        <button class="seg-row" onclick="_net.abrirNovaSenha()"><i>⌁</i><span>Alterar senha</span><em>›</em></button>
+        <button class="seg-row" onclick="segurancaBloqueiosCarregar();render()"><i>⊘</i><span>Usuários bloqueados${lista===null?'':' · '+(lista||[]).length}</span><em>›</em></button>
+        ${lista===null ? '<p class="nota">Carregando bloqueios…</p>' : (lista&&lista.length ? `<div>${nomes}</div>` : '<p class="nota">Você não bloqueou ninguém.</p>')}
+      </div>
+
+      <div class="card seg-card">
+        <h3>Documentos e conta</h3>
+        <button class="seg-row" disabled><i>◫</i><span>Termos e serviços</span><em>›</em></button>
+        <button class="seg-row" disabled><i>◌</i><span>Política de privacidade</span><em>›</em></button>
+        <button class="seg-row perigo" disabled><i>⌫</i><span>Excluir conta</span><em>›</em></button>
+        <p class="nota">Essas ações entram quando os documentos e o processo seguro de exclusão estiverem definidos.</p>
+      </div>
+    </div>`};
 },
 
 /* =========================================================================
