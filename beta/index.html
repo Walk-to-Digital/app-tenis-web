@@ -2134,30 +2134,34 @@ button,input,select,textarea{font:inherit;color:inherit}
 #trofeus .tr-pill.tem{background:var(--up-bg);color:var(--up)}
 #trofeus .tr-pill.nao{background:var(--sup2);color:var(--ink3)}
 
-/* ===== TELA DE DESAFIO — VS (estilo Cartola) ===== */
-#vs{position:absolute;inset:0;z-index:60;display:none;overflow:hidden}
-#vs.on{display:flex;flex-direction:column}
+/* ===== TELA DE DESAFIO — referência Match Game do Figma ===== */
+#vs{position:fixed;inset:0;z-index:60;display:none;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+#vs.on{display:block}
 #vs .vs-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center}
 #vs .vs-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
-  background:linear-gradient(180deg,rgba(11,8,6,.9) 0%,rgba(11,8,6,.28) 24%,rgba(11,8,6,.2) 52%,rgba(11,8,6,.88) 88%,rgba(11,8,6,.98) 100%)}
-#vs .vs-top{position:relative;z-index:3;padding:26px 20px 0;text-align:center}
-#vs .vs-kick{font:400 var(--t-title-l)/1.15 var(--f-disp);color:var(--ink);text-shadow:0 2px 12px rgba(0,0,0,.9)}
-#vs .vs-arena{position:relative;z-index:2;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px}
-#vs .vs-lado{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0}
-#vs .vs-lado .bfig{position:relative;height:250px;max-height:38vh;display:flex;align-items:flex-end;justify-content:center}
-#vs .vs-lado .bfig::after{content:"";position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:120px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);filter:blur(10px);z-index:-1}
-#vs .vs-lado img.bcv{height:250px;max-height:38vh;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
-#vs .vs-nome{margin-top:8px;font:700 var(--t-label) var(--f-ui);color:var(--ink);text-shadow:0 2px 8px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-#vs .vs-x{z-index:2;font:400 30px var(--f-disp);color:var(--acc);text-shadow:0 2px 14px rgba(0,0,0,.9);flex:0 0 auto;padding-bottom:34px}
-#vs .vs-card{position:relative;z-index:3;padding:16px 18px calc(18px + env(safe-area-inset-bottom));background:rgba(12,9,8,.72);backdrop-filter:blur(10px);border-top:1px solid var(--linha)}
-#vs .vs-adv{text-align:center;margin-bottom:14px}
-#vs .vs-adv b{font:600 var(--t-title-s) var(--f-ui);color:var(--ink)}
-#vs .vs-id{font-size:var(--t-caption);color:var(--ink3);font-weight:400}
-#vs .vs-meta{font-size:var(--t-caption);color:var(--ink2);margin-top:3px}
-#vs .vs-acoes{display:flex;gap:10px}
-#vs .vs-acoes button{flex:1;padding:15px;border-radius:13px;border:none;font:700 15px var(--f-ui);cursor:pointer}
-#vs .vs-no{background:#2a1a16;color:var(--ink);border:1px solid var(--linha2)}
-#vs .vs-ok{background:var(--up);color:var(--acc-ink)}
+  background:linear-gradient(180deg,rgba(7,9,8,.9) 0%,rgba(7,9,8,.58) 42%,rgba(7,9,8,.96) 100%)}
+#vs .vs-in{position:relative;z-index:2;box-sizing:border-box;min-height:100%;padding:calc(38px + env(safe-area-inset-top)) var(--pad-lado) calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+#vs .vs-kick{text-align:center;font:700 var(--t-nav) var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--acc)}
+#vs .vs-tit{margin-top:8px;text-align:center;font:700 clamp(30px,9vw,42px)/1.05 var(--f-disp);color:var(--ink)}
+#vs .vs-sub{margin:12px auto 0;text-align:center;max-width:280px;font:400 var(--t-body)/1.4 var(--f-ui);color:var(--ink2)}
+#vs .vs-rule{height:1px;width:74%;margin:18px auto 0;background:var(--linha3)}
+#vs .vs-arena{display:flex;align-items:flex-start;justify-content:center;gap:10px;margin-top:28px}
+#vs .vs-lado{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center}
+#vs .vs-face{width:100%;max-width:136px;aspect-ratio:1;border-radius:50%;border:2px solid var(--acc);background-color:var(--bg);background-repeat:no-repeat}
+#vs .vs-nome{margin-top:12px;font:700 var(--t-body) var(--f-ui);color:var(--ink);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center}
+#vs .vs-pil{margin-top:9px;width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--acc);border-radius:var(--rp);background:rgba(8,10,9,.52);display:flex;justify-content:space-around;gap:6px}
+#vs .vs-pil b{font:700 var(--t-label) var(--f-ui);color:var(--acc)}
+#vs .vs-pil span{font:400 var(--t-label) var(--f-ui);color:var(--ink3)}
+#vs .vs-x{align-self:center;margin-top:48px;flex:0 0 auto;font:400 25px var(--f-disp);color:var(--acc)}
+#vs .vs-card{margin-top:24px;padding:14px;border:1px solid var(--linha);border-radius:var(--r);background:rgba(8,10,9,.72);backdrop-filter:blur(10px)}
+#vs .vs-adv{text-align:center;font:400 var(--t-caption) var(--f-ui);color:var(--ink2)}
+#vs .vs-adv b{font-weight:700;color:var(--ink)}
+#vs .vs-id{color:var(--ink3);font-weight:400}
+#vs .vs-meta{margin-top:5px;color:var(--ink3)}
+#vs .vs-acoes{margin-top:auto;padding-top:18px;display:flex;gap:10px}
+#vs .vs-acoes button{flex:1;min-height:52px;padding:13px 8px;border-radius:var(--rp);font:700 var(--t-label) var(--f-ui);cursor:pointer}
+#vs .vs-no{background:rgba(40,25,20,.92);color:var(--ink);border:1px solid var(--linha2)}
+#vs .vs-ok{border:0;background:var(--up);color:var(--acc-ink)}
 
 /* =========================================================================
    TELA DE MATCH GAME (03/09) — node 1:2334 do `RANKET - TELAS FINAIS`.
@@ -2443,7 +2447,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788871833"></script>
+<script src="net.js?v=1788872629"></script>
 
 <script>
 /* =========================================================================
@@ -8600,9 +8604,10 @@ function desenharTrofeus(){
 }
 
 /* =========================================================================
-   TELA DE DESAFIO — VS (estilo Cartola, adaptado: personagem vs personagem).
-   Aparece quando alguém te desafia. Os dois bonecos na quadra, "quem ganha?",
-   dados do adversário e Aceitar/Recusar.
+   TELA DE DESAFIO — a porta ANTES do aceite.
+   Segue a composição Match Game do arquivo: dois avatares circulares, dados
+   comparáveis e as decisões no rodapé. A versão anterior usava bonecos de
+   corpo inteiro em uma quadra e era uma adaptação visual antiga.
    ========================================================================= */
 function mostrarDesafioVS(m){
   const eu=S.jogadores[EU];
@@ -8610,29 +8615,41 @@ function mostrarDesafioVS(m){
   const j=S.jogadores[advKey] || {nome:'Jogador', cor:'#5C2E3C', bon:'m1', nivel:1200};
   const advId=window.netId?netId(advKey):'';
   const amigo=window.netEhAmigo?netEhAmigo(advKey):false;
-  const div=divisaoDe(j.nivel||1200);
+  const T=tabelaPontos();
+  const meusPts=(T.comunidade&&T.comunidade[EU])||0;
+  const ptsAdv=(T.comunidade&&T.comunidade[advKey])||0;
+  const minhaClasse=classeDe(eu), classeAdv=classeDe(j);
   const q=(eu.cena&&eu.cena.quadra)||'saibro', mo=(eu.cena&&eu.cena.momento)||'noite';
+  const lado=(p,nome,classe,pontos)=>`<div class="vs-lado">
+      <div class="vs-face" style="${estiloRosto(p.bon||'m1')}"></div>
+      <div class="vs-nome">${_esc((nome||'Jogador').split(' ')[0])}</div>
+      <div class="vs-pil"><b>${_esc(classe)}</b><span>${Number(pontos).toLocaleString('pt-BR')} pts</span></div>
+    </div>`;
   let el=document.getElementById('vs');
   if(!el){ el=document.createElement('div'); el.id='vs'; document.body.appendChild(el); }
   el.innerHTML=`
     <div class="vs-bg" style="background-image:url('../quadras/${q}-${mo}.jpg')"></div>
     <div class="vs-scrim"></div>
-    <div class="vs-top"><div class="vs-kick">Quem vai ganhar esse confronto?</div></div>
-    <div class="vs-arena">
-      <div class="vs-lado" style="--camisa:${eu.cor}">${bonecoImg(eu,true)}<div class="vs-nome">Você</div></div>
+    <div class="vs-in">
+      <div class="vs-kick">Desafio recebido</div>
+      <div class="vs-tit">Bora para a quadra?</div>
+      <div class="vs-sub">${_esc((j.nome||'Um jogador').split(' ')[0])} quer marcar uma partida com você.</div>
+      <div class="vs-rule"></div>
+      <div class="vs-arena">
+        ${lado(eu,'Você',minhaClasse,meusPts)}
       <div class="vs-x">VS</div>
-      <div class="vs-lado" style="--camisa:${j.cor||'#5C2E3C'}">${bonecoImg(j,true)}<div class="vs-nome">${(j.nome||'').split(' ')[0]}</div></div>
-    </div>
-    <div class="vs-card">
-      <div class="vs-adv"><b>${j.nome}</b> <span class="vs-id">${advId}</span>
-        <div class="vs-meta">Classe ${div} · ${amigo?'<span style="color:var(--up)">✔ seu amigo</span>':'não é seu amigo'}</div></div>
+        ${lado(j,j.nome,classeAdv,ptsAdv)}
+      </div>
+      <div class="vs-card">
+        <div class="vs-adv"><b>${_esc(j.nome)}</b> <span class="vs-id">${_esc(advId)}</span>
+          <div class="vs-meta">${amigo?'<span style="color:var(--up)">✔ seu amigo</span>':'Desafio de jogador da comunidade'}</div></div>
+      </div>
       <div class="vs-acoes">
         <button class="vs-no" onclick="fecharVS();_net.recusar('${m.id}')">Recusar</button>
         <button class="vs-ok" onclick="fecharVS();_net.aceitar('${m.id}')">Aceitar desafio</button>
       </div>
     </div>`;
   el.classList.add('on');
-  pintarBonecos();
 }
 function fecharVS(){ const el=document.getElementById('vs'); if(el) el.classList.remove('on') }
 window.mostrarDesafioVS = mostrarDesafioVS;
