@@ -1566,9 +1566,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .nh-txt b,.noticias .nh-txt b{display:block;font:700 18px/1.16 var(--f-disp);letter-spacing:-.015em;color:var(--ink);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ini .nh-txt small,.noticias .nh-txt small{display:block;font:400 var(--t-caption) var(--f-ui);color:rgba(255,255,255,.68);margin-top:6px}
-.ini .nh-seta,.noticias .nh-seta{position:absolute;z-index:2;right:13px;top:13px;width:28px;height:28px;border-radius:50%;
-  border:1px solid rgba(202,255,78,.72);background:rgba(7,8,7,.44);color:var(--acc);font-size:15px;
-  display:flex;align-items:center;justify-content:center}
+.ini .nh-proxima,.noticias .nh-proxima{position:absolute;z-index:2;right:13px;top:13px;border:1px solid rgba(202,255,78,.72);
+  border-radius:999px;background:rgba(7,8,7,.7);color:var(--acc);padding:8px 11px;font:800 10px var(--f-ui);
+  letter-spacing:.09em;text-transform:uppercase;display:flex;align-items:center;gap:6px;cursor:pointer}
+.ini .nh-proxima span,.noticias .nh-proxima span{font-size:17px;line-height:10px}
+.ini .nh-proxima:active,.noticias .nh-proxima:active{transform:scale(.96);background:rgba(202,255,78,.18)}
 .ini .nh-dots,.noticias .nh-dots{position:absolute;z-index:2;left:15px;top:16px;display:flex;gap:6px;align-items:center}
 .ini .nh-dots i,.noticias .nh-dots i{display:block;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.55);transition:width .25s,background .25s}
 .ini .nh-dots i.on,.noticias .nh-dots i.on{width:18px;background:var(--acc)}
@@ -2441,7 +2443,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788823452"></script>
+<script src="net.js?v=1788871833"></script>
 
 <script>
 /* =========================================================================
@@ -3636,12 +3638,12 @@ function noticiasHTML(){
   const n0 = lista[indice];
   const dots = lista.map((_, i) => `<i class="${i===indice?'on':''}" aria-hidden="true"></i>`).join('');
   const imagem = n0.img ? `<img src="${_newsImagemSrc(n0.img)}" alt="" loading="lazy" onerror="this.closest('.nheroi').classList.add('semfoto')">` : '';
-  const heroi = `<a class="nheroi${n0.img?'':' semfoto'}" href="${_esc(n0.link)}" target="_blank" rel="noopener noreferrer">
+  const heroi = `<article class="nheroi${n0.img?'':' semfoto'}">
         ${imagem}
         <span class="nh-dots" aria-label="Notícia ${indice + 1} de ${lista.length}">${dots}</span>
         <div class="nh-txt"><span class="nh-kicker">${_esc(n0.fonte||'Ranket')}</span><b>${_esc(n0.titulo)}</b>${n0.data?`<small>${_esc(n0.data)}</small>`:''}</div>
-        <span class="nh-seta">›</span>
-      </a>`;
+        <button class="nh-proxima" type="button" onclick="avancarNoticia()" aria-label="Ver próxima notícia">Próxima <span>›</span></button>
+      </article>`;
 
   return `<div class="news-wrap">
       <div class="news-rot"><span>${titulo}</span></div>
@@ -3650,13 +3652,19 @@ function noticiasHTML(){
 }
 
 let _newsTrocaTimer = null;
+function avancarNoticia(){
+  const total = _newsValidas().length;
+  if(!total) return;
+  window.__newsCarouselIndex = ((window.__newsCarouselIndex || 0) + 1) % total;
+  /* A notícia muda sem devolver a pessoa ao topo da tela. */
+  render(true);
+}
+
 function agendarRodizioNoticias(){
   if(_newsTrocaTimer) clearTimeout(_newsTrocaTimer);
   _newsTrocaTimer = setTimeout(()=>{
-    const total = _newsValidas().length;
-    if(total) window.__newsCarouselIndex = ((window.__newsCarouselIndex || 0) + 1) % total;
     /* A troca acontece apenas onde há o card. Nenhum formulário é repintado. */
-    if(!document.hidden && (aba==='inicio' || aba==='comunidade')) render();
+    if(!document.hidden && (aba==='inicio' || aba==='comunidade')) avancarNoticia();
     agendarRodizioNoticias();
   }, 8000);
 }
@@ -3695,7 +3703,8 @@ function radarBuscar(ev){
   if(window._net && _net.abrirBusca) _net.abrirBusca(termo);
   return false;
 }
-function render(){
+function render(manterPosicao=false){
+  const posicaoAnterior = manterPosicao ? $('#tela').scrollTop : 0;
   const atual = pilha.length ? pilha[pilha.length-1] : {rota:aba};
   const v = VISTAS[atual.rota](atual.params||{});
   $('#titulo').textContent = v.titulo;
@@ -3751,7 +3760,7 @@ function render(){
   // porque a camisa e o boneco mudam no vestiário
   const _bt = $('#btEu'); if(_bt) _bt.innerHTML = avatar(EU,'');
   $('#tela').innerHTML = v.html;
-  $('#tela').scrollTop = 0;
+  $('#tela').scrollTop = manterPosicao ? posicaoAnterior : 0;
   // 25/08 (bug do Nuno): durante o vestiário DO CADASTRO a nav some — com ela
   // viva dava pra vazar do fluxo no meio e "o passo 4 não funcionava"
   document.getElementById('nav').style.display = cadVest ? 'none' : 'grid';
