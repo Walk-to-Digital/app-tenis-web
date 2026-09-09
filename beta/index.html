@@ -2486,7 +2486,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788972258"></script>
+<script src="net.js?v=1788973700"></script>
 
 <script>
 /* =========================================================================
@@ -5509,6 +5509,7 @@ inicio(){
              Logo e sino são os SVG do próprio arquivo (app/fig/). -->
         <div class="linha1">
           <img class="logo" src="fig/logo-ranket.svg" alt="Ranket">
+          <button class="tpmenu" onclick="perfilProprioMenu()" aria-label="Configurações e privacidade">⋮</button>
           <div class="ic" onclick="abrirNotificacoes()"><img src="fig/sino.svg" alt="Notificações">${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
           <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
         </div>
@@ -6270,10 +6271,10 @@ souProfessor(){
         <div class="rot">Uma linha sobre você</div>
         <input class="onb-input" placeholder="Ex.: 12 anos de quadra, aula individual e em dupla" maxlength="160"
                value="${(d.apresentacao||'').replace(/"/g,'&quot;')}" oninput="profSet('apresentacao',this.value,true)">
-        <div class="rot">Onde você atua</div>
-        <input class="onb-input" placeholder="Pituba e Itaigara · Clube Espanhol · até 10 km" maxlength="140"
+        <div class="rot">Quadras e clubes onde dou aula</div>
+        <input class="onb-input" placeholder="AABB Salvador · Clube Bahiano · Quadra do condomínio" maxlength="140"
                value="${(d.atuacao||'').replace(/"/g,'&quot;')}" oninput="profSet('atuacao',this.value,true)">
-        <p class="nota">Nas suas palavras: bairros, clubes, raio. Aparece no seu card e no seu perfil.</p>
+        <p class="nota">Liste os lugares onde você atende e, se quiser, seus horários. Essa informação aparece para alunos no seu perfil.</p>
         <div class="rot">Especialidades</div>
         <input class="onb-input" placeholder="Backhand · saque · aula pra iniciantes" maxlength="140"
                value="${(d.especialidades||'').replace(/"/g,'&quot;')}" oninput="profSet('especialidades',this.value,true)">
