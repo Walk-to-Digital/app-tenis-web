@@ -2469,7 +2469,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788964136"></script>
+<script src="net.js?v=1788964442"></script>
 
 <script>
 /* =========================================================================
@@ -3691,8 +3691,13 @@ function avancarNoticia(){
   const total = _newsValidas().length;
   if(!total) return;
   window.__newsCarouselIndex = ((window.__newsCarouselIndex || 0) + 1) % total;
-  /* A notícia muda sem devolver a pessoa ao topo da tela. */
-  render(true);
+  /* Só o card editorial muda. Renderizar a tela inteira apagava a mensagem
+     que a pessoa estava digitando no Feed a cada oito segundos. */
+  document.querySelectorAll('.news-wrap').forEach(atual=>{
+    const caixa=document.createElement('div'); caixa.innerHTML=noticiasHTML();
+    const proxima=caixa.firstElementChild;
+    if(proxima) atual.replaceWith(proxima);
+  });
 }
 
 function agendarRodizioNoticias(){
@@ -8889,7 +8894,7 @@ async function abrirCriarPost(){
           <option value="">Carregando seus grupos&hellip;</option>
         </select>
         <textarea class="cp-txt" id="cp-txt" placeholder="Diga algo sobre a partida" oninput="cpValidar()"></textarea>
-        <input type="file" id="cp-file" accept="image/jpeg,image/png,image/webp" hidden onchange="cpFoto(this)">
+        <input type="file" id="cp-file" accept="image/*" hidden onchange="cpFoto(this)">
         <button class="cp-foto" onclick="document.getElementById('cp-file').click()">${CPIC.camera}Adicionar foto</button>
         <img class="cp-previa" id="cp-previa" hidden alt="">
         <div class="cp-loc">
