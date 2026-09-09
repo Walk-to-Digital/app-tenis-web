@@ -2122,8 +2122,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 #trofeus .tr-aba{flex:0 0 auto;padding:7px 14px;border-radius:99px;border:1px solid var(--linha);
   background:rgba(12,9,8,.55);backdrop-filter:blur(6px);color:var(--ink2);font:600 12px var(--f-ui);cursor:pointer}
 #trofeus .tr-aba.on{background:var(--gold);color:#1a1208;border-color:var(--gold)}
-#trofeus .tr-x{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;
-  background:rgba(21,16,13,.7);border:1px solid var(--linha2);color:var(--ink);font-size:20px;cursor:pointer;z-index:5}
+#trofeus .tr-x{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:max(12px,env(safe-area-inset-right));width:44px;height:44px;border-radius:50%;
+  background:rgba(21,16,13,.92);border:1px solid var(--linha2);color:var(--ink);font-size:25px;cursor:pointer;z-index:8;touch-action:manipulation}
 #trofeus .tr-prat{position:absolute;left:0;right:0;z-index:3;display:flex;align-items:flex-end;justify-content:space-evenly;gap:2px;padding:0 26px}
 #trofeus .tr-cint{position:absolute;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
 #trofeus .tr-peca{position:relative;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:0}
@@ -2469,7 +2469,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788963167"></script>
+<script src="net.js?v=1788964105"></script>
 
 <script>
 /* =========================================================================
@@ -8943,7 +8943,7 @@ function cpFoto(input){
    aplica — checar aqui evita a viagem até o banco pra ouvir não. */
 function cpValidar(){
   const t = (document.getElementById('cp-txt').value||'').trim();
-  const ok = !!t && (_cp.destino === 'feed' || !!_cp.grupo);
+  const ok = (!!t || !!_cp.arquivo) && (_cp.destino === 'feed' || !!_cp.grupo);
   document.getElementById('cp-pub').disabled = !ok;
 }
 async function cpPublicar(){
@@ -9283,6 +9283,13 @@ function onbSenha(v){ onb.senha=v }
 function onbSenha2(v){ onb.senha2=v }
 function onbNasc(v){ onb.nasc=v }
 function onbTempo(v){ onb.tempo=v }
+function onbFoto(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  if(!_fotoEntradaOk(f)){ alert('Escolha uma imagem.'); input.value=''; return; }
+  if(f.size>FOTO_ORIGINAL_MAX){ alert('A foto passa de 25 MB. Escolha uma menor.'); input.value=''; return; }
+  if(onb.fotoUrl) URL.revokeObjectURL(onb.fotoUrl);
+  onb.fotoArquivo=f; onb.fotoUrl=URL.createObjectURL(f); renderOnb();
+}
 function onbSet2(k,v){ onb[k]=v }          // sem re-render: não perde o foco do input
 /* (66) a porta escolhida. `perfil` CONGELA no banco depois de criada a conta —
    aqui ainda dá pra voltar, porque a conta só nasce no passo 2. */
@@ -9531,6 +9538,10 @@ function completarCadastro(){
     if(window.netCadastroPerfil){
       try{ await netCadastroPerfil(eu); }catch(e){ console.error('[cadastro] perfil', e); }
     }
+    if(onb.fotoArquivo && window._net && _net.fotoPerfilTrocar){
+      try{ const f=await _net.fotoPerfilTrocar(onb.fotoArquivo); if(f&&f.caminho){ eu.foto=f.caminho; salvar(); render(); } }catch(e){ console.error('[cadastro] foto', e); }
+      if(onb.fotoUrl) URL.revokeObjectURL(onb.fotoUrl);
+    }
     /* 25/08: SEGUNDA TENTATIVA do convite. A primeira roda no signUp (passo 2)
        e é a que vale; esta existe porque falha silenciosa ali deixava o código
        livre pra sempre — medido em teste real, com a FK apontando pro lugar
@@ -9649,6 +9660,12 @@ function renderOnb(){
       <div class="onb-head"><div class="onb-kick">Passo 2 de 4</div><h2>Dados Pessoais</h2></div>
       <input id="onb-nome" class="onb-input" placeholder="Nome" value="${(onb.nome||'').replace(/"/g,'&quot;')}" oninput="onbNome(this.value)" maxlength="30" autocomplete="given-name">
       <input id="onb-sobre" class="onb-input" placeholder="Sobrenome" value="${(onb.sobrenome||'').replace(/"/g,'&quot;')}" oninput="onbSobrenome(this.value)" maxlength="30" autocomplete="family-name">
+      <div class="onb-rot">Foto de perfil <span style="color:var(--ink3);font-weight:400">(opcional)</span></div>
+      <label class="onb-card" style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:14px">
+        <input type="file" accept="image/*" hidden onchange="onbFoto(this)">
+        ${onb.fotoUrl?`<img src="${onb.fotoUrl}" alt="Prévia" style="width:54px;height:54px;border-radius:50%;object-fit:cover">`:'<div class="dv">⌾</div>'}
+        <div class="tx"><b>${onb.fotoUrl?'Trocar foto':'Adicionar foto'}</b><small>Você também pode mudar depois no seu perfil.</small></div>
+      </label>
       <div class="onb-rot">Data de nascimento</div>
       <input id="onb-nasc" class="onb-input" type="date" value="${onb.nasc||''}" oninput="onbNasc(this.value)" max="${new Date().toISOString().slice(0,10)}">
       <p class="nota">Sua data de nascimento não aparece para os outros usuários. O Ranket é só para maiores de 18.</p>
@@ -10148,7 +10165,17 @@ async function atualizarApp(manual=false){
   try{
     if(window._net && _net.atualizarTudo) await _net.atualizarTudo();
     else if(window.netAtualizarTudo) await netAtualizarTudo();
-    if(manual && window.toast) toast('Tudo atualizado.');
+    /* Atualizar precisa repedir o que a tela está mostrando; só renovar inbox
+       fazia o gesto anunciar sucesso enquanto feed, radar e notícias ficavam no cache. */
+    if(aba==='comunidade'){ window.__comuFeed=undefined; if(typeof comuFeedCarregar==='function') comuFeedCarregar(); }
+    if(aba==='radar'){
+      window.__profs=undefined; window.__lugares=undefined; window.__eq=undefined;
+      if(typeof profCarregar==='function') profCarregar();
+      if(typeof lugCarregar==='function') lugCarregar();
+      if(typeof equipCarregar==='function') equipCarregar();
+    }
+    if(typeof render==='function') render(true);
+    if(manual && window.toast) toast('Informações atualizadas.');
   }catch(e){
     if(manual && window.toast) toast('Não deu para atualizar agora.');
   }finally{
