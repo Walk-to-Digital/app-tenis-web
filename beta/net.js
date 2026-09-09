@@ -3273,10 +3273,14 @@ async function netFotoPerfilTrocar(arquivo){
   if(!FOTO_TIPOS.includes(menor.type)) return {erro:'não consegui converter essa foto — tente JPG, PNG ou WEBP'};
   if(menor.size > FOTO_MAX) return {erro:'não consegui reduzir a foto para 2 MB — escolha uma menor'};
   const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
-  const caminho = `${MEU_UID}/perfil.${ext}`;
+  /* Cada troca ganha um caminho novo. Assim o envio só precisa criar o arquivo
+     do próprio usuário; não depende do UPDATE interno que o `upsert` faz no
+     Storage e que bloqueava fotos em alguns aparelhos. Depois que o perfil
+     aponta para a nova foto, a anterior é removida. */
+  const caminho = `${MEU_UID}/perfil-${Date.now()}.${ext}`;
   const antiga = (await sb.from('players').select('foto').eq('id',MEU_UID).maybeSingle()).data;
   const { error: eUp } = await sb.storage.from('perfil-foto')
-    .upload(caminho, menor, { contentType: menor.type, upsert: true, cacheControl: '3600' });
+    .upload(caminho, menor, { contentType: menor.type, cacheControl: '3600' });
   if(eUp) return {erro:'não deu pra subir a foto: '+eUp.message};
   /* a LINHA é a fonte da verdade: arquivo no balde sem players.foto apontando
      pra ele é invisível e pago. Se o update falhar, o arquivo sai junto. */

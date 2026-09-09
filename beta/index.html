@@ -1050,6 +1050,10 @@ button,input,select,textarea{font:inherit;color:inherit}
     rgba(6,9,14,0) 46%, rgba(6,9,14,.55) 78%, var(--bar) 100%)}
 .ini .hud{position:relative;z-index:2;
   padding:max(8px,env(safe-area-inset-top)) var(--pad-lado) 0}
+/* Seções da home precisam ficar acima da camada de luz da quadra. Sem esse
+   nível, a agenda do aluno era pintada por baixo do scrim e sobrava apenas o
+   emoji solto na tela. */
+.ini > .sec{position:relative;z-index:2}
 .ini .linha1{display:flex;align-items:center;gap:10px}
 .ini.prof .scrim{background:linear-gradient(180deg,rgba(255,92,0,.18) 0%,rgba(6,9,14,.08) 28%,rgba(6,9,14,.55) 78%,var(--bar) 100%)}
 /* A conta que dá aula e também joga escolhe a área logo abaixo do topo.
@@ -2486,7 +2490,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788973700"></script>
+<script src="net.js?v=1788974575"></script>
 
 <script>
 /* =========================================================================
