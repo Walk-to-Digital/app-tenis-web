@@ -2469,7 +2469,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788964105"></script>
+<script src="net.js?v=1788964136"></script>
 
 <script>
 /* =========================================================================
@@ -9285,8 +9285,9 @@ function onbNasc(v){ onb.nasc=v }
 function onbTempo(v){ onb.tempo=v }
 function onbFoto(input){
   const f=input.files&&input.files[0]; if(!f) return;
-  if(!_fotoEntradaOk(f)){ alert('Escolha uma imagem.'); input.value=''; return; }
-  if(f.size>FOTO_ORIGINAL_MAX){ alert('A foto passa de 25 MB. Escolha uma menor.'); input.value=''; return; }
+  const imagem = (f.type||'').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name||'');
+  if(!imagem){ alert('Escolha uma imagem.'); input.value=''; return; }
+  if(f.size>25*1024*1024){ alert('A foto passa de 25 MB. Escolha uma menor.'); input.value=''; return; }
   if(onb.fotoUrl) URL.revokeObjectURL(onb.fotoUrl);
   onb.fotoArquivo=f; onb.fotoUrl=URL.createObjectURL(f); renderOnb();
 }
