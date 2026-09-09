@@ -384,6 +384,7 @@ async function netBoot(eu){
     // sou ADM do app? acende a porta de entrada da aba ADM (migração 18)
     try{ await netCheckAdm(); }catch(e){}
     try{ await netCheckPerfil(); }catch(e){}   // (66) o papel decide a nav e a home
+    try{ await netAtualizarProfessor(); }catch(e){} // pedidos de aluno já acendem no primeiro quadro
     try{ await netMinhasAulas(); }catch(e){}   // (70) e a matrícula liga a aba Aulas do aluno
     // as comunidades reais e minha posição em cada uma (12/08) — mesmo padrão
     try{ await netMeusQuadros(); }catch(e){}
@@ -681,10 +682,41 @@ let _todasMinhas = [];
 const _expirando = {};   // guarda de reentrada do vencimento do cinturão
 let _inboxStatus = {};   // matchId → última chave de estado vista (ver _chaveEstado)
 
+/* Uma novidade pode vir de quatro portas: partida, amizade, pedido de aluno
+   ou aula avulsa. A contagem fica num só lugar para o sino, a home e a barra
+   do professor nunca discordarem. */
+function _recontarNovidades(){
+  if(typeof S==='undefined') return 0;
+  const partidas = (_inbox||[]).filter(netAcionavel).length;
+  const amizades = window.netPedidosAmizade ? netPedidosAmizade().length : 0;
+  const professor = +(window.__profNovidades||0);
+  S.novidades = partidas + amizades + professor;
+  if(window.pintarNav){ try{ pintarNav(); }catch(e){} }
+  return S.novidades;
+}
+
+async function netAtualizarProfessor(){
+  if(!MEU_UID) return null;
+  try{
+    const t = await netTurma();
+    window.__turma = t;
+    window.__turmaLoad = true;
+    if(window.render) render(true);
+    return t;
+  }catch(e){
+    console.error('[net] atualização do professor', e);
+    return null;
+  }
+}
+
 function netSubscribe(){
   if(_canal || !MEU_UID) return;
-  _canal = sb.channel('matches-'+MEU_UID)
+  _canal = sb.channel('ranket-'+MEU_UID)
     .on('postgres_changes', { event:'*', schema:'public', table:'matches' }, ()=> netAtualizarInbox())
+    .on('postgres_changes', { event:'*', schema:'public', table:'aluno_pedidos' }, ()=> netAtualizarProfessor())
+    .on('postgres_changes', { event:'*', schema:'public', table:'aulas_avulsas' }, ()=> netAtualizarProfessor())
+    .on('postgres_changes', { event:'*', schema:'public', table:'alunos' }, ()=> netAtualizarProfessor())
+    .on('postgres_changes', { event:'*', schema:'public', table:'aulas' }, ()=> netAtualizarProfessor())
     .subscribe();
 }
 
@@ -830,8 +862,8 @@ async function netAtualizarInbox(){
   try{ await netCarregarPedidosAmizade(true); }catch(e){}
   // badge do ✉ na home = quantas coisas pedem a minha ação
   if(typeof S!=='undefined'){
-    S.novidades = _inbox.filter(netAcionavel).length + (window.netPedidosAmizade ? netPedidosAmizade().length : 0);
-    if(window.render) render();
+    _recontarNovidades();
+    if(window.render) render(true);
   }
   if(desafioVS && window.mostrarDesafioVS) window.mostrarDesafioVS(desafioVS);
   else if(abrirInbox) netAbrirInbox();
@@ -2852,7 +2884,15 @@ let _gnew = null;
    Público leva o caminho por DONO (`<uid>/…`) e o de grupo por GRUPO
    (`<grupo_id>/…`), que é o primeiro nível que cada policy olha. */
 const FOTO_MAX = 2 * 1024 * 1024;                 // o mesmo teto do balde
+/* A foto ORIGINAL do celular pode ser bem maior que o arquivo que vai pro
+   Storage. Recusar antes de comprimir fazia a maioria das fotos do iPhone
+   morrer na escolha, apesar de o resultado comprimido caber com folga. */
+const FOTO_ORIGINAL_MAX = 25 * 1024 * 1024;
 const FOTO_TIPOS = ['image/jpeg','image/png','image/webp'];
+function _fotoEntradaOk(arquivo){
+  return !!(arquivo && (((arquivo.type||'').startsWith('image/'))
+    || /\.(jpe?g|png|webp|heic|heif)$/i.test(arquivo.name||'')));
+}
 function _fotoBalde(grupo){ return grupo ? 'feed-grupo' : 'feed-publico'; }
 
 /* ⚠️ COMPRIME ANTES DE SUBIR — e o motivo é a CONTA, não a estética.
@@ -2864,30 +2904,47 @@ function _fotoBalde(grupo){ return grupo ? 'feed-grupo' : 'feed-publico'; }
    1600px e qualidade 0,82 derrubam foto de celular pra 200-300 KB sem
    diferença visível num telefone. O teto de 2 MB segue no balde (mig 91) como
    rede: aqui é o caminho normal, lá é o que impede o anormal.
-   Se qualquer passo falhar, devolve o arquivo ORIGINAL — foto grande é melhor
-   que post sem foto, e nenhum navegador vale perder a publicação da pessoa. */
+   Se a conversão falhar, devolve o original. Quem chama confere novamente o
+   tipo e o tamanho: um HEIC que o navegador não conseguiu abrir recebe uma
+   mensagem clara, em vez de subir num formato que o Storage não serve. */
 const FOTO_LADO_MAX = 1600;
 const FOTO_QUALIDADE = 0.82;
 async function _fotoComprimir(arquivo){
   try{
-    if(!arquivo || !arquivo.type.startsWith('image/')) return arquivo;
-    /* navegador sem `createImageBitmap` ou sem DOM: devolve o original. Safari
-       iOS antigo é o caso real aqui, e o app nunca foi aberto nele — melhor
-       subir grande do que estourar e perder o post. */
-    if(typeof createImageBitmap !== 'function' || typeof document === 'undefined') return arquivo;
-    const bmp = await createImageBitmap(arquivo);
-    const maior = Math.max(bmp.width, bmp.height);
+    if(!_fotoEntradaOk(arquivo)) return arquivo;
+    if(typeof document === 'undefined') return arquivo;
+    /* Safari/iPhone nem sempre abre HEIC por createImageBitmap, apesar de
+       conseguir mostrá-lo pelo elemento Image. A segunda porta usa o decoder
+       nativo do aparelho e permite converter a foto para JPEG. */
+    let fonte, fechar = ()=>{};
+    if(typeof createImageBitmap === 'function'){
+      try{ fonte = await createImageBitmap(arquivo); fechar = ()=>fonte.close&&fonte.close(); }
+      catch(e){ fonte = null; }
+    }
+    if(!fonte){
+      fonte = await new Promise((resolve,reject)=>{
+        const url = URL.createObjectURL(arquivo), img = new Image();
+        img.onload=()=>resolve({img,url,width:img.naturalWidth,height:img.naturalHeight});
+        img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('formato não abriu')); };
+        img.src=url;
+      });
+      const pacote=fonte; fonte=pacote.img;
+      fechar=()=>URL.revokeObjectURL(pacote.url);
+    }
+    const maior = Math.max(fonte.width, fonte.height);
     const escala = maior > FOTO_LADO_MAX ? FOTO_LADO_MAX / maior : 1;
     /* já pequena E já leve: não reprocessa. Recomprimir JPEG de novo só perde
        qualidade sem ganhar tamanho que importe. */
-    if(escala === 1 && arquivo.size <= 400*1024){ bmp.close && bmp.close(); return arquivo }
-    const w = Math.round(bmp.width * escala), h = Math.round(bmp.height * escala);
+    if(escala === 1 && arquivo.size <= 400*1024 && FOTO_TIPOS.includes(arquivo.type)){
+      fechar(); return arquivo;
+    }
+    const w = Math.round(fonte.width * escala), h = Math.round(fonte.height * escala);
     const cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
-    cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
-    bmp.close && bmp.close();
+    cv.getContext('2d').drawImage(fonte, 0, 0, w, h);
+    fechar();
     const blob = await new Promise(r=> cv.toBlob(r, 'image/jpeg', FOTO_QUALIDADE));
-    if(!blob || blob.size >= arquivo.size) return arquivo;   // não piorou nada
+    if(!blob || (blob.size >= arquivo.size && FOTO_TIPOS.includes(arquivo.type))) return arquivo;
     /* vira JPEG sempre: PNG de screenshot fica maior que o original em foto, e
        o nome precisa acompanhar a extensão senão o caminho mente sobre o tipo. */
     const nome = (arquivo.name||'foto').replace(/\.[^.]+$/,'') + '.jpg';
@@ -2995,7 +3052,7 @@ window.netAtividadesResumo = netAtividadesResumo;
 async function netPostar(corpo, grupo, arquivo, local){
   if(!MEU_UID) return {erro:'sem sessão'};
   const t = (corpo||'').trim();
-  if(!t) return {erro:'escreva alguma coisa'};
+  if(!t && !arquivo) return {erro:'escreva alguma coisa ou escolha uma foto'};
   /* 03/09 (mig 96): o lugar. Cortado em 80 aqui também — o check do banco
      recusa acima disso, e ouvir o "não" do servidor por um campo opcional
      depois de já ter subido a foto seria o pior momento possível. */
@@ -3006,9 +3063,11 @@ async function netPostar(corpo, grupo, arquivo, local){
     /* o teto e os tipos também estão no balde (mig 91) — ali é regra, aqui é
        cortesia: falhar antes de subir 5 MB no 4G da quadra é melhor do que
        subir e ouvir não. */
-    if(!FOTO_TIPOS.includes(arquivo.type)) return {erro:'a foto precisa ser JPG, PNG ou WEBP'};
-    if(arquivo.size > FOTO_MAX) return {erro:'a foto passa de 2 MB — tire uma menor ou reduza antes'};
+    if(!_fotoEntradaOk(arquivo)) return {erro:'escolha um arquivo de imagem'};
+    if(arquivo.size > FOTO_ORIGINAL_MAX) return {erro:'a foto original passa de 25 MB — escolha uma menor'};
     const menor = await _fotoComprimir(arquivo);
+    if(!FOTO_TIPOS.includes(menor.type)) return {erro:'não consegui converter essa foto — tente JPG, PNG ou WEBP'};
+    if(menor.size > FOTO_MAX) return {erro:'não consegui reduzir a foto para 2 MB — escolha uma menor'};
     const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
     const pasta = grupo ? grupo : MEU_UID;         // o 1o nível que a policy olha
     caminho = `${pasta}/${MEU_UID}-${Date.now()}.${ext}`;
@@ -3081,12 +3140,14 @@ function netGrupoCapaUrl(caminho){
 async function netGrupoCapaTrocar(gid, arquivo){
   if(!MEU_UID) return {erro:'sem sessão'};
   if(!arquivo)  return {erro:'escolha uma imagem'};
-  if(!FOTO_TIPOS.includes(arquivo.type)) return {erro:'a capa precisa ser JPG, PNG ou WEBP'};
-  if(arquivo.size > FOTO_MAX) return {erro:'a capa passa de 2 MB — use uma menor'};
+  if(!_fotoEntradaOk(arquivo)) return {erro:'escolha um arquivo de imagem'};
+  if(arquivo.size > FOTO_ORIGINAL_MAX) return {erro:'a foto original passa de 25 MB — escolha uma menor'};
   /* nome FIXO por grupo (`<gid>/capa.<ext>`) e `upsert`: capa é uma só, e sem
      nome fixo cada troca deixaria a anterior no balde pra sempre — o grupo
      acumularia capas velhas que ninguém vê e ninguém apaga. */
   const menor = await _fotoComprimir(arquivo);
+  if(!FOTO_TIPOS.includes(menor.type)) return {erro:'não consegui converter essa foto — tente JPG, PNG ou WEBP'};
+  if(menor.size > FOTO_MAX) return {erro:'não consegui reduzir a capa para 2 MB — escolha uma menor'};
   const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
   const caminho = `${gid}/capa.${ext}`;
   /* ⚠️ o nome é fixo POR TIPO, e o tipo pode mudar: um PNG que a compressão
@@ -3206,9 +3267,11 @@ function netFotoPerfilUrl(caminho){
 async function netFotoPerfilTrocar(arquivo){
   if(!MEU_UID)  return {erro:'sem sessão'};
   if(!arquivo)  return {erro:'escolha uma imagem'};
-  if(!FOTO_TIPOS.includes(arquivo.type)) return {erro:'a foto precisa ser JPG, PNG ou WEBP'};
-  if(arquivo.size > FOTO_MAX) return {erro:'a foto passa de 2 MB — use uma menor'};
+  if(!_fotoEntradaOk(arquivo)) return {erro:'escolha um arquivo de imagem'};
+  if(arquivo.size > FOTO_ORIGINAL_MAX) return {erro:'a foto original passa de 25 MB — escolha uma menor'};
   const menor = await _fotoComprimir(arquivo);
+  if(!FOTO_TIPOS.includes(menor.type)) return {erro:'não consegui converter essa foto — tente JPG, PNG ou WEBP'};
+  if(menor.size > FOTO_MAX) return {erro:'não consegui reduzir a foto para 2 MB — escolha uma menor'};
   const ext = (menor.name||'').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
   const caminho = `${MEU_UID}/perfil.${ext}`;
   const antiga = (await sb.from('players').select('foto').eq('id',MEU_UID).maybeSingle()).data;
@@ -3850,11 +3913,9 @@ async function _cinturaoTentarPassar(m){
    Três coisas que ele desenha e que esta folha responde de outro jeito, com o
    porquê à vista em vez de escondido:
 
-   · FOTO DE CAPA — existe desde 01/09 (migs 92 e 93), mas NÃO aqui: põe-se
-     depois de criar, pelo botão do cabeçalho do grupo. O caminho do arquivo é
-     `<grupo_id>/capa.<ext>`, e o grupo só ganha id ao nascer — pedir a capa
-     neste formulário seria subir arquivo pra uma pasta que ainda não tem nome.
-     É o mesmo motivo do link de convite logo abaixo.
+   · FOTO DE CAPA — escolhida aqui e enviada logo depois que o grupo recebe o
+     id. O arquivo continua no caminho `<grupo_id>/capa.<ext>`; a diferença é
+     que a pessoa não precisa criar primeiro e descobrir depois onde editar.
 
    · LINK DE CONVITE — o board o mostra PREENCHIDO num formulário de criação, e
      isso não pode existir: o link carrega o id do grupo, e o grupo ainda não
@@ -3867,6 +3928,10 @@ async function _cinturaoTentarPassar(m){
 function netCriarGrupoUI(){
   _gnew = _gnew || { nome:'', regras:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', aberto:false };
   const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.gset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid ${_gnew[campo]==v?'var(--acc)':'var(--linha2)'};font:600 13px var(--f-ui);cursor:pointer;background:${_gnew[campo]==v?'var(--acc)':'var(--sup2)'};color:${_gnew[campo]==v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
+  const capa = _gnew.capaUrl
+    ? `<img src="${_gnew.capaUrl}" alt="Prévia da capa" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`
+    : `<div style="font:300 26px/1 var(--f-ui);color:var(--marca)">+</div>
+       <div style="font:600 9px var(--f-ui);color:var(--marca);letter-spacing:.06em">ESCOLHER FOTO</div>`;
   _sheet('net-gnew', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px var(--f-ui)">Criar grupo</div>
       <button onclick="_net.fecharGnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
@@ -3876,11 +3941,12 @@ function netCriarGrupoUI(){
     <div style="display:flex;gap:10px;margin-top:16px;align-items:flex-start">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Foto de capa</div>
-        <div style="aspect-ratio:1/1;border:1px dashed var(--marca);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center">
-          <div style="font:300 26px/1 var(--f-ui);color:var(--marca)">+</div>
-          <div style="font:600 9px var(--f-ui);color:var(--marca);letter-spacing:.06em">SEM DADO REAL</div>
-        </div>
-        <div style="font-size:10px;color:var(--ink3);margin-top:5px;line-height:1.4">Foto de grupo depende de Storage, que o app ainda não tem. O cartão usa a inicial do nome até lá.</div>
+        <label style="position:relative;aspect-ratio:1/1;border:1px dashed var(--marca);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;overflow:hidden;text-align:center;cursor:pointer">
+          <input type="file" accept="image/*" hidden onchange="_net.gcapa(this)">
+          ${capa}
+          ${_gnew.capaUrl?'<span style="position:absolute;right:7px;bottom:7px;padding:5px 8px;border-radius:8px;background:rgba(10,10,10,.78);color:white;font:700 9px var(--f-ui)">Trocar</span>':''}
+        </label>
+        <div style="font-size:10px;color:var(--ink3);margin-top:5px;line-height:1.4">Pode escolher uma foto do celular. O app reduz o arquivo antes de enviar.</div>
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Descrição do grupo</div>
@@ -3915,6 +3981,14 @@ function netCriarGrupoUI(){
    isso a descrição do board seria impossível de digitar. */
 const _GSET_MUDO = ['nome','regras'];
 function _gset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; _gnew[campo]=v; if(!_GSET_MUDO.includes(campo)) netCriarGrupoUI(); }
+function _gCapaEscolher(input){
+  const f=input&&input.files&&input.files[0]; if(!f||!_gnew) return;
+  if(!_fotoEntradaOk(f)){ input.value=''; alert('Escolha uma imagem.'); return; }
+  if(f.size>FOTO_ORIGINAL_MAX){ input.value=''; alert('A foto original passa de 25 MB. Escolha uma menor.'); return; }
+  if(_gnew.capaUrl) URL.revokeObjectURL(_gnew.capaUrl);
+  _gnew.capa=f; _gnew.capaUrl=URL.createObjectURL(f);
+  netCriarGrupoUI();
+}
 async function _gcriar(){
   /* o piso de 2 é o mesmo do `grupos_nome_tam` (mig 82). Cobrar aqui é conforto
      — dizer antes de a rede negar; a cerca é o check, porque quem manda o POST
@@ -3927,16 +4001,23 @@ async function _gcriar(){
      superfície nova não herda trava nenhuma, nem as que a antiga nunca teve.
      Vazia vira null e não string vazia: "sem descrição" é ausência, não texto
      de comprimento zero, e as duas se comportam diferente em toda consulta. */
-  const desc = (_gnew.regras||'').trim();
+  const desc = (_gnew.regras||'').trim(), capaArquivo=_gnew.capa||null, capaUrl=_gnew.capaUrl||null;
   const { data, error } = await sb.from('grupos').insert({ nome:_gnew.nome.trim(), dono_id:MEU_UID, regras:desc||null, esporte:_gnew.esporte, aberto:!!_gnew.aberto, local_id:_gnew.local_id||null }).select().single();
   if(error){ alert('Erro ao criar: '+error.message); return; }
   await sb.from('grupo_membros').insert({ grupo_id:data.id, player_id:MEU_UID, papel:'dono' });
+  let capaErro=null;
+  if(capaArquivo){
+    const cr=await netGrupoCapaTrocar(data.id,capaArquivo);
+    capaErro=cr.erro||null;
+  }
+  if(capaUrl) URL.revokeObjectURL(capaUrl);
   _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove();
-  if(window.toast) toast('Comunidade criada! Manda o link pros amigos.');
+  if(capaErro) alert('A comunidade foi criada, mas a capa não subiu: '+capaErro);
+  else if(window.toast) toast('Comunidade criada! Manda o link pros amigos.');
   netMeusQuadros(true).catch(()=>{});   // entrou uma comunidade: o quadro muda
   netVerGrupo(data.id);
 }
-function netFecharGnew(){ _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove(); }
+function netFecharGnew(){ if(_gnew&&_gnew.capaUrl) URL.revokeObjectURL(_gnew.capaUrl); _gnew=null; const el=document.getElementById('net-gnew'); if(el) el.remove(); }
 
 // -- pedir pra entrar (upsert cobre o re-pedido depois de recusado) --
 async function netPedirEntrar(gid){
@@ -4331,7 +4412,7 @@ async function netAvisos(){
   const av = { grupo:{}, partida:{}, amigo:{} };   // (101) a terceira metade
   (data||[]).forEach(r=>{ if(av[r.sala]) av[r.sala][r.sala_id] = r.nao_lidas; });
   _avisos = av;
-  if(window.render) render();
+  if(window.render) render(true);
   if(document.getElementById('net-inbox')) netRenderInbox();
 }
 function netRecadosDe(tipo, id){ return (_avisos && _avisos[tipo] && _avisos[tipo][id]) || 0; }
@@ -4340,6 +4421,19 @@ function netTemRecado(tipo){
   return (tipo ? [tipo] : ['grupo','partida','amigo'])
     .some(t=> Object.values(_avisos[t]||{}).some(n=> n>0));
 }
+
+/* Atualização manual e fallback do tempo real. Reúne os dados que mudam por
+   ação de outra pessoa sem recarregar a página nem interromper formulários. */
+let _atualizandoTudo = null;
+function netAtualizarTudo(){
+  if(!MEU_UID) return Promise.resolve(false);
+  if(_atualizandoTudo) return _atualizandoTudo;
+  _atualizandoTudo = Promise.allSettled([
+    netAtualizarInbox(), netAtualizarProfessor(), netAvisos(), netMinhasAulas()
+  ]).then(()=>true).finally(()=>{ _atualizandoTudo=null; });
+  return _atualizandoTudo;
+}
+window.netAtualizarTudo = netAtualizarTudo;
 
 /* 25/08 (mig 66): AULAS — a REGRA, não a lista.
    O banco guarda "terça 18h, esses alunos". As ocorrências de cada semana são
@@ -4702,7 +4796,23 @@ async function netSalvarProfessor(d){
     especialidades: (d.especialidades||'').trim() || null,  // 27/08 (mig 69)
     aceitando_ate: d.aceitandoAte || null };
   const { error } = await sb.from('professores').upsert(linha);
-  return { erro: error ? error.message : null };
+  if(error) return {erro:error.message};
+  /* A porta "Você dá aula?" também existe para quem entrou como jogador.
+     Criar só a linha de professores fazia essa pessoa aparecer no Radar, mas
+     a navegação continuava presa no papel de jogador. A promoção é de mão
+     única e preserva o `joga`: ela passa a ter as duas lentes. */
+  const atual = (_perfil&&_perfil.perfil) || ((window.__perfil||{}).perfil) || 'jogador';
+  let promovido=false;
+  if(atual!=='professor'){
+    const rp=await sb.from('players').update({perfil:'professor'}).eq('id',MEU_UID).select('id');
+    if(rp.error) return {erro:'seu anúncio foi salvo, mas não deu pra abrir o modo professor: '+rp.error.message};
+    if(!rp.data||!rp.data.length) return {erro:'seu anúncio foi salvo, mas o modo professor não foi ativado'};
+    promovido=true;
+    const joga = _perfil ? _perfil.joga !== false : (window.__perfil||{}).joga !== false;
+    _perfil={perfil:'professor',joga}; window.__perfil=_perfil;
+    if(typeof S!=='undefined'&&S.jogadores&&S.jogadores[EU]) S.jogadores[EU].perfil='professor';
+  }
+  return {erro:null,promovido};
 }
 /* a turma: quem é meu aluno, quem é meu professor, e o que está pendente */
 async function netTurma(){
@@ -4715,12 +4825,18 @@ async function netTurma(){
   ]);
   if(a.error) console.error('[net] turma', a.error);
   const linhas = a.data || [];
-  return {
+  const turma = {
     alunos:      linhas.filter(x=> x.treinador_id === MEU_UID),
     professores: linhas.filter(x=> x.aluno_id     === MEU_UID),
     pedidos:     (pd.data || []),
     avulsas:     (av.data || []).filter(x=> x.professor_id === MEU_UID),
   };
+  /* Só os pedidos que vieram do outro lado exigem resposta. O interesse do
+     aluno passa a acender o sino e a aba Turma assim que chega. */
+  window.__profNovidades = turma.pedidos.filter(x=>x.quem_pediu!==MEU_UID).length
+                           + turma.avulsas.length;
+  _recontarNovidades();
+  return turma;
 }
 async function netAlunoPedir(outro, esporte, aulaId){
   /* 27/08 (mig 70): o pedido pode apontar a TURMA. Sem aulaId é o pedido
@@ -6020,7 +6136,7 @@ async function netLocais(force){
             // 03/09 (mig 95): `piso`. O select aqui e EXPLICITO — coluna nova que
       // nao entra nesta linha simplesmente nunca chega no cliente, sem erro
       // nenhum, e a capa da quadra nasceria neutra pra sempre.
-      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,telefone,locacao,piso,locais_endereco(endereco)')
+      .select('id,nome,tipo,quadras,cidade_id,regiao_id,origem,dono_id,telefone,locacao,piso,coberta,locais_endereco(endereco)')
       .eq('ativo',true).order('nome'),
     sb.from('cidades').select('id,nome,uf'),
     sb.from('regioes').select('id,nome,cidade_id'),
@@ -6192,7 +6308,7 @@ function netRenderMeusLocais(){
           <span style="padding:3px 6px;border-radius:6px;background:rgba(10,10,10,.62);color:var(--acc);font:800 8px var(--f-ui);letter-spacing:.06em;text-transform:uppercase">${_admEsc(piso)}</span>
         </div>
         <div style="min-width:0;flex:1"><b style="font-size:14px">${_admEsc(l.nome)}</b> <span style="color:var(--ink3);font-size:11px">›</span>
-          <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+_admEsc(l.cidade):''}</div>
+          <div style="font-size:11px;color:var(--ink2)">${TIPO[l.tipo]||''}${TIPO[l.tipo]?' · ':''}${l.quadras} quadra${l.quadras>1?'s':''}${typeof l.coberta==='boolean'?' · '+(l.coberta?'fechada/coberta':'ao ar livre'):''}${l.cidade?' · '+_admEsc(l.cidade):''}</div>
           ${l.endereco?`<div style="font-size:10.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_admEsc(l.endereco)}</div>`:''}</div>
       </div>
       ${on?`<button onclick="_net.locPrincipal('${l.id}')" style="padding:6px 10px;border-radius:9px;border:1px solid ${pr?'var(--gold-bg)':'var(--linha2)'};background:${pr?'var(--gold-bg)':'var(--sup2)'};color:${pr?'var(--gold)':'var(--ink2)'};font:600 11px var(--f-ui);cursor:pointer">${pr?'★ principal':'tornar principal'}</button>`:''}
@@ -6275,6 +6391,8 @@ function netVerLocal(id){
       ${tel ? linha('📞', telLink) : linha('📞', 'Sem telefone cadastrado.', 'var(--ink3)')}
       ${l.piso ? linha('▤', PISO_ROTULO[l.piso] || _admEsc(l.piso))
                : linha('▤', 'Piso não informado' + (meu ? ' — toque em Editar pra dizer qual é.' : '.'), 'var(--ink3)')}
+      ${typeof l.coberta==='boolean' ? linha('⌂', l.coberta?'Quadra fechada / coberta':'Quadra ao ar livre')
+                                    : linha('⌂', 'Ambiente não informado' + (meu?' — toque em Editar pra escolher.':'.'), 'var(--ink3)')}
     </div>
 
     ${l.origem==='jogador'
@@ -6305,7 +6423,7 @@ function netFecharLocal(){ const el=document.getElementById('net-local'); if(el)
 let _qnova = null;
 function netCriarQuadra(){
   const meu = window.__meusLocais || {};
-  _qnova = { id:null, nome:'', tipo:'condominio', quadras:1, endereco:'', piso:null,
+  _qnova = { id:null, nome:'', tipo:'condominio', quadras:1, endereco:'', piso:null, coberta:null,
              cidade_id: meu.cidadeId || (_cidades[0]||{}).id || null };
   netRenderCriarQuadra();
 }
@@ -6333,6 +6451,7 @@ function netEditarQuadra(id){
   if(l.dono_id !== MEU_UID){ alert('Essa quadra não é sua.'); return; }
   _qnova = { id:l.id, nome:l.nome||'', tipo:l.tipo||'condominio',
              quadras:l.quadras||1, endereco:l.endereco||'', piso:l.piso||null,
+             coberta:typeof l.coberta==='boolean'?l.coberta:null,
              cidade_id:l.cidade_id||null,
              /* guardados pra comparar na hora de gravar: `cidade0` decide se a
                 região tem que ser zerada (região pertence a uma cidade, e nada
@@ -6368,6 +6487,8 @@ function netRenderCriarQuadra(){
      permanente, que e pior que campo vazio pra quem procura quadra por piso. */
   const PISOS=[['saibro','Saibro'],['cimento','Cimento'],['grama','Grama'],['areia','Areia'],['misto','Vários']];
   const segPiso = PISOS.map(([v,n])=>`<button onclick="_net.qset('piso','${q.piso===v?'':v}')" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--linha2);font:600 11px var(--f-ui);cursor:pointer;background:${q.piso===v?'var(--acc)':'var(--sup2)'};color:${q.piso===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
+  const segAmbiente = [[false,'Ao ar livre'],[true,'Fechada / coberta']].map(([v,n])=>
+    `<button onclick="_net.qset('coberta',${q.coberta===v?'null':v})" style="flex:1;padding:10px 6px;border-radius:9px;border:1px solid var(--linha2);font:600 12px var(--f-ui);cursor:pointer;background:${q.coberta===v?'var(--acc)':'var(--sup2)'};color:${q.coberta===v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
   _sheet('net-qnova', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px var(--f-ui)">${q.id?'Editar minha quadra':'Cadastrar minha quadra'}</div>
       <button onclick="_net.fecharQnova()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
@@ -6385,6 +6506,9 @@ function netRenderCriarQuadra(){
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Piso <span style="color:var(--ink3)">— opcional, escolhe a foto da quadra</span></div>
     <div style="display:flex;gap:6px">${segPiso}</div>
     ${q.piso ? `<div style="margin-top:10px">${_capaLocal(q.piso)}</div>` : ''}
+
+    <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Ambiente <span style="color:var(--ink3)">— opcional</span></div>
+    <div style="display:flex;gap:7px">${segAmbiente}</div>
 
     <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Endereço <span style="color:var(--dn)">— obrigatório</span></div>
     <input id="q-endereco" value="${_admEsc(q.endereco)}" oninput="_net.qset('endereco',this.value,this.selectionStart)" placeholder="Rua, número e bairro" maxlength="160"
@@ -6469,7 +6593,8 @@ async function _qsalvarInterno(){
        outro lugar — e o chip de região do radar casaria a pessoa com jogadores
        da cidade errada. Zera só quando a cidade muda: zerar sempre apagaria a
        classificação do ADM a cada correção de nome, que é estrago de outro tipo. */
-    const campos = { nome, tipo:q.tipo, quadras:q.quadras, cidade_id:q.cidade_id, piso:q.piso||null };
+    const campos = { nome, tipo:q.tipo, quadras:q.quadras, cidade_id:q.cidade_id, piso:q.piso||null,
+                     coberta:typeof q.coberta==='boolean'?q.coberta:null };
     if(q.cidade0 && q.cidade_id !== q.cidade0) campos.regiao_id = null;
 
     const upd = await sb.from('locais').update(campos).eq('id', q.id).select('id');
@@ -6501,6 +6626,7 @@ async function _qsalvarInterno(){
 
   const novo = await sb.from('locais').insert({
     nome, cidade_id:q.cidade_id, tipo:q.tipo, quadras:q.quadras, piso:q.piso||null,
+    coberta:typeof q.coberta==='boolean'?q.coberta:null,
     origem:'jogador', dono_id:MEU_UID,
   }).select('id').single();
   if(novo.error){ alert('Não deu pra cadastrar: '+novo.error.message); return; }
@@ -6898,11 +7024,24 @@ async function netCheckPerfil(){
   if(_perfil !== null) return _perfil;
   if(!MEU_UID){ return null; }
   try{
-    const r = await sb.from('players').select('perfil, joga').eq('id', MEU_UID).maybeSingle();
+    const [r,pr] = await Promise.all([
+      sb.from('players').select('perfil, joga').eq('id', MEU_UID).maybeSingle(),
+      sb.from('professores').select('player_id, ativo').eq('player_id',MEU_UID).maybeSingle(),
+    ]);
     _perfil = r && r.data ? { perfil: r.data.perfil || 'jogador', joga: r.data.joga !== false }
                           : { perfil:'jogador', joga:true };
+    /* Recupera quem usou a antiga porta "Você dá aula?": ela criou a ficha
+       no Radar, mas deixou players.perfil como jogador. A mig 102 permite a
+       promoção de mão única quando essa ficha ativa já existe. */
+    if(_perfil.perfil==='jogador' && pr && pr.data && pr.data.ativo){
+      const up=await sb.from('players').update({perfil:'professor'}).eq('id',MEU_UID).select('id');
+      if(!up.error && up.data && up.data.length) _perfil.perfil='professor';
+    }
   }catch(e){ _perfil = { perfil:'jogador', joga:true }; }
   window.__perfil = _perfil;
+  if(typeof S!=='undefined' && S.jogadores && S.jogadores[EU]){
+    S.jogadores[EU].perfil=_perfil.perfil; S.jogadores[EU].joga=_perfil.joga;
+  }
   if(typeof render === 'function'){ try{ render(); }catch(e){} }
   return _perfil;
 }
@@ -7563,6 +7702,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
   onPiso:_onPiso,   // (83) saibro | dura | rapida
   cancelarDesafio:netCancelarDesafio,
+  resumoDesafio:(m)=>_pinOuVazio(m), atualizarTudo:netAtualizarTudo,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
   atividadeCriar:netAtividadeCriar, atividadesResumo:netAtividadesResumo,
   desfazerAmizade:netDesfazerAmizade, partidaCom:netPartidaCom,
@@ -7595,6 +7735,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   avaliacoes:netAvaliacoes, avaliar:netAvaliar, partidasParaAvaliar:netPartidasParaAvaliar,
   seguirNumeros:netSeguirNumeros, seguir:netSeguir, deixarDeSeguir:netDeixarDeSeguir,
   estiloSalvar:netEstiloSalvar,
-  grupoCapaUrl:netGrupoCapaUrl, grupoCapaTrocar:netGrupoCapaTrocar };
+  grupoCapaUrl:netGrupoCapaUrl, grupoCapaTrocar:netGrupoCapaTrocar,
+  gcapa:_gCapaEscolher };
 window.netAbrirMeusLocais = netAbrirMeusLocais;
 window.netAbrirInbox = netAbrirInbox;

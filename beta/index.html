@@ -210,6 +210,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- corpo ---------- */
 #tela{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;z-index:1;padding-bottom:16px}
 #tela::-webkit-scrollbar{width:0}
+#puxaAtualiza{position:absolute;z-index:65;left:50%;top:max(9px,env(safe-area-inset-top));transform:translate(-50%,-54px);
+  opacity:0;pointer-events:none;padding:8px 13px;border-radius:999px;background:var(--sup);border:1px solid var(--linha2);
+  color:var(--ink2);font:700 11px var(--f-ui);box-shadow:0 8px 24px rgba(0,0,0,.36);transition:transform .2s,opacity .2s}
+#puxaAtualiza.on{transform:translate(-50%,0);opacity:1}
+#puxaAtualiza.pronto{color:var(--acc);border-color:var(--acc)}
+#puxaAtualiza.girando::before{content:'↻';display:inline-block;margin-right:7px;animation:girarAtualiza .7s linear infinite}
+@keyframes girarAtualiza{to{transform:rotate(360deg)}}
 .pad{padding:16px var(--pad-lado)}
 .sec{padding:18px var(--pad-lado) 0}
 /* 01/09 — O TÍTULO DE SEÇÃO DO FIGMA é branco, caixa normal, sem tracking
@@ -1044,6 +1051,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .hud{position:relative;z-index:2;
   padding:max(8px,env(safe-area-inset-top)) var(--pad-lado) 0}
 .ini .linha1{display:flex;align-items:center;gap:10px}
+.ini.prof .scrim{background:linear-gradient(180deg,rgba(255,92,0,.18) 0%,rgba(6,9,14,.08) 28%,rgba(6,9,14,.55) 78%,var(--bar) 100%)}
+.ini.prof .prof-modo{align-self:flex-start;margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;
+  border-radius:999px;background:var(--marca);color:var(--marca-ink);font:800 10px var(--f-ui);letter-spacing:.12em;text-transform:uppercase;box-shadow:0 7px 20px rgba(0,0,0,.28)}
+.ini.prof .prof-modo::before{content:'◆';font-size:8px}
+.ini.prof .prof-modo button{margin-left:3px;padding:0 0 0 9px;border:0;border-left:1px solid rgba(0,0,0,.28);background:none;color:inherit;font:700 10px var(--f-ui);cursor:pointer}
+.ini.prof .painel{border-color:var(--marca)}
+.ini.prof .painel .q.acende b{color:var(--marca)}
+.ini.prof .acao .big.up{background:var(--marca);color:var(--marca-ink);box-shadow:0 8px 24px rgba(255,92,0,.2)}
 /* node 35:836 pelo código: logo 179x52,6 de um frame de 1080 — 16,6% da
    largura. Estava com 30px de altura, que dá ~102px de largura (27% da tela):
    quase o dobro do desenho. Agora vai por largura relativa, que é como o Figma
@@ -2158,6 +2173,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 #vs .vs-adv b{font-weight:700;color:var(--ink)}
 #vs .vs-id{color:var(--ink3);font-weight:400}
 #vs .vs-meta{margin-top:5px;color:var(--ink3)}
+#vs .vs-combinado{margin-top:12px;padding-top:12px;border-top:1px solid var(--linha);text-align:left}
+#vs .vs-comb-tit{font:800 10px var(--f-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin-bottom:7px}
+#vs .vs-formato{font:400 11.5px var(--f-ui);color:var(--ink2);margin-top:3px}
 #vs .vs-acoes{margin-top:auto;padding-top:18px;display:flex;gap:10px}
 #vs .vs-acoes button{flex:1;min-height:52px;padding:13px 8px;border-radius:var(--rp);font:700 var(--t-label) var(--f-ui);cursor:pointer}
 #vs .vs-no{background:rgba(40,25,20,.92);color:var(--ink);border:1px solid var(--linha2)}
@@ -2400,6 +2418,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     </div>
   </div>
 
+  <div id="puxaAtualiza">Puxe para baixo para atualizar</div>
   <div id="tela"></div>
 
   <!-- 18/08: nasce escondida. Só aparece se o navegador disser que dá pra
@@ -2447,7 +2466,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788872629"></script>
+<script src="net.js?v=1788959023"></script>
 
 <script>
 /* =========================================================================
@@ -3347,6 +3366,13 @@ function navAbas(){
     {t:'aulas', i:'🗓', r:'Aulas'}, chat,
   ];
 }
+function abrirNotificacoes(){
+  /* Pedido de aluno exige ação na Turma; o sino leva direto à decisão. As
+     demais novidades continuam na caixa geral de partidas e conversas. */
+  if(veProfessor() && +(window.__profNovidades||0)>0){ trocarAba('turma'); return; }
+  if(window.netAbrirInbox) netAbrirInbox();
+}
+window.abrirNotificacoes = abrirNotificacoes;
 function pintarNav(){
   const el = document.getElementById('nav');
   if(!el) return;
@@ -3356,6 +3382,8 @@ function pintarNav(){
     if(a.t==='comunidade'){
       extra = (S.novidades? ` <span class="badge">${S.novidades}</span>`:'')
             + ((window.netTemRecado&&netTemRecado('grupo'))? ' <span class="ponto"></span>':'');
+    } else if(a.t==='turma' && +(window.__profNovidades||0)>0){
+      extra = ` <span class="badge">${window.__profNovidades}</span>`;
     } else if(a.t==='chat'){
       extra = (window.netTemRecado&&netTemRecado())? ' <span class="ponto"></span>':'';
     }
@@ -3763,6 +3791,8 @@ function render(manterPosicao=false){
   // o avatar do topo é a porta do perfil (board): repintado a cada render
   // porque a camisa e o boneco mudam no vestiário
   const _bt = $('#btEu'); if(_bt) _bt.innerHTML = avatar(EU,'');
+  const _sp = $('#sinoPt');
+  if(_sp) _sp.hidden = !(S.novidades || (window.netTemRecado&&netTemRecado()));
   $('#tela').innerHTML = v.html;
   $('#tela').scrollTop = manterPosicao ? posicaoAnterior : 0;
   // 25/08 (bug do Nuno): durante o vestiário DO CADASTRO a nav some — com ela
@@ -3948,7 +3978,7 @@ const DIAS_PT=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
    jogador. A ficha e aberta de varios lugares (Encontrar, aulas, turma) e o
    boot nao hidrata nada dela, entao a consulta e por demanda e guardada.
    `null` = carregando; objeto = pronto. */
-function profCarregar(pid){
+function profFichaCarregar(pid){
   window.__profCache = window.__profCache || {};
   if(window.__profCache[pid] !== undefined) return;
   window.__profCache[pid] = null;
@@ -4168,9 +4198,9 @@ function comuFeedCarregar(){
 async function comuPostar(){
   const el = document.getElementById('post-txt');
   const t = el ? el.value : '';
-  if(!t.trim()){ toast('Escreve alguma coisa antes de publicar.'); return }
   const inp = document.getElementById('post-foto');
   const foto = inp && inp.files && inp.files[0];
+  if(!t.trim()&&!foto){ toast('Escreve alguma coisa ou escolhe uma foto.'); return }
   const r = await _net.postar(t, null, foto);
   /* o teto de 20 posts por hora é trigger no banco e chega como exceção. A
      frase dele já diz o que fazer, então ela sobe inteira em vez de virar um
@@ -4215,7 +4245,7 @@ function postHtml(x){
         <div class="txt"><b>${quem}</b><small>${dia}</small></div>
         ${meu?`<button class="men" onclick="comuApagarPost('${x.id}')" title="Apagar">⋮</button>`:''}
       </div>
-      <div class="corpo">${(x.corpo||'').replace(/</g,'&lt;')}</div>
+      ${x.corpo?`<div class="corpo">${(x.corpo||'').replace(/</g,'&lt;')}</div>`:''}
       ${x.imgUrl ? `<img class="post-foto" src="${_attr(x.imgUrl)}" alt="" loading="lazy">` : ''}
     </div>`;
 }
@@ -4227,12 +4257,15 @@ function fotoEscolhida(input, alvoId){
   const f = input.files && input.files[0];
   if(!el) return;
   if(!f){ el.textContent=''; return }
-  if(f.size > 2*1024*1024){
+  if(!((f.type||'').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name||''))){
+    input.value=''; el.textContent=''; alert('Escolha uma imagem.'); return;
+  }
+  if(f.size > 25*1024*1024){
     input.value=''; el.textContent='';
-    alert('A foto passa de 2 MB. Tire uma menor ou reduza antes de subir.');
+    alert('A foto original passa de 25 MB. Escolha uma menor.');
     return;
   }
-  el.textContent = f.name;
+  el.textContent = f.name + (f.size>2*1024*1024?' · será reduzida':'');
 }
 function comuFeed(){
   comuFeedCarregar();
@@ -4246,20 +4279,20 @@ function comuFeed(){
      "publica agora e anexa depois" — e subir antes deixaria arquivo órfão no
      balde toda vez que alguém desistisse do post. */
   const escrever = `<textarea id="post-txt" class="onb-area" maxlength="1000"
-        placeholder="Conta pra comunidade — um jogo, uma quadra, uma pergunta."></textarea>
+        placeholder="O que rolou na quadra hoje?"></textarea>
       <div class="postbar">
         <label class="foto-bt">
-          <input type="file" id="post-foto" accept="image/jpeg,image/png,image/webp"
+          <input type="file" id="post-foto" accept="image/*"
                  onchange="fotoEscolhida(this,'post-foto-nome')" hidden>
-          <span>🖼 Foto</span>
+          <span>🖼 Adicionar foto</span>
         </label>
         <small id="post-foto-nome" class="foto-nome"></small>
       </div>
-      <button class="btn" style="margin-top:8px" onclick="comuPostar()">Publicar</button>`;
+      <button class="btn" style="margin-top:8px" onclick="comuPostar()">Publicar no feed</button>`;
   const corpo = l === null
     ? `<div class="card"><p class="nota">Carregando o feed…</p></div>`
     : l.length ? l.map(postHtml).join('')
-    : `<div class="card"><div class="vazio"><i class="ic">✎</i>Ninguém publicou nada ainda. O primeiro post é seu.</div></div>`;
+    : `<div class="card"><div class="vazio"><i class="ic">✎</i>A conversa começa na quadra. Compartilhe o primeiro jogo, convite ou resenha.</div></div>`;
   /* as notícias são as mesmas da vitrine — arquivo curado, sem tabela. O board
      as põe no topo desta aba, e é o mesmo bloco: não há segunda fonte. */
   /* o `.noticias` não é enfeite: as regras da notícia nasceram debaixo de
@@ -4450,9 +4483,9 @@ function grupoCarregar(id){
 async function grupoCapaEnviar(gid, input){
   const f = input && input.files && input.files[0];
   if(!f) return;
-  if(f.size > 2*1024*1024){
+  if(f.size > 25*1024*1024){
     input.value='';
-    alert('A capa passa de 2 MB. Use uma imagem menor.');
+    alert('A foto original passa de 25 MB. Escolha uma menor.');
     return;
   }
   toast('Subindo a capa…');
@@ -4468,9 +4501,9 @@ async function grupoCapaEnviar(gid, input){
 async function grupoPostar(gid){
   const el = document.getElementById('gpost-txt');
   const t = el ? el.value : '';
-  if(!t.trim()){ toast('Escreve alguma coisa antes de publicar.'); return }
   const inp = document.getElementById('gpost-foto');
   const foto = inp && inp.files && inp.files[0];
+  if(!t.trim()&&!foto){ toast('Escreve alguma coisa ou escolhe uma foto.'); return }
   const r = await _net.postar(t, gid, foto);
   if(r.erro){ alert('Não deu pra publicar: '+r.erro); return }
   if(el) el.value='';
@@ -4772,8 +4805,14 @@ async function profSalvar(){
   const r=await _net.salvarProfessor(d);
   if(r.erro){ alert('Não deu pra salvar: '+r.erro); return; }
   window.__profLoad=false; window.__profs=undefined;
-  toast('Pronto. Você aparece em <b>Encontrar › Professores</b>.');
-  voltar();
+  if(r.promovido){
+    S.modoProf='prof'; aba='inicio'; pilha=[]; salvar();
+    toast('Modo professor ativado. Agora você pode alternar entre <b>Professor</b> e <b>Jogar</b>.');
+    render();
+  } else {
+    toast('Pronto. Você aparece em <b>Encontrar › Professores</b>.');
+    voltar();
+  }
 }
 function turmaCarregar(){
   if(window.__turmaLoad) return;
@@ -4871,23 +4910,21 @@ function homeProfessor(){
   const hhmm=(h)=>String(h||'').slice(0,5);
   /* a ação grande, por urgência — o que só ELE pode resolver vem primeiro */
   let bt;
-  if(esperando)          bt={cls:'up', t:esperando+(esperando>1?' pessoas esperando':' pessoa esperando'),
-                             s:(pedidos.length?pedidos.length+' pedido'+(pedidos.length>1?'s':'')+' de vaga':'')
-                               +(pedidos.length&&avulsas.length?' · ':'')
-                               +(avulsas.length?avulsas.length+' aula avulsa'+(avulsas.length>1?'s':''):''), go:"ir('turma')"};
-  else if(hoje.length)   bt={cls:'', t:'Aula hoje · '+hhmm(hoje[0].hora),
+  if(esperando)          bt={cls:'up', t:esperando+' solicitação'+(esperando>1?'ões':'')+' aguardando resposta',
+                             s:'Veja quem quer treinar com você e responda enquanto o interesse está quente.', go:"ir('turma')"};
+  else if(hoje.length)   bt={cls:'', t:'Você tem aula hoje · '+hhmm(hoje[0].hora),
                              s:((hoje[0].aula_alunos||[]).length)+' aluno(s)'+(hoje[0].local_txt?' · '+hoje[0].local_txt:'')
                                +(hoje.length>1?' · +'+(hoje.length-1)+' hoje':''), go:"trocarAba('aulas')"};
-  else if(A&&!A.length)  bt={cls:'', t:'Criar minha primeira aula', s:'Dois toques: o dia e a hora', go:"ir('aulaNova')"};
-  else if(!naVitrine)    bt={cls:'', t:'Você não aparece pra quem procura', s:'Ligue o "pegando aluno" pra voltar à busca', go:"ir('souProfessor')"};
-  else                   bt={cls:'', t:'Divulgar minhas aulas', s:'Seu perfil em Encontrar › Professores', go:"ir('souProfessor')"};
+  else if(A&&!A.length)  bt={cls:'', t:'Coloque sua primeira aula na agenda', s:'Defina o dia, a hora e os alunos.', go:"ir('aulaNova')"};
+  else if(!naVitrine)    bt={cls:'', t:'Seu perfil não está aparecendo na busca', s:'Ative a disponibilidade para voltar a receber alunos.', go:"ir('souProfessor')"};
+  else                   bt={cls:'', t:'Você está disponível para novos alunos', s:'Veja como seu perfil aparece para quem procura aula.', go:"ir('souProfessor')"};
 
   /* secundárias: só o que o botão grande NÃO cobriu (mesma técnica da home
      do jogador) — nunca duas portas pra mesma coisa na mesma tela */
   const sec2 = `<div class="acoes-sec">
-      ${!esperando ? `<button onclick="ir('turma')">👥 Minha turma</button>` : ''}
-      ${!hoje.length && !(A&&!A.length) ? `<button onclick="trocarAba('aulas')">🗓 Minhas aulas</button>` : ''}
-      ${bt.go.indexOf('souProfessor')<0 ? `<button onclick="ir('souProfessor')">◈ Meu perfil</button>` : ''}
+      ${!esperando ? `<button onclick="ir('turma')">👥 Ver minha turma</button>` : ''}
+      ${!hoje.length && !(A&&!A.length) ? `<button onclick="trocarAba('aulas')">🗓 Ver agenda</button>` : ''}
+      ${bt.go.indexOf('souProfessor')<0 ? `<button onclick="ir('souProfessor')">◈ Editar meu perfil</button>` : ''}
     </div>`;
 
   /* a aula de hoje só vira LISTA quando há mais de uma — com uma só, o botão
@@ -4917,45 +4954,43 @@ function homeProfessor(){
                 <small>${j.calibrando?'em calibragem · '+(j.cal||0)+' de 8 partidas':(cls?('Classe '+cls+' · Nível '+nv):'sem partida ainda')}</small></div>
             </div></div>`;
           }).join('')
-        : `<div class="card"><p class="nota">Nenhum aluno ainda. Quem procura professor te acha em <b>Encontrar › Professores</b> — e o vínculo nasce quando o aluno confirma.</p></div>`)}
+        : `<div class="card"><p class="nota">Sua turma começa quando o primeiro aluno confirma. Deixe seu perfil disponível para quem estiver procurando aula.</p></div>`)}
     </div>`;
 
-  const cena = eu.cena||{quadra:'saibro',momento:'noite'};
   const nAulas = A ? A.length : null;
 
   return {titulo:'Início', dir:'', html:`
-    <div class="ini" style="--camisa:${eu.cor}">
-      <div class="cena" style="background-image:url('../quadras/${cena.quadra}-${cena.momento}.jpg')"></div>
+    <div class="ini prof" style="--camisa:${eu.cor}">
+      <div class="cena"></div>
       <div class="scrim"></div>
 
       <div class="hud">
         <div class="linha1">
-          <img class="logo" src="../marcas/ranket-horizontal.png" alt="Ranket">
-          <div class="ic" onclick="netAbrirInbox()">🔔${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
+          <img class="logo" src="fig/logo-ranket.svg" alt="Ranket">
+          <div class="ic" onclick="abrirNotificacoes()"><img src="fig/sino.svg" alt="Notificações">${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
           <!-- 28/08: o caminho do professor até a própria ficha (switch "eu
                compito", histórico, sair da conta) -->
           <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
         </div>
-        ${euJogo()?`
-        <!-- 28/08: a ida pra lente de jogador, no MESMO lugar e com o mesmo
-             peso do "👥 Sou professor" que volta de lá — a simetria é o que
-             faz as duas lentes se lerem como um par, e não como dois acasos -->
-        <button onclick="modoTrocar('jogo')" style="align-self:flex-start;margin-top:8px;padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:rgba(30,23,20,.72);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer;backdrop-filter:blur(6px)">🎾 Jogar</button>`:''}
-        <div class="painel">
-          <div class="q"><b>${D?D.length:'—'}</b><small>Alunos</small></div>
-          <div class="q"><b>${nAulas===null?'—':nAulas}</b><small>Aulas/sem</small></div>
-          <div class="q ${esperando?'acende':''}"><b>${esperando||'—'}</b><small>Esperando</small></div>
-        </div>
-      </div>
-
-      <div class="palco">
-        <div class="sombra"></div>
-        <div class="glow"></div>
-        <div class="boneco" onclick="trocarAba('ficha')">${bonecoImg(eu, true)}</div>
-        <div class="placa">
-          <div class="nm">${eu.nome}</div>
-          <div class="meta">Professor${D&&D.length?` · <b>${D.length}</b> aluno${D.length>1?'s':''}`:''}
-            <span class="pil2" style="${naVitrine?'':'background:var(--sup2);color:var(--ink3)'}">${naVitrine?'na busca':'fora da busca'}</span></div>
+        <div class="htopo">
+          <div class="hcol">
+            <div class="prof-modo">Modo professor${euJogo()?`<button onclick="modoTrocar('jogo')">Ir para Jogar</button>`:''}</div>
+            <div class="painel">
+              <div class="q"><b>${D?D.length:'—'}</b><small>Alunos</small></div>
+              <div class="q"><b>${nAulas===null?'—':nAulas}</b><small>Aulas/sem</small></div>
+              <div class="q ${esperando?'acende':''}"><b>${esperando||'—'}</b><small>Esperando</small></div>
+            </div>
+          </div>
+          <div class="palco">
+            <div class="sombra"></div>
+            <div class="glow"></div>
+            <div class="boneco" onclick="trocarAba('ficha')">${bonecoImg(eu, true)}</div>
+            <div class="placa">
+              <div class="nm">${eu.nome}</div>
+              <div class="meta">Professor${D&&D.length?` · <b>${D.length}</b> aluno${D.length>1?'s':''}`:''}
+                <span class="pil2" style="${naVitrine?'':'background:var(--sup2);color:var(--ink3)'}">${naVitrine?'na busca':'fora da busca'}</span></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -5404,7 +5439,7 @@ inicio(){
      ele desenha um estado, não os três. Quando há placar esperando, o botão
      é o placar: o registro é o elo frágil do ciclo e não pode ficar atrás de
      um convite pra marcar mais jogo. */
-  else                      bt={cls:'',        t:'Ver oponentes no seu radar', s:'Quem está livre na sua faixa, agora', go:"trocarAba('radar')"};
+  else                      bt={cls:'',        t:'Encontrar adversário', s:'Veja quem está livre na sua faixa agora.', go:"trocarAba('radar')"};
 
   /* Ações secundárias: marcar jogo e buscar oponente existiam só dentro de
      abas. Ficam abaixo do botão grande, discretas — o registro continua sendo
@@ -5412,11 +5447,11 @@ inicio(){
   const secundarias = `<div class="acoes-sec">
       ${bt.t!=='Buscar oponentes' ? `<button onclick="trocarAba('radar')">${ICO_HOME.bola}<span>Marcar jogo</span></button>` : ''}
       <button onclick="_net.abrirBusca&&_net.abrirBusca()">${ICO_HOME.lupa}<span>Buscar por nome</span></button>
-      <button onclick="trocarAba('comunidade')">${ICO_HOME.gente}<span>Minha comunidade</span></button>
+      <button onclick="trocarAba('comunidade')">${ICO_HOME.gente}<span>Ver comunidade</span></button>
       <!-- 18/08 (item 42): o card sai do app. Fica aqui, entre as secundárias,
            e não como botão grande: compartilhar é consequência de ter jogado,
            não a ação do ciclo. -->
-      <button onclick="exportarCard()">${ICO_HOME.card}<span>Meu card</span></button>
+      <button onclick="exportarCard()">${ICO_HOME.card}<span>Compartilhar card</span></button>
     </div>`;
 
   // faixa "o que mexeu na comunidade" — o feed real, não loot.
@@ -5450,7 +5485,7 @@ inicio(){
              Logo e sino são os SVG do próprio arquivo (app/fig/). -->
         <div class="linha1">
           <img class="logo" src="fig/logo-ranket.svg" alt="Ranket">
-          <div class="ic" onclick="netAbrirInbox()"><img src="fig/sino.svg" alt="Notificações">${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
+          <div class="ic" onclick="abrirNotificacoes()"><img src="fig/sino.svg" alt="Notificações">${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
           <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
         </div>
         ${modoJogador()?`
@@ -5483,7 +5518,7 @@ inicio(){
                explicação saiu da home; se ela precisar existir, o lugar é o
                Quadro, não este card. -->
           <div class="fim">${cat>1
-              ? `Sobe pra <b>${proxDegrau}</b> com mais ${faltamCat} de Nível.`
+              ? `Faltam <b>${faltamCat} pontos de nível</b> para ${proxDegrau}.`
               : (teto ? `Você está no topo da <b>${divDe(eu)}</b>. Rumo à classe <b>${acima}</b>!`
                       : 'Você está na Classe A1 — o topo da escada.')}</div>
         </div>
@@ -5506,8 +5541,8 @@ inicio(){
           return (temSlot || temFlag) ? '' : `
         <div class="hlets">
           <img class="lets" src="fig/lets-ranket.svg" alt="Let's Ranket">
-          <p>Adicione sua disponibilidade para que os outros jogadores no radar vejam você.</p>
-          <button onclick="trocarAba('radar'); ir('dispForm')">Adicionar disponibilidade</button>
+          <p>Marque quando você pode jogar. O radar mostra seu perfil para quem combina com você.</p>
+          <button onclick="trocarAba('radar'); ir('dispForm')">Marcar quando posso jogar</button>
         </div>`; })()}
         </div><!-- /hcol -->
 
@@ -5948,8 +5983,8 @@ radar(){
         </div>
         <div class="odir">
           ${rot?`<span class="olivre">🎾 ${rot.replace('Livre ','Livre ')}</span>`:''}
-          <button class="oconv" onclick="netDesafiar('${x.id}')">Convidar</button>
-          <button class="operf" onclick="netVerJogador('${x.id}')">Ver perfil</button>
+          <button class="oconv" onclick="netDesafiar('${x.id}')">Convidar para jogar</button>
+          <button class="operf" onclick="netVerJogador('${x.id}')">Conhecer melhor</button>
         </div>
       </div>
     </div>`;
@@ -5964,10 +5999,10 @@ radar(){
            Sobram as duas que de fato existem, e sao coisas diferentes: o flag
            do dia (sem hora) e o horario marcado. -->
       <div style="margin-bottom:10px">
-        <b style="font-family:var(--f-disp);font-size:17px">Está livre para jogar?</b>
+        <b style="font-family:var(--f-disp);font-size:17px">Quer jogar hoje?</b>
       </div>
       <div class="card dcard" onclick="ir('dispEditar')" title="editar disponibilidades">
-        <div class="rot" style="margin-bottom:8px">Suas disponibilidades ${minhas===null?'<span>carregando…</span>':''}</div>
+        <div class="rot" style="margin-bottom:8px">Quando você pode jogar ${minhas===null?'<span>carregando…</span>':''}</div>
         <div class="dgrade">${dias.map(colDia).join('')}</div>
       </div>
       <!-- o atalho de hoje (mig 42) continua: é o "Agora" sem agenda -->
@@ -5995,8 +6030,8 @@ radar(){
         style="width:100%;padding:14px;border-radius:var(--rp);cursor:pointer;
                font:700 13px var(--f-ui);border:1px solid var(--acc);
                background:none;color:var(--acc)">
-        Marcar dia e hora que você joga</button>
-      <p class="nota" style="margin-top:8px">Com hora, quadra e bairro — quem está na sua faixa vê e te chama.</p>
+        Marcar quando você pode jogar</button>
+      <p class="nota" style="margin-top:8px">Conte dia, hora e bairro. O radar faz o resto.</p>
     </div>
 
     <div class="sec">
@@ -6004,7 +6039,7 @@ radar(){
            título, alinhado à direita da margem. No app ele estava na linha de
            baixo, ao lado das abas temporais. As abas continuam (são adição do
            app, mantida) e passam a ter a linha só pra elas. -->
-      <div class="rot">Disponíveis no seu radar
+      <div class="rot">Quem topa jogar
         <button class="rfiltro" onclick="ir('radarFiltros')">Filtros${nFiltros?` · ${nFiltros}`:''} <i>⌄</i></button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
@@ -6013,9 +6048,9 @@ radar(){
       </div>
       ${lista.length ? lista.map(card).join('')
         : `<div class="card"><p class="nota">${
-            S.radarSub==='agora' ? 'Ninguém livre agora na sua faixa. Olhe <b>Hoje</b> e <b>Esta semana</b> — ou marque sua disponibilidade e apareça no radar dos outros.'
-          : 'Ninguém com disponibilidade marcada aqui ainda. Quem marca aparece — comece você.'}</p></div>`}
-      <p class="nota" style="margin-top:10px">O radar é <b>puxado</b>: ele nunca te notifica sugerindo jogo. Você abre quando quer jogar.</p>
+            S.radarSub==='agora' ? 'Ninguém livre agora na sua faixa. Veja <b>Hoje</b> ou <b>Esta semana</b> — ou marque seu horário para aparecer no radar dos outros.'
+          : 'Ainda não apareceu ninguém neste horário. Marque a sua disponibilidade e seja o próximo a entrar no radar.'}</p></div>`}
+      <p class="nota" style="margin-top:10px">O radar só aparece quando você quer jogar. Você decide quando chamar alguém.</p>
     </div>
 
     <div class="sec">
@@ -6945,7 +6980,7 @@ grupo(p){
         ? `<img class="capa" src="${_attr(capaUrl)}" alt="" loading="lazy">`
         : `<div class="ini" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 62px var(--f-ui);color:var(--linha2)">${(g.nome||'?').trim().charAt(0).toUpperCase()}</div>`}
       ${d.souGestor ? `<label class="capa-bt">
-          <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+          <input type="file" accept="image/*" hidden
                  onchange="grupoCapaEnviar('${id}', this)">
           <span>${capaUrl?'Trocar capa':'Pôr capa'}</span>
         </label>` : ''}
@@ -6985,19 +7020,19 @@ grupo(p){
   } else {
     const posts = d.posts||[];
     // sem `.sec` própria: já vem dentro de uma. Ver a nota no `comuFeed`.
-    const escrever = d.souMembro ? `<textarea id="gpost-txt" class="onb-area" maxlength="1000" placeholder="Escreve pro grupo."></textarea>
+    const escrever = d.souMembro ? `<textarea id="gpost-txt" class="onb-area" maxlength="1000" placeholder="O que rolou na quadra hoje?"></textarea>
         <div class="postbar">
           <label class="foto-bt">
-            <input type="file" id="gpost-foto" accept="image/jpeg,image/png,image/webp"
+            <input type="file" id="gpost-foto" accept="image/*"
                    onchange="fotoEscolhida(this,'gpost-foto-nome')" hidden>
-            <span>🖼 Foto</span>
+            <span>🖼 Adicionar foto</span>
           </label>
           <small id="gpost-foto-nome" class="foto-nome"></small>
         </div>
         <button class="btn" style="margin-top:8px" onclick="grupoPostar('${id}')">Publicar no grupo</button>`
-      : `<p class="nota" style="margin-top:12px">Só quem é do grupo publica aqui — a policy da mig 79 cobra isso no banco, não só na tela.</p>`;
+      : `<p class="nota" style="margin-top:12px">Entre para compartilhar jogos, convites e resenhas com esta comunidade.</p>`;
     const lista = posts.length ? posts.map(postHtml).join('')
-      : `<div class="card"><div class="vazio"><i class="ic">✎</i>Ninguém publicou nada neste grupo ainda.</div></div>`;
+      : `<div class="card"><div class="vazio"><i class="ic">✎</i>A conversa deste grupo começa na quadra. Compartilhe o primeiro jogo ou convite.</div></div>`;
     corpo = `<div class="sec">${escrever}${lista}</div>`;
   }
 
@@ -7363,7 +7398,7 @@ editarPerfil(){
         <div style="flex:0 0 96px;text-align:center">
           <div class="rot" style="margin-bottom:8px">Foto de perfil</div>
           <label style="display:block;cursor:pointer">
-            <input type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="perfFoto(this)">
+            <input type="file" accept="image/*" hidden onchange="perfFoto(this)">
             ${fotoUrl
               ? `<img src="${_attr(fotoUrl)}" alt="" style="width:96px;height:96px;border-radius:50%;object-fit:cover;display:block">`
               : `<div style="width:96px;height:96px;border-radius:50%;background:var(--linha4);display:flex;align-items:center;justify-content:center;font-size:26px">⌾</div>`}
@@ -7617,7 +7652,7 @@ amigos(){
    nao mostrava.
    ========================================================================= */
 professor(p){
-  profCarregar(p.pid);
+  profFichaCarregar(p.pid);
   const d = (window.__profCache||{})[p.pid];
   const nomeP = (typeof _nomeDe === 'function' ? _nomeDe(p.pid) : null) || 'Professor';
   const esc = (t)=> String(t==null?'':t).replace(/</g,'&lt;');
@@ -8619,6 +8654,10 @@ function mostrarDesafioVS(m){
   const meusPts=(T.comunidade&&T.comunidade[EU])||0;
   const ptsAdv=(T.comunidade&&T.comunidade[advKey])||0;
   const minhaClasse=classeDe(eu), classeAdv=classeDe(j);
+  const combinado=(window._net&&_net.resumoDesafio)
+    ? _net.resumoDesafio(m)
+    : '<div style="font-size:11.5px;color:var(--ink3)">Detalhes a combinar</div>';
+  const formato=m.formato==='set'?'Partida única':'Melhor de 3 sets';
   const q=(eu.cena&&eu.cena.quadra)||'saibro', mo=(eu.cena&&eu.cena.momento)||'noite';
   const lado=(p,nome,classe,pontos)=>`<div class="vs-lado">
       <div class="vs-face" style="${estiloRosto(p.bon||'m1')}"></div>
@@ -8643,6 +8682,11 @@ function mostrarDesafioVS(m){
       <div class="vs-card">
         <div class="vs-adv"><b>${_esc(j.nome)}</b> <span class="vs-id">${_esc(advId)}</span>
           <div class="vs-meta">${amigo?'<span style="color:var(--up)">✔ seu amigo</span>':'Desafio de jogador da comunidade'}</div></div>
+        <div class="vs-combinado">
+          <div class="vs-comb-tit">Informações do desafio</div>
+          ${combinado}
+          <div class="vs-formato">◈ ${formato}${m.dupla?' · Duplas':' · Simples'}</div>
+        </div>
       </div>
       <div class="vs-acoes">
         <button class="vs-no" onclick="fecharVS();_net.recusar('${m.id}')">Recusar</button>
@@ -9780,7 +9824,7 @@ document.addEventListener('click', (e)=>{
    `ir()` e não `trocarAba()` de propósito — nenhuma das duas tem item na nav,
    e trocarAba deixaria `aba` apontando pra uma rota que pintarNav não conhece,
    que é justamente o caso em que ele te devolve pra Home em silêncio. */
-$('#btSino').onclick = ()=>{ if(window.netAbrirInbox) netAbrirInbox(); };
+$('#btSino').onclick = abrirNotificacoes;
 $('#btEu').onclick  = ()=> ir('ficha');
 document.getElementById('mais').addEventListener('click', (e)=>{
   if(e.target.classList.contains('mais-fundo')) fecharMais();
@@ -10089,11 +10133,61 @@ function conferirVersao(){
 }
 conferirVersao();
 
+/* Atualiza os dados sem reiniciar o app. No celular, puxar a tela para baixo
+   a partir do topo dispara esta função; uma batida discreta de 30 em 30
+   segundos cobre aparelhos onde o Realtime ficou suspenso pelo sistema. */
+let _atualizandoApp = false;
+async function atualizarApp(manual=false){
+  if(_atualizandoApp) return;
+  _atualizandoApp=true;
+  const aviso=$('#puxaAtualiza');
+  if(aviso){ aviso.textContent='Atualizando…'; aviso.className='on girando'; }
+  conferirVersao();
+  try{
+    if(window._net && _net.atualizarTudo) await _net.atualizarTudo();
+    else if(window.netAtualizarTudo) await netAtualizarTudo();
+    if(manual && window.toast) toast('Tudo atualizado.');
+  }catch(e){
+    if(manual && window.toast) toast('Não deu para atualizar agora.');
+  }finally{
+    _atualizandoApp=false;
+    if(aviso){
+      aviso.textContent='Atualizado'; aviso.className='on pronto';
+      setTimeout(()=>{ aviso.className=''; aviso.textContent='Puxe para baixo para atualizar'; },900);
+    }
+  }
+}
+window.atualizarApp=atualizarApp;
+
+(function gestoAtualizar(){
+  const tela=$('#tela'), aviso=$('#puxaAtualiza');
+  if(!tela || !aviso) return;
+  let inicio=null, distancia=0;
+  tela.addEventListener('touchstart', e=>{
+    if(tela.scrollTop<=0 && e.touches.length===1){ inicio=e.touches[0].clientY; distancia=0; }
+  }, {passive:true});
+  tela.addEventListener('touchmove', e=>{
+    if(inicio===null) return;
+    distancia=Math.max(0,Math.min(100,e.touches[0].clientY-inicio));
+    if(distancia>12){
+      aviso.className='on'+(distancia>=72?' pronto':'');
+      aviso.textContent=distancia>=72?'Solte para atualizar':'Puxe para baixo para atualizar';
+    }
+  }, {passive:true});
+  tela.addEventListener('touchend', ()=>{
+    const dispara=distancia>=72;
+    inicio=null; distancia=0;
+    if(dispara) atualizarApp(true);
+    else { aviso.className=''; aviso.textContent='Puxe para baixo para atualizar'; }
+  }, {passive:true});
+})();
+
+setInterval(()=>{ if(!document.hidden) atualizarApp(false); },30000);
+
 /* app instalado passa dias aberto: a volta pro primeiro plano é a única hora
    em que dá pra perguntar de novo sem custo nenhum. */
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){
-  conferirVersao();
-  if(window.netAvisos) netAvisos();   // (51) a volta ao primeiro plano reconta os recados
+  atualizarApp(false);
 }});
 
 /* o `?v=` cumpriu o papel de furar o cache uma vez; limpar evita que ele fique
