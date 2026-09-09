@@ -26,5 +26,13 @@
     "justamente a palavra 'nossa' que faz a lista valer alguma coisa.",
     "Enquanto estiver vazia, a tela explica que está sendo montada."
   ],
-  "itens": []
+  "itens": [
+    {
+      "nome": "Decathlon Salvador Shopping",
+      "tipo": "ambos",
+      "bairro": "Caminho das Árvores",
+      "sobre": "Raquetes, bolas e encordoamento de raquete.",
+      "site": "https://www.decathlon.com.br/lojas/decathlon-salvador-shopping"
+    }
+  ]
 }

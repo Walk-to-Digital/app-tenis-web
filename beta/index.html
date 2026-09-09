@@ -2469,7 +2469,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788959900"></script>
+<script src="net.js?v=1788963167"></script>
 
 <script>
 /* =========================================================================
@@ -4961,6 +4961,12 @@ function homeProfessor(){
     </div>`;
 
   const nAulas = A ? A.length : null;
+  /* A Home do professor segue a mesma ordem da Home do jogador: panorama da
+     temporada, ação do momento e notícias. Só a métrica muda de pontos para
+     alunos e agenda. */
+  const blocoTemporada = `<div class="sec"><div class="rot">Sua temporada <a onclick="trocarAba('aulas')" style="cursor:pointer">ver agenda ›</a></div>
+    <div class="stats"><div><div class="v">${D?D.length:'—'}</div><div class="k">Alunos ativos</div></div>
+      <div><div class="v">${nAulas===null?'—':nAulas}</div><div class="k">Aulas na agenda</div></div></div></div>`;
 
   return {titulo:'Início', dir:'', html:`
     <div class="ini prof" style="--camisa:${eu.cor}">
@@ -5010,7 +5016,9 @@ function homeProfessor(){
            depois rola sobre a mesma cena, coberto pelo mesmo scrim. Fora dele
            elas cairiam sobre o fundo base, que nesta rota está desligado
            justamente porque a tela pinta o próprio fundo. -->
+      ${blocoTemporada}
       ${blocoHoje}${blocoTurma}
+      ${noticiasHTML()}
       ${typeof agendaHomeHTML==='function'?agendaHomeHTML():''}
     </div>`};
 }
@@ -5166,27 +5174,18 @@ function professoresHTML(){
     const j = S.jogadores[p.player_id] || {};
     const nome = j.nome || 'Professor';
     const lugar = (window._net && _net.locNome && mapa[p.player_id]) ? (_net.locNome(mapa[p.player_id].local_id)||'') : '';
-    const tel = p.contato ? p.contato.replace(/[^0-9]/g,'') : null;
-    return `<div class="card oc">
-      <div class="linha-item" style="align-items:flex-start">
+    /* A lista serve para comparar. Bio, WhatsApp e pedido de aula pertencem à
+       ficha do professor; deixá-los aqui fazia cada card ocupar meia tela. */
+    const resumo = p.atuacao || p.apresentacao || p.especialidades || 'Aulas de tênis';
+    return `<div class="card clic" onclick="_net.verProfessor&&_net.verProfessor('${p.player_id}')">
+      <div class="linha-item" style="align-items:center">
         ${S.jogadores[p.player_id] ? avatar(p.player_id,'g') : '<div class="av g">🎾</div>'}
-        <!-- 27/08 (QA do Nuno): tocar é consulta, não compromisso — mesma lição
-             do perfil do jogador (16/08). O toque abre a folha do professor;
-             "Quero ser aluno" e "Falar" continuam diretos no lado direito. -->
-        <div class="txt" onclick="_net.verProfessor&&_net.verProfessor('${p.player_id}')" style="cursor:pointer">
-          <b style="font-size:15px">${nome}</b>
-          ${p.apresentacao?`<small>${p.apresentacao}</small>`:''}
-          ${p.atuacao?`<small>◎ ${p.atuacao}</small>`:''}
-          ${p.especialidades?`<small>🎯 ${p.especialidades}</small>`:''}
-          ${lugar?`<small>📍 ${lugar}</small>`:''}
-          <div style="margin-top:7px">${profAceitando(p)
-            ? '<span class="pil up">Pegando aluno</span>'
-            : '<span class="pil gh">Turma fechada agora</span>'}</div>
-        </div>
-        <div class="odir">
-          ${(tel && tel.length>=8) ? `<a class="oconv" style="text-align:center;text-decoration:none;display:block" href="https://wa.me/55${tel}" target="_blank" rel="noopener">Falar</a>` : ''}
-          ${profAceitando(p) ? `<button class="operf" onclick="profPedir('${p.player_id}')">Quero ser aluno</button>` : ''}
-        </div>
+        <div class="txt"><b style="font-size:15px">${nome}</b>
+          <small>${String(resumo).slice(0,68)}${String(resumo).length>68?'…':''}${lugar?' · '+lugar:''}</small>
+          <div style="margin-top:6px">${profAceitando(p)
+            ? '<span class="pil up">Pegando alunos</span>'
+            : '<span class="pil gh">Turma fechada</span>'}</div>
+        </div><div class="seta">›</div>
       </div>
     </div>`;
   }).join('');
@@ -5361,29 +5360,25 @@ function lugaresHTML(){
   const lista = (L||[]).filter(l=> l.origem !== 'jogador');
   if(!lista.length) return '<div class="sec"><div class="card"><p class="nota">Nenhum lugar cadastrado ainda.</p></div></div>';
   const TIPO={clube:'Clube',condominio:'Condomínio',publico:'Quadra pública',academia:'Academia',outro:'Espaço'};
+  const fotosReais = {
+    'Clube Bahiano de Tênis':'https://clubebahianodetenis.com.br/image/estrutura/2.jpg'
+  };
   const cards = lista.map(l=>{
-    const tel = l.telefone ? l.telefone.replace(/[^0-9]/g,'') : null;
+    /* Foto enviada pelo local entra aqui no próximo passo; enquanto ela não
+       existe, a imagem por piso mostra uma quadra real do Ranket e declara que
+       é ilustrativa. Não inventamos uma foto como se fosse daquele endereço. */
+    const foto = fotosReais[l.nome] || ((l.piso && l.piso!=='misto') ? `../quadras/${l.piso}-dia.jpg` : '../vestiario/clube.jpg');
+    const rotuloFoto = fotosReais[l.nome] ? 'Foto do local' : 'Imagem ilustrativa';
     return `
-    <div class="card oc">
-      <div class="linha-item" style="align-items:flex-start">
-        <!-- 27/08 (QA do Nuno): o card era vitrine sem porta — o perfil do lugar
-             (netVerLocal) existia desde a mig 19 e nada aqui levava até ele. O
-             clique fica no avatar e no texto; zap/ligar seguem diretos no lado
-             direito, sem passar pelo perfil. -->
-        <div class="av" onclick="_net.verLocal('${l.id}')" style="cursor:pointer">📍</div>
-        <div class="txt" onclick="_net.verLocal('${l.id}')" style="cursor:pointer">
-          <b style="font-size:15px">${l.nome}</b>
-          <small>▤ ${TIPO[l.tipo]||'Espaço'} · ${l.quadras} quadra${l.quadras>1?'s':''}</small>
-          ${l.cidade?`<small>◎ ${l.cidade}</small>`:''}
-          <div style="margin-top:7px">${lugRotulo(l)}</div>
+    <div class="card clic" onclick="_net.verLocal('${l.id}')">
+      <div class="linha-item" style="align-items:center">
+        <div style="width:92px;height:68px;flex:0 0 92px;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.62)),url('${foto}') center/cover;position:relative">
+          <span style="position:absolute;left:6px;bottom:6px;padding:3px 5px;border-radius:5px;background:rgba(7,9,8,.75);color:var(--acc);font:700 8px var(--f-ui);text-transform:uppercase">${rotuloFoto}</span>
         </div>
-        <div class="odir">
-          ${tel ? `<a class="oconv" style="text-align:center;text-decoration:none;display:block"
-                     href="https://wa.me/55${tel}" target="_blank" rel="noopener">Falar no zap</a>
-                   <a class="operf" style="text-align:center;text-decoration:none;display:block"
-                     href="tel:${tel}">Ligar</a>`
-                : `<span class="nota" style="text-align:right">Sem contato<br>cadastrado</span>`}
-        </div>
+        <div class="txt"><b style="font-size:15px">${l.nome}</b>
+          <small>▤ ${TIPO[l.tipo]||'Espaço'} · ${l.quadras} quadra${l.quadras>1?'s':''}${l.cidade?' · '+l.cidade:''}</small>
+          <div style="margin-top:6px">${lugRotulo(l)}</div>
+        </div><div class="seta">›</div>
       </div>
     </div>`;
   }).join('');
