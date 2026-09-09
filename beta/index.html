@@ -1484,6 +1484,23 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini .placa .meta{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(21,16,13,.62);border:1px solid var(--linha);border-radius:99px;padding:4px 12px;font-size:11.5px;color:var(--ink2);backdrop-filter:blur(4px)}
 .ini .placa .meta b{font-family:var(--f-disp);font-size:var(--t-label);color:var(--ink)}
 .ini .placa .meta .pil2{background:var(--up);color:var(--acc-ink);font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.06em}
+/* Home do professor: personagem e nome ocupam a largura inteira. A placa não
+   divide mais espaço com os números, para que o nome seja lido por completo. */
+.ini.prof .htopo{display:block;margin-top:12px}
+.ini.prof .htopo .palco{width:100%;min-height:0;display:flex;padding:0}
+.ini.prof .boneco{height:min(29vh,29dvh);min-height:190px}
+.ini.prof .prof-placa{width:100%;margin:10px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:11px 20px}
+.ini.prof .prof-placa .nm{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.05}
+.ini.prof .prof-placa .meta{justify-content:center;text-align:center}
+.ini.prof .prof-resumo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.ini.prof .prof-resumo .q{padding:11px 6px;background:rgba(10,14,12,.78);border:1px solid var(--linha);border-radius:14px;text-align:center;backdrop-filter:blur(6px)}
+.ini.prof .prof-resumo .q b{display:block;font-family:var(--f-disp);font-size:var(--t-title-m);line-height:1.1}
+.ini.prof .prof-resumo .q small{display:block;color:var(--ink3);font-size:var(--t-nav);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.ini.prof .prof-resumo .q.acende b{color:var(--up)}
+.ini.prof .agenda-prof{margin:0 16px 6px;position:relative;z-index:2;background:rgba(10,14,12,.84);border:1px solid var(--up);border-radius:18px;padding:15px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.ini.prof .agenda-prof .agenda-k{color:var(--up);font-size:var(--t-label);font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.ini.prof .agenda-prof b{display:block;font-size:var(--t-title-s)}
+.ini.prof .agenda-prof small{display:block;margin-top:4px;color:var(--ink3);font-size:var(--t-body)}
 .ini .acao{position:relative;z-index:2;padding:20px 16px 18px}
 /* 25/08 (telas novas): a ação da home é a pílula LARANJA */
 /* 01/09 (board 35:808): o botão tem 668 de 1080 — 62% da largura, centralizado.
@@ -2469,7 +2486,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788964442"></script>
+<script src="net.js?v=1788972258"></script>
 
 <script>
 /* =========================================================================
@@ -4930,10 +4947,12 @@ function homeProfessor(){
   /* secundárias: só o que o botão grande NÃO cobriu (mesma técnica da home
      do jogador) — nunca duas portas pra mesma coisa na mesma tela */
   const sec2 = `<div class="acoes-sec">
-      ${!esperando ? `<button onclick="ir('turma')">👥 Ver minha turma</button>` : ''}
-      ${!hoje.length && !(A&&!A.length) ? `<button onclick="trocarAba('aulas')">🗓 Ver agenda</button>` : ''}
-      ${bt.go.indexOf('souProfessor')<0 ? `<button onclick="ir('souProfessor')">◈ Editar meu perfil</button>` : ''}
+      <button onclick="ir('turma')">👥 Ver minha turma</button>
+      <button onclick="ir('insightsProfessor')">◈ Insights da turma</button>
     </div>`;
+  const agendaResumo = hoje.length
+    ? `<div class="agenda-prof" onclick="trocarAba('aulas')"><div class="agenda-k">Sua agenda</div><b>Próxima aula · hoje, ${hhmm(hoje[0].hora)}</b><small>${(hoje[0].aula_alunos||[]).length} aluno(s)${hoje[0].local_txt?' · '+hoje[0].local_txt:''} · Ver agenda completa ›</small></div>`
+    : `<div class="agenda-prof" onclick="trocarAba('aulas')"><div class="agenda-k">Sua agenda</div><b>${A&&A.length?'Confira suas próximas aulas':'Sua agenda está livre'}</b><small>${A&&A.length?'Ver agenda completa ›':'Crie sua primeira aula e organize sua semana ›'}</small></div>`;
 
   /* a aula de hoje só vira LISTA quando há mais de uma — com uma só, o botão
      grande já disse tudo e repetir logo abaixo é o ruído que a gente quer
@@ -4991,26 +5010,25 @@ function homeProfessor(){
           <button class="on" aria-current="page">◆ Professor</button>
         </nav>`:''}
         <div class="htopo">
-          <div class="hcol">
-            <div class="painel">
-              <div class="q"><b>${D?D.length:'—'}</b><small>Alunos</small></div>
-              <div class="q"><b>${nAulas===null?'—':nAulas}</b><small>Aulas/sem</small></div>
-              <div class="q ${esperando?'acende':''}"><b>${esperando||'—'}</b><small>Esperando</small></div>
-            </div>
-          </div>
           <div class="palco">
             <div class="sombra"></div>
             <div class="glow"></div>
             <div class="boneco" onclick="trocarAba('ficha')">${bonecoImg(eu, true)}</div>
-            <div class="placa">
-              <div class="nm">${eu.nome}</div>
-              <div class="meta">Professor${D&&D.length?` · <b>${D.length}</b> aluno${D.length>1?'s':''}`:''}
-                <span class="pil2" style="${naVitrine?'':'background:var(--sup2);color:var(--ink3)'}">${naVitrine?'na busca':'fora da busca'}</span></div>
-            </div>
+          </div>
+          <div class="placa prof-placa">
+            <div class="nm">${eu.nome}</div>
+            <div class="meta">Professor${D&&D.length?` · <b>${D.length}</b> aluno${D.length>1?'s':''}`:''}
+              <span class="pil2" style="${naVitrine?'':'background:var(--sup2);color:var(--ink3)'}">${naVitrine?'na busca':'fora da busca'}</span></div>
+          </div>
+          <div class="prof-resumo">
+            <div class="q"><b>${D?D.length:'—'}</b><small>Alunos</small></div>
+            <div class="q"><b>${nAulas===null?'—':nAulas}</b><small>Aulas</small></div>
+            <div class="q ${esperando?'acende':''}"><b>${esperando||0}</b><small>Pedidos</small></div>
           </div>
         </div>
       </div>
 
+      ${agendaResumo}
       <div class="acao">
         <button class="big ${bt.cls}" onclick="${bt.go}">${bt.t}<small>${bt.s}</small></button>
         ${sec2}
@@ -6271,6 +6289,32 @@ souProfessor(){
       </div>
       <button class="btn" style="margin-top:14px" onclick="profSalvar()">Salvar</button>
     </div>`};
+},
+
+/* ---------------- INSIGHTS DO PROFESSOR ---------------- */
+insightsProfessor(){
+  aulasCarregar(); turmaCarregar(); alunosDetalheCarregar();
+  const A=window.__aulas, T=window.__turma, D=window.__alunosDet;
+  const meuUid=(window._net&&_net.uid?_net.uid():null);
+  const pedidos=((T&&T.pedidos)||[]).filter(x=>x.quem_pediu!==meuUid).length + ((T&&T.avulsas)||[]).length;
+  const hoje=A?aulasHoje(A):[];
+  const ativos=D?D.length:null;
+  const evoluindo=D?D.filter(x=>!(x.jogador||{}).calibrando).length:null;
+  const proxima=hoje[0] || (A&&A[0]);
+  return {titulo:'Insights da turma',html:`<div class="pad">
+    <div class="sec" style="margin-top:0"><div class="rot">Visão de gestão <span>ao vivo</span></div>
+      <p class="nota" style="margin:0 0 14px">Veja o que pede sua atenção e organize a semana da sua turma.</p>
+      <div class="stats"><div><div class="v">${ativos===null?'—':ativos}</div><div class="k">Alunos ativos</div></div><div><div class="v">${A===undefined?'—':A.length}</div><div class="k">Aulas na agenda</div></div></div>
+    </div>
+    <div class="sec"><div class="rot">Agora</div>
+      <div class="card clic" onclick="ir('turma')"><div class="linha-item"><div class="av">✦</div><div class="txt"><b>${pedidos?pedidos+' pedido'+(pedidos>1?'s':'')+' aguardando':'Nenhum pedido aguardando'}</b><small>${pedidos?'Responda quem quer treinar com você.':'Sua caixa de solicitações está em dia.'}</small></div><div class="seta">›</div></div></div>
+      <div class="card clic" onclick="trocarAba('aulas')"><div class="linha-item"><div class="av">🗓</div><div class="txt"><b>${proxima?'Próxima aula · '+DIAS_LONGO[proxima.dia_semana]+' · '+String(proxima.hora||'').slice(0,5):'Nenhuma aula marcada'}</b><small>${proxima?((proxima.aula_alunos||[]).length+' aluno(s)'+(proxima.local_txt?' · '+proxima.local_txt:'')):'Abra a agenda para criar a primeira aula.'}</small></div><div class="seta">›</div></div></div>
+    </div>
+    <div class="sec"><div class="rot">Acompanhamento</div>
+      <div class="card"><div class="linha-item"><div class="av">↗</div><div class="txt"><b>${evoluindo===null?'Carregando evolução…':evoluindo+' aluno'+(evoluindo!==1?'s':'')+' com nível definido'}</b><small>${evoluindo===null?'':(ativos-evoluindo)+' ainda '+((ativos-evoluindo)===1?'está':'estão')+' em calibragem.'}</small></div></div></div>
+      <p class="nota">A evolução aparece quando o aluno conclui as partidas de calibragem. Use a turma para acompanhar cada perfil.</p>
+    </div>
+  </div>`};
 },
 
 /* ---------------- AULAS (25/08, mig 66) ---------------- */
