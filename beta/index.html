@@ -2497,7 +2497,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1789051511"></script>
+<script src="net.js?v=1789052049"></script>
 
 <script>
 /* =========================================================================
@@ -3282,11 +3282,14 @@ window.modoTrocar = modoTrocar;
 const MAISIC = {
   partida:`<svg viewBox="0 0 31 31" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><g id="fi-rs-tennis"> <path id="Vector" d="M26.46 4.54135C24.2928 2.37616 21.5323 0.902107 18.5275 0.305508C15.5227 -0.291091 12.4085 0.0165526 9.57848 1.18955C6.74848 2.36255 4.32978 4.34824 2.62811 6.89561C0.926435 9.44298 0.0181956 12.4377 0.0181956 15.5011C0.0181956 18.5646 0.926435 21.5593 2.62811 24.1067C4.32978 26.654 6.74848 28.6397 9.57848 29.8127C12.4085 30.9857 15.5227 31.2934 18.5275 30.6968C21.5323 30.1002 24.2928 28.6261 26.46 26.4609C29.3625 23.552 30.9925 19.6105 30.9925 15.5011C30.9925 11.3918 29.3625 7.45031 26.46 4.54135V4.54135ZM28.3316 14.1216C26.7827 14.3095 25.2113 14.1426 23.7364 13.6335C22.2615 13.1244 20.9218 12.2865 19.8185 11.1831C18.7153 10.0798 17.8775 8.73994 17.3686 7.26498C16.8597 5.79003 16.6929 4.21863 16.881 2.66972C19.8127 2.97795 22.5497 4.28357 24.6341 6.36816C26.7184 8.45275 28.0237 11.1899 28.3316 14.1216V14.1216ZM2.66879 16.8806C4.21773 16.6927 5.78911 16.8597 7.264 17.3687C8.7389 17.8778 10.0787 18.7158 11.1819 19.8191C12.2851 20.9225 13.1229 22.2623 13.6318 23.7373C14.1408 25.2122 14.3075 26.7836 14.1194 28.3326C11.1877 28.0243 8.45071 26.7187 6.36636 24.6341C4.282 22.5495 2.97669 19.8124 2.66879 16.8806V16.8806ZM24.6336 24.6306C22.5115 26.7574 19.7112 28.0732 16.7195 28.3493C16.9049 26.4548 16.668 24.5428 16.0259 22.7508C15.3838 20.9588 14.3524 19.3314 13.006 17.9858C11.6596 16.6401 10.0317 15.6096 8.23932 14.9685C6.44697 14.3274 4.53479 14.0915 2.64038 14.2779C2.92133 11.2868 4.23829 8.48777 6.36371 6.36447C8.48912 4.24118 11.2895 2.92701 14.2809 2.64905C14.1072 4.44002 14.3101 6.24751 14.8766 7.95537C15.4432 9.66322 16.3608 11.2336 17.5705 12.5657C18.7801 13.8978 20.2552 14.962 21.9007 15.69C23.5462 16.418 25.3258 16.7936 27.1252 16.7928C27.5347 16.7928 27.9454 16.7721 28.3562 16.7334C28.0756 19.7209 26.7587 22.5161 24.6336 24.6345V24.6306Z" fill="currentColor"/> </g></svg>`,
   atividade:`<svg viewBox="0 0 30.0004 33.291" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><path id="Union" d="M13.9035 23.4717C15.3042 23.1468 16.7328 23.0837 17.8937 23.5811C20.0685 24.5131 20.7172 26.619 20.8781 28.2002C20.9606 29.0121 20.9253 29.764 20.8722 30.3076C20.8454 30.5813 20.8141 30.8079 20.7882 30.9678C20.7753 31.0476 20.7636 31.1118 20.755 31.1572C20.7508 31.1797 20.7469 31.1977 20.7443 31.2109C20.743 31.2175 20.7422 31.2233 20.7413 31.2275C20.7409 31.2296 20.7407 31.2319 20.7404 31.2334L20.7394 31.2354V31.2363C20.6251 31.7766 20.0942 32.1221 19.5538 32.0078C19.014 31.8933 18.6685 31.3632 18.7824 30.8232C18.7825 30.8224 18.783 30.821 18.7833 30.8193C18.7845 30.8134 18.7864 30.802 18.7892 30.7871C18.7948 30.7573 18.8036 30.7104 18.8136 30.6484C18.8337 30.5239 18.8598 30.3399 18.882 30.1133C18.9267 29.6562 18.9531 29.0437 18.8878 28.4023C18.753 27.0768 18.2708 25.918 17.1066 25.4189C16.5176 25.1666 15.5872 25.1343 14.3556 25.4199C13.1509 25.6994 11.7833 26.254 10.4181 27.0059C7.65958 28.5251 5.11067 30.7339 3.96986 32.7783C3.70068 33.2604 3.09172 33.4331 2.60951 33.1641C2.12754 32.8949 1.95481 32.2859 2.22377 31.8037C3.61664 29.3077 6.51982 26.87 9.45424 25.2539C10.9352 24.4383 12.4756 23.8029 13.9035 23.4717ZM28.1369 5.2002C28.4157 4.72364 29.0284 4.56314 29.505 4.8418C29.9817 5.12071 30.1423 5.7333 29.8634 6.20996C20.2579 22.625 7.64304 24.1851 0.558732 20.7031C0.0633601 20.4595 -0.140706 19.8598 0.102677 19.3643C0.346258 18.8687 0.945936 18.6648 1.44154 18.9082C7.35729 21.8155 18.9223 20.9467 28.1369 5.2002ZM11.5001 7.69727C12.7158 7.69727 13.7427 8.1305 14.4601 8.9043C15.1668 9.66671 15.5001 10.6804 15.5001 11.7246C15.5001 12.7688 15.1668 13.7826 14.4601 14.5449C13.7427 15.3186 12.7157 15.751 11.5001 15.751C10.2846 15.7509 9.25751 15.3186 8.54018 14.5449C7.83356 13.7826 7.50021 12.7687 7.50014 11.7246C7.50014 10.6805 7.8336 9.66669 8.54018 8.9043C9.25752 8.13047 10.2845 7.69733 11.5001 7.69727ZM28.5001 0C28.9653 0 29.339 0.22214 29.5773 0.472656C29.8089 0.716235 30.0001 1.07779 30.0001 1.5C30.0001 1.92221 29.8089 2.28377 29.5773 2.52734C29.339 2.77786 28.9653 3 28.5001 3C28.035 2.99991 27.6612 2.77787 27.423 2.52734C27.1915 2.28377 27.0001 1.92213 27.0001 1.5C27.0001 1.07787 27.1915 0.716233 27.423 0.472656C27.6612 0.222133 28.035 8.61612e-05 28.5001 0ZM28.5001 1C28.3083 1.00008 28.1847 1.08991 28.1281 1.14941C28.0781 1.20201 28.0001 1.31373 28.0001 1.5C28.0001 1.68627 28.0781 1.79799 28.1281 1.85059C28.1847 1.91009 28.3083 1.99992 28.5001 2C28.2269 1.99983 28.0001 1.73576 28.0001 1.5C28.0001 1.26424 28.2269 1.00017 28.5001 1ZM28.5001 1C28.7735 1 29.0001 1.26416 29.0001 1.5C29.0001 1.73584 28.7735 2 28.5001 2C28.692 2 28.8155 1.91012 28.8722 1.85059C28.9222 1.79805 29.0001 1.68643 29.0001 1.5C29.0001 1.31357 28.9222 1.20195 28.8722 1.14941C28.8155 1.08988 28.692 1 28.5001 1Z" fill="currentColor"/></svg>`,
-  post:`<svg viewBox="0 0 31 31" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><circle id="Ellipse 83" cx="15.5" cy="15.5" r="14.5" stroke="currentColor" stroke-width="2"/> <path d="M15.5 9.5V21.5M9.5 15.5H21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  post:`<svg viewBox="0 0 31 31" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="width:1.25em;height:1.25em;display:block;margin:auto"><circle cx="15.5" cy="15.5" r="14.5" stroke="currentColor" stroke-width="2"/><path d="M15.5 9.5V21.5M9.5 15.5H21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  aula:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6.5h18v11H3zM7 3v5M17 3v5M3 10h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="14" r="1.8" stroke="currentColor" stroke-width="1.6"/><path d="M5.8 19c.4-1.9 1.6-3 3.2-3s2.8 1.1 3.2 3M15 14h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  pendentes:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.7" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  historico:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V5h16v15H4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 16v-4M12 16V8M16 16v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
 };
 function maisItens(){
   const eu = [];
-  if(veProfessor()) eu.push(['🗓','Nova aula','Marcar aula com um aluno', "_net.aulaCriar()", false]);
+  if(veProfessor()) eu.push([MAISIC.aula,'Nova aula','Marcar aula com um aluno', "_net.aulaCriar()", false]);
   eu.push(['1-1','Registrar placar','Uma partida que já aconteceu', "_net.abrirMao()", false]);
   eu.push([MAISIC.partida,'Organizar nova partida','Ver quem está livre no seu radar', "trocarAba('radar')", false]);
   /* 03/09 — DEIXOU DE SER CASCA no mesmo dia. A pergunta que travava ("treino
@@ -3299,7 +3302,7 @@ function maisItens(){
   eu.push([MAISIC.post,'Novo post no feed','Escrever pra comunidade ou pra um grupo', "abrirCriarPost()", false]);
   /* a aba Aulas do aluno (mig 70) saiu da barra pra que o + coubesse; ela
      reaparece aqui — mesma superfície, um toque, outro lugar. */
-  if(window.__souAluno) eu.push(['📚','Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')", false]);
+  if(window.__souAluno) eu.push([MAISIC.aula,'Minhas aulas','Suas turmas e a fila de espera', "ir('aulasAluno')", false]);
   /* 04/09 — DUAS TELAS PRONTAS QUE NÃO TINHAM PORTA. `VISTAS.historico` e
      `VISTAS.registrar` existem há semanas: a primeira só era alcançável por um
      link de texto cinza no fim da ficha, a segunda só pelo botão gigante da
@@ -3314,8 +3317,8 @@ function maisItens(){
     ? [ _esp ? `${_esp} esperando placar` : '', _prop ? `${_prop} proposta${_prop>1?'s':''}` : '' ]
         .filter(Boolean).join(' · ')
     : 'Desafios combinados e placares a lançar';
-  eu.push(['⏳','Partidas em aberto', _sub, "trocarAba('registrar')", false]);
-  eu.push(['📊','Meus jogos','Histórico de partidas e análise do ano', "ir('historico')", false]);
+  eu.push([MAISIC.pendentes,'Partidas em aberto', _sub, "trocarAba('registrar')", false]);
+  eu.push([MAISIC.historico,'Meus jogos','Histórico de partidas e análise do ano', "ir('historico')", false]);
   return eu;
 }
 function abrirMais(){
