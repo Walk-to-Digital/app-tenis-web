@@ -5018,7 +5018,7 @@ async function _chatEnviar(){
   const { error } = await sb.from(_chat.sala.tabela)
     .insert({ ..._salaChaves(), autor_id:MEU_UID, texto:txt });
   if(campo) campo.disabled = false;
-  if(error){ alert('Não deu pra enviar: '+error.message); return; }
+  if(error){ alert(error.code==='23505'?'Um desses amigos já recebeu convite para este campeonato.':'Não deu pra enviar: '+error.message); return; }
   _chat.rascunho = '';
   await _chatCarregar();
 }
@@ -5426,6 +5426,57 @@ async function netEscolherCategoria(t){
 async function netSairTorneio(id){
   await sb.from('torneio_participantes').delete().eq('torneio_id',id).eq('player_id',MEU_UID);
   netAbrirTorneios();
+}
+
+/* Convites de campeonato não são links que inscrevem alguém sem resposta. O
+   dono escolhe amigos; cada pessoa vê as regras e aceita ou recusa no próprio
+   app. A inscrição só nasce quando ela aceita, pela RPC do banco. */
+async function netConvidarTorneio(id){
+  const t=(await sb.from('torneios').select('id,nome,dono_id,status,tamanho').eq('id',id).maybeSingle()).data;
+  if(!t || t.dono_id!==MEU_UID){ alert('Só quem criou o campeonato pode convidar.'); return; }
+  if(t.status!=='inscricoes'){ alert('A chave já começou. Os convites fecharam junto com as inscrições.'); return; }
+  const amigos=_meusAmigos();
+  if(!amigos.length){ alert('Você ainda não tem amigos no Ranket para convidar.'); return; }
+  const ja=(await sb.from('torneio_participantes').select('player_id').eq('torneio_id',id)).data||[];
+  const dentro=new Set(ja.map(x=>x.player_id));
+  const candidatos=amigos.filter(uid=>!dentro.has(uid));
+  if(!candidatos.length){ alert('Todos os seus amigos já participam deste campeonato.'); return; }
+  const {data:pessoas,error}=await sb.from('players').select('id,nome,nivel,nivelb').in('id',candidatos);
+  if(error){ alert('Não deu pra carregar seus amigos: '+error.message); return; }
+  const linhas=(pessoas||[]).map(p=>`<label style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--linha);cursor:pointer">
+    ${_discoUid(p.id,34)}<span style="flex:1"><b>${p.nome||'Jogador'}</b><small style="display:block;color:var(--ink3);margin-top:2px">${netId(p.id)}</small></span>
+    <input type="checkbox" value="${p.id}" class="tconv" style="accent-color:var(--acc);width:19px;height:19px" aria-label="Convidar ${p.nome||'jogador'}">
+  </label>`).join('');
+  _sheet('net-tconv', `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font:700 17px var(--f-ui)">Convidar amigos</div><button onclick="document.getElementById('net-tconv').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
+    <div style="font-size:12px;color:var(--ink2);margin:7px 0 10px">${t.nome} · cada pessoa confirma a própria vaga.</div>${linhas}
+    <button onclick="_net.enviarConvitesTorneio('${id}')" style="width:100%;padding:13px;border-radius:11px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:14px">Enviar convites</button>`);
+}
+
+async function netEnviarConvitesTorneio(id){
+  const ids=[...document.querySelectorAll('.tconv:checked')].map(x=>x.value);
+  if(!ids.length){ alert('Escolha pelo menos um amigo.'); return; }
+  const linhas=ids.map(para_id=>({torneio_id:id,de_id:MEU_UID,para_id,status:'pendente'}));
+  const {error}=await sb.from('torneio_convites').insert(linhas);
+  if(error){ alert('Não deu pra enviar: '+error.message); return; }
+  const el=document.getElementById('net-tconv'); if(el) el.remove();
+  if(window.toast) toast(ids.length===1?'Convite enviado.':'Convites enviados.');
+  netVerTorneio(id);
+}
+
+async function netAbrirConvitesTorneio(){
+  const {data,error}=await sb.from('torneio_convites').select('id,torneio_id,de_id,status,created_at,torneios(nome,esporte,formato,tamanho,comeca_em)')
+    .eq('para_id',MEU_UID).eq('status','pendente').order('created_at',{ascending:false});
+  if(error){ alert('Não deu pra carregar os convites: '+error.message); return; }
+  const rows=(data||[]).map(c=>{ const t=c.torneios||{}; return `<div style="border:1px solid var(--linha);border-radius:12px;padding:12px;margin-top:9px"><b>${t.nome||'Campeonato'}</b><div style="font-size:11px;color:var(--ink2);margin-top:3px">${t.esporte==='beach'?'Beach':'Tênis'} · ${t.formato||'mata-mata'} · até ${t.tamanho||'—'} pessoas</div><div style="display:flex;gap:8px;margin-top:11px"><button onclick="_net.responderConviteTorneio('${c.id}',false)" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 12px var(--f-ui);cursor:pointer">Recusar</button><button onclick="_net.responderConviteTorneio('${c.id}',true)" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--acc);color:var(--acc-ink);font:700 12px var(--f-ui);cursor:pointer">Aceitar convite</button></div></div>`; }).join('');
+  _sheet('net-tconvites', `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font:700 17px var(--f-ui)">Convites para campeonatos</div><button onclick="document.getElementById('net-tconvites').remove()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>${rows||'<p style="font-size:13px;color:var(--ink2);margin-top:12px">Nenhum convite aguardando sua resposta.</p>'}`);
+}
+
+async function netResponderConviteTorneio(conviteId,aceitar){
+  const {error}=await sb.rpc('torneio_convite_responder',{p_convite:conviteId,p_aceitar:aceitar});
+  if(error){ alert('Não deu pra responder: '+error.message); return; }
+  const el=document.getElementById('net-tconvites'); if(el) el.remove();
+  if(window.toast) toast(aceitar?'Você entrou no campeonato.':'Convite recusado.');
+  netAbrirConvitesTorneio(); netAbrirTorneios();
 }
 
 // -- UI: lista de torneios --
@@ -5931,8 +5982,9 @@ async function netVerTorneio(id){
     ${chaveH}
     ${lista||'<p style="color:var(--ink2);font-size:13px">Ninguém inscrito ainda.</p>'}
     ${acao}${donoMonta}
+    ${inscricoesAbertas&&t.dono_id===MEU_UID?`<button onclick="_net.convidarTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:none;background:var(--acc);color:var(--acc-ink);font:700 13px var(--f-ui);cursor:pointer;margin-top:10px">👥 Convidar amigos</button>`:''}
     ${inscricoesAbertas?`<button onclick="_net.copiarLinkTorneio('${id}')" style="width:100%;padding:12px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:10px">🔗 Copiar link de convite</button>
-    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">Quem abrir o link entra direto, sem aprovação.</div>`:''}
+    <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:6px">O link é opcional. Convites para amigos pedem aceite no aplicativo.</div>`:''}
     ${(t.dono_id===MEU_UID && t.status==='inscricoes')?`<button onclick="_net.editarTorneio('${id}')" style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:8px">⚙️ Editar regras</button>`:''}`);
 }
 function netFecharTver(){ const el=document.getElementById('net-tver'); if(el) el.remove(); }
@@ -7641,6 +7693,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   aceitarAmizade:netAceitarAmizade, recusarAmizade:netRecusarAmizade,
   abrirTorneios:netAbrirTorneios, fecharTorneios:netFecharTorneios, criarTorneio:netCriarTorneioUI, fecharTnew:netFecharTnew,
   tset:_tset, tcriar:_tcriar, verTorneio:netVerTorneio, fecharTver:netFecharTver, entrarTorneio:netEntrarTorneio, sairTorneio:netSairTorneio,
+  convidarTorneio:netConvidarTorneio, enviarConvitesTorneio:netEnviarConvitesTorneio,
+  abrirConvitesTorneio:netAbrirConvitesTorneio, responderConviteTorneio:netResponderConviteTorneio,
   tclasse:_tclasse, tcatadd:_tcatadd, tcatdel:_tcatdel, tcatset:_tcatset, tcatclasse:_tcatclasse,
   abrirGrupos:netAbrirGrupos, fecharGrupos:netFecharGrupos, criarGrupo:netCriarGrupoUI, fecharGnew:netFecharGnew, gset:_gset, gcriar:_gcriar,
   verGrupo:netVerGrupo, fecharGver:netFecharGver, pedirEntrar:netPedirEntrar, aceitarPedido:netAceitarPedido, recusarPedido:netRecusarPedido,
