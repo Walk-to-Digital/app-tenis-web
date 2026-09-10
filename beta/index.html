@@ -192,6 +192,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--linha2);
   background:none;display:none;align-items:center;justify-content:center;font-size:15px;cursor:pointer;
 }
+.topo .voltar img{width:28px;height:28px;display:block}
 .topo.temvoltar .voltar{display:flex}
 .topo h1{
   font-family:var(--f-disp);font-size:var(--t-title-s);font-weight:700;text-transform:uppercase;
@@ -736,6 +737,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .seg-espera{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:var(--r);
   background:var(--sup2);color:var(--ink2);font:400 var(--t-label)/1.45 var(--f-ui)}
 .seg-espera i{font-style:normal;color:var(--gold)}
+.seg-espera .seg-globe{width:24px;height:24px;flex:0 0 24px;margin-top:1px}
 .seg-bloq{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--linha4)}
 .seg-bloq:first-child{border-top:0}
 .seg-bloq .txt{flex:1;min-width:0}
@@ -1143,6 +1145,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* o menu de 3 pontos do topo (board 159:1604) */
 .tpmenu{background:none;border:0;color:var(--ink2);font-size:19px;cursor:pointer;
   padding:0 2px;line-height:1}
+.tpmenu img{width:24px;height:24px;display:block}
 
 .hpart{display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:9px;
   border:1px solid var(--linha);border-radius:16px;background:rgba(11,11,11,.6)}
@@ -1501,7 +1504,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ini.prof .prof-resumo .q b{display:block;font-family:var(--f-disp);font-size:var(--t-title-m);line-height:1.1}
 .ini.prof .prof-resumo .q small{display:block;color:var(--ink3);font-size:var(--t-nav);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
 .ini.prof .prof-resumo .q.acende b{color:var(--up)}
-.ini.prof .agenda-prof{margin:0 16px 6px;position:relative;z-index:2;background:rgba(10,14,12,.84);border:1px solid var(--up);border-radius:18px;padding:15px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.ini.prof .agenda-prof{margin:0 16px 6px;position:relative;z-index:2;background:rgba(10,14,12,.84);border:1px solid var(--up);border-radius:18px;padding:15px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.18);display:flex;align-items:center;gap:12px}
+.ini.prof .agenda-prof .agenda-symbol{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:rgba(131,224,0,.1);color:var(--up);display:flex;align-items:center;justify-content:center}
+.ini.prof .agenda-prof .agenda-symbol svg{width:21px;height:21px;display:block}
+.ini.prof .agenda-prof .agenda-copy{min-width:0}
 .ini.prof .agenda-prof .agenda-k{color:var(--up);font-size:var(--t-label);font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
 .ini.prof .agenda-prof b{display:block;font-size:var(--t-title-s)}
 .ini.prof .agenda-prof small{display:block;margin-top:4px;color:var(--ink3);font-size:var(--t-body)}
@@ -1960,7 +1966,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 #onb .onb-wrap{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding:18px 22px max(24px,env(safe-area-inset-bottom));overflow-y:auto}
 #onb .onb-wrap::-webkit-scrollbar{width:0}
 #onb .onb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;min-height:30px}
-#onb .onb-voltar{width:30px;height:30px;border-radius:50%;border:1px solid var(--linha2);background:rgba(30,23,20,.6);color:var(--ink2);font-size:15px;cursor:pointer}
+#onb .onb-voltar{width:30px;height:30px;border:0;background:none;cursor:pointer;padding:0}
+#onb .onb-voltar img{width:30px;height:30px;display:block}
 #onb .onb-dots{display:flex;gap:6px;margin-left:auto}
 #onb .onb-dots span{width:6px;height:6px;border-radius:99px;background:var(--linha2);transition:.2s}
 #onb .onb-dots span.on{background:var(--acc);width:18px}
@@ -2418,7 +2425,7 @@ button,input,select,textarea{font:inherit;color:inherit}
        42px de volta no topo, que é onde eles fazem mais falta. -->
 
   <div class="topo" id="topo">
-    <button class="voltar" id="voltar">‹</button>
+    <button class="voltar" id="voltar" aria-label="Voltar"><img src="icones/voltar-circulo.svg" alt=""></button>
     <div class="marca" id="marca"><img src="../marcas/ranket-r.png" alt="Ranket"></div>
     <h1 id="titulo">Quadro</h1>
     <!-- 01/09 (node 31:738) — A BUSCA DO RADAR. O Figma põe uma pílula de
@@ -2490,7 +2497,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1788974575"></script>
+<script src="net.js?v=1789048722"></script>
 
 <script>
 /* =========================================================================
@@ -3368,6 +3375,8 @@ const ICO_HOME = {
 };
 
 const NAVIC = {
+  turma:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="8.5" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="9" r="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 20c.5-4 2.7-6 6-6s5.5 2 6 6M14 15c3.3.1 5.5 1.9 5.5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  agenda:`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
 
   home:`<svg viewBox="0 0 61.9553 57.4765" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10.4531 48.8409H10.4511M36.2658 48.8409H51.7546V28.37C51.7546 27.0904 51.7535 26.4502 51.5857 25.8547C51.4371 25.327 51.1931 24.8277 50.8629 24.3764C50.4903 23.8672 49.9722 23.4449 48.9342 22.6023L36.5431 12.5439C34.6158 10.9793 33.6521 10.1975 32.5676 9.89994C31.6119 9.63776 30.5933 9.63776 29.6377 9.89994C28.554 10.1973 27.5917 10.9784 25.6672 12.5405L13.2721 22.6023C12.234 23.4449 11.7162 23.8672 11.3436 24.3764C11.0134 24.8277 10.7675 25.327 10.6189 25.8547C10.4511 26.4502 10.4511 27.0904 10.4511 28.37V48.8409H25.94M25.94 48.8409H36.2658M25.94 48.8409V39.2615C25.94 36.6162 28.2515 34.4718 31.1029 34.4718C33.9543 34.4718 36.2658 36.6162 36.2658 39.2615V48.8409" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   radar:`<svg viewBox="0 0 56.7301 56.7301" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7.08978 28.366C7.08978 40.1152 16.6144 49.6398 28.3636 49.6398C40.1128 49.6398 49.6374 40.1152 49.6374 28.366C49.6374 16.6168 40.1128 7.09219 28.3636 7.09219C16.6144 7.09219 7.08978 16.6168 7.08978 28.366Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/><path d="M24.8179 24.8203L37.8186 18.911L31.9092 31.9116L18.9086 37.821L24.8179 24.8203Z" stroke="currentColor" stroke-width="2.9858" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -3385,9 +3394,9 @@ function navAbas(){
   /* o professor mantém Turma e Aulas, que são a vida dele. A Ficha — onde vive
      o switch "eu compito" da mig 72 — sobe pro avatar do topo, como todo mundo. */
   return [
-    {t:'inicio', i:NAVIC.home, r:'Home'}, {t:'turma', i:'👥', r:'Turma'},
+    {t:'inicio', i:NAVIC.home, r:'Home'}, {t:'turma', i:NAVIC.turma, r:'Turma'},
     mais,
-    {t:'aulas', i:'🗓', r:'Aulas'}, chat,
+    {t:'aulas', i:NAVIC.agenda, r:'Agenda'}, chat,
   ];
 }
 function abrirNotificacoes(){
@@ -4951,12 +4960,12 @@ function homeProfessor(){
   /* secundárias: só o que o botão grande NÃO cobriu (mesma técnica da home
      do jogador) — nunca duas portas pra mesma coisa na mesma tela */
   const sec2 = `<div class="acoes-sec">
-      <button onclick="ir('turma')">👥 Ver minha turma</button>
-      <button onclick="ir('insightsProfessor')">◈ Insights da turma</button>
+      <button onclick="ir('turma')">${NAVIC.turma}<span>Ver minha turma</span></button>
+      <button onclick="ir('insightsProfessor')">${ICO_HOME.card}<span>Insights da turma</span></button>
     </div>`;
   const agendaResumo = hoje.length
-    ? `<div class="agenda-prof" onclick="trocarAba('aulas')"><div class="agenda-k">Sua agenda</div><b>Próxima aula · hoje, ${hhmm(hoje[0].hora)}</b><small>${(hoje[0].aula_alunos||[]).length} aluno(s)${hoje[0].local_txt?' · '+hoje[0].local_txt:''} · Ver agenda completa ›</small></div>`
-    : `<div class="agenda-prof" onclick="trocarAba('aulas')"><div class="agenda-k">Sua agenda</div><b>${A&&A.length?'Confira suas próximas aulas':'Sua agenda está livre'}</b><small>${A&&A.length?'Ver agenda completa ›':'Crie sua primeira aula e organize sua semana ›'}</small></div>`;
+    ? `<div class="agenda-prof" onclick="trocarAba('aulas')"><div class="agenda-symbol">${NAVIC.agenda}</div><div class="agenda-copy"><div class="agenda-k">Sua agenda</div><b>Próxima aula · hoje, ${hhmm(hoje[0].hora)}</b><small>${(hoje[0].aula_alunos||[]).length} aluno(s)${hoje[0].local_txt?' · '+hoje[0].local_txt:''} · Ver agenda completa ›</small></div></div>`
+    : `<div class="agenda-prof" onclick="trocarAba('aulas')"><div class="agenda-symbol">${NAVIC.agenda}</div><div class="agenda-copy"><div class="agenda-k">Sua agenda</div><b>${A&&A.length?'Confira suas próximas aulas':'Sua agenda está livre'}</b><small>${A&&A.length?'Ver agenda completa ›':'Crie sua primeira aula e organize sua semana ›'}</small></div></div>`;
 
   /* a aula de hoje só vira LISTA quando há mais de uma — com uma só, o botão
      grande já disse tudo e repetir logo abaixo é o ruído que a gente quer
@@ -5513,7 +5522,7 @@ inicio(){
              Logo e sino são os SVG do próprio arquivo (app/fig/). -->
         <div class="linha1">
           <img class="logo" src="fig/logo-ranket.svg" alt="Ranket">
-          <button class="tpmenu" onclick="perfilProprioMenu()" aria-label="Configurações e privacidade">⋮</button>
+          <button class="tpmenu" onclick="perfilProprioMenu()" aria-label="Configurações e privacidade"><img src="icones/mais-vertical.svg" alt=""></button>
           <div class="ic" onclick="abrirNotificacoes()"><img src="fig/sino.svg" alt="Notificações">${S.novidades?`<span class="badge">${S.novidades}</span>`:''}${(window.netTemRecado&&netTemRecado())?'<span class="ponto"></span>':''}</div>
           <div class="av-topo" onclick="trocarAba('ficha')" title="Minha ficha">${eu.bon?`<i class="ro" style="${estiloRosto(eu.bon)}"></i>`:(eu.ap||'?')}</div>
         </div>
@@ -7117,7 +7126,7 @@ ficha(){
      que todo o histórico anterior é. */
   const jogadas = S.historico.filter(h=>!h.tipo);
   const v=jogadas.filter(h=>h.venceu).length;
-  return {titulo:'Ficha', dir:`<button class="tpmenu" onclick="perfilProprioMenu()" aria-label="Mais">⋮</button>`, html:`
+  return {titulo:'Ficha', dir:`<button class="tpmenu" onclick="perfilProprioMenu()" aria-label="Mais"><img src="icones/mais-vertical.svg" alt=""></button>`, html:`
     <div class="hero">
       <div class="cab-hero">
         ${avatar(EU,'gg')}
@@ -7559,7 +7568,7 @@ seguranca(){
 
       <div class="card seg-card">
         <h3>Convites e mensagens</h3>
-        <div class="seg-espera"><i>◌</i><span>A escolha de quem pode convidar ou enviar mensagem ainda depende da regra no banco. Ela será ligada junto com a proteção real, não só nesta tela.</span></div>
+        <div class="seg-espera"><img class="seg-globe" src="icones/globo.svg" alt=""><span>A escolha de quem pode convidar ou enviar mensagem ainda depende da regra no banco. Ela será ligada junto com a proteção real, não só nesta tela.</span></div>
       </div>
 
       <div class="card seg-card">
@@ -8054,7 +8063,7 @@ jogador(p){
       ${cascaNota('O board mostra a grade de sete dias por três períodos. O app guarda disponibilidade como horários avulsos que expiram, não como agenda semanal — a grade precisa de um modelo de dado que ainda não existe.')}`;
 
   return {titulo:j.nome,
-    dir:`<button class="tpmenu" onclick="perfilMenu('${p.id}')" aria-label="Mais">⋮</button>`,
+    dir:`<button class="tpmenu" onclick="perfilMenu('${p.id}')" aria-label="Mais"><img src="icones/mais-vertical.svg" alt=""></button>`,
     html:`
     <div class="pcab">
       ${avatar(p.id,'gg')}
@@ -9867,7 +9876,7 @@ function renderOnb(){
   }
 
   el.innerHTML = `<div class="onb-bg"></div><div class="onb-wrap">
-      <div class="onb-top">${((onb.step>0||onb.tela) && !onb.quiz)?`<button class="onb-voltar" onclick="onbBack()">‹</button>`:'<span></span>'}${dots(onb.tela?0:onb.step)}</div>
+      <div class="onb-top">${((onb.step>0||onb.tela) && !onb.quiz)?`<button class="onb-voltar" onclick="onbBack()" aria-label="Voltar"><img src="icones/voltar-circulo.svg" alt=""></button>`:'<span></span>'}${dots(onb.tela?0:onb.step)}</div>
       ${body}
     </div>`;
   const inp=document.getElementById(onb.step===1?'onb-email':'onb-nome');
