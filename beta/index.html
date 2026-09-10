@@ -2498,7 +2498,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1789070119"></script>
+<script src="net.js?v=1789071345"></script>
 
 <script>
 /* =========================================================================
@@ -7576,6 +7576,12 @@ seguranca(){
       <div class="card seg-card">
         <h3>Convites e mensagens</h3>
         <div class="seg-espera"><img class="seg-globe" src="icones/globo.svg" alt=""><span>A escolha de quem pode convidar ou enviar mensagem ainda depende da regra no banco. Ela será ligada junto com a proteção real, não só nesta tela.</span></div>
+      </div>
+
+      <div class="card seg-card">
+        <h3>Cantadas públicas</h3>
+        <p class="nota" style="margin:0 0 12px">A cantada privada continua disponível. Esta escolha controla se adversários podem deixar uma provocação pública antes da partida.</p>
+        <div style="display:flex;gap:8px"><button class="seg-row" style="flex:1" onclick="_net.cantadaPreferencia(false)"><i>◈</i><span>Permitir</span></button><button class="seg-row" style="flex:1" onclick="_net.cantadaPreferencia(true)"><i>⊘</i><span>Não receber</span></button></div>
       </div>
 
       <div class="card seg-card">

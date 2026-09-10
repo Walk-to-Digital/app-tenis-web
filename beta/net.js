@@ -809,6 +809,16 @@ async function netAtualizarInbox(){
     .in('status',['desafiado','aceito','pendente','confirmada','contestada'])
     .order('created_at',{ascending:false});
   if(error){ console.error('[net] inbox', error); return; }
+  /* Cantada é um objeto próprio: não reabre a antiga coluna experimental de
+     matches, e chega junto do card para a provocação pública não sumir. */
+  if(data && data.length){
+    const {data: cantadas, error: ec} = await sb.from('cantadas').select('*')
+      .in('match_id', data.map(m=>m.id));
+    if(!ec){
+      const porPartida = Object.fromEntries((cantadas||[]).map(c=>[c.match_id,c]));
+      data.forEach(m=>{ m._cantada=porPartida[m.id]||null; });
+    }
+  }
   // 11/08: apura o prazo de 72h ANTES de ler o resto. Se fechou alguma, a
   // lista em mãos envelheceu na hora — recarrega em vez de renderizar dado
   // morto. Não recursa infinito: partida fechada sai de 'pendente' e o
@@ -2163,6 +2173,57 @@ const _checkinDe = (m)=>{
                   :                 ['var(--ink2)', `✅ ${nome0} já está na quadra`];
   return `<div style="font-size:11.5px;color:${cor};margin-top:6px">${txt}</div>`;
 };
+const _CANTADA_NOME = {
+  sem_perder_set:'vence sem perder set', margem_6_games:'abre 6 games de frente',
+  virada:'busca a virada', set_6_0:'aplica um 6–0'
+};
+function _cantadaLinha(m){
+  const c=m&&m._cantada; if(!c) return '';
+  /* privada só aparece a quem cantou; pública vira parte do fight card */
+  if(!c.publica && c.cantador_id!==MEU_UID) return '';
+  const de=c.cantador_id===MEU_UID?'Você cantou':`${_nomeDe(c.cantador_id).split(' ')[0]} cantou`;
+  return `<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(132,227,0,.08);border:1px solid rgba(132,227,0,.42);font:700 11px var(--f-ui);color:var(--up);text-transform:uppercase;letter-spacing:.04em">${c.publica?'◈ Pública · ':'◌ Privada · '}${de}: ${_CANTADA_NOME[c.tipo]||'vai ganhar do seu jeito'}</div>`;
+}
+let _cantadaDraft=null;
+async function netAbrirCantada(mid){
+  const m=(_todasMinhas||[]).find(x=>x.id===mid);
+  if(!m || m.status!=='aceito'){ alert('A cantada só entra antes de lançar o placar.'); return; }
+  if(m.dupla || !_souCapitao(m)){ alert('Nesta primeira versão, a cantada vale para partidas de simples entre os capitães.'); return; }
+  if(m._cantada){ alert('Já existe uma cantada nesta partida.'); return; }
+  _cantadaDraft={mid,tipo:'sem_perder_set',publica:false};
+  netRenderCantada();
+}
+function netRenderCantada(){
+  if(!_cantadaDraft) return;
+  const d=_cantadaDraft;
+  const op=(tipo, titulo, sub)=>`<button onclick="_net.cantadaTipo('${tipo}')" style="text-align:left;width:100%;padding:12px;border-radius:12px;border:1px solid ${d.tipo===tipo?'var(--up)':'var(--linha2)'};background:${d.tipo===tipo?'rgba(132,227,0,.09)':'var(--bg)'};color:var(--ink);cursor:pointer;margin-top:8px"><b style="display:block;font:700 14px var(--f-ui)">${titulo}</b><span style="display:block;margin-top:3px;font-size:11px;color:var(--ink2)">${sub}</span></button>`;
+  _sheet('net-cantada', `<div style="padding:18px 16px 16px"><div style="font:700 20px var(--f-disp)">Cantar a pedra</div><p style="margin:6px 0 14px;color:var(--ink2);font-size:12px;line-height:1.45">Declare como você vai ganhar antes do placar. Vale só Pontos de Temporada, nunca Nível.</p>
+    ${op('sem_perder_set','Vencer sem perder set','Ganhar todos os sets da partida.')}
+    ${op('margem_6_games','Abrir 6 games de frente','Terminar com pelo menos 6 games de vantagem.')}
+    ${op('virada','Buscar a virada','Perder o primeiro set e ganhar a partida.')}
+    ${op('set_6_0','Aplicar um 6–0','Fazer um set de 6 a 0.')}
+    <div style="font-size:12px;color:var(--ink2);margin:16px 0 7px">Visibilidade</div>
+    <div style="display:flex;gap:8px"><button onclick="_net.cantadaVis(false)" style="flex:1;padding:10px;border-radius:10px;border:1px solid ${!d.publica?'var(--up)':'var(--linha2)'};background:${!d.publica?'rgba(132,227,0,.09)':'var(--bg)'};color:var(--ink);cursor:pointer">Privada · ±10%</button><button onclick="_net.cantadaVis(true)" style="flex:1;padding:10px;border-radius:10px;border:1px solid ${d.publica?'var(--up)':'var(--linha2)'};background:${d.publica?'rgba(132,227,0,.09)':'var(--bg)'};color:var(--ink);cursor:pointer">Pública · ±20%</button></div>
+    <p style="font-size:11px;line-height:1.45;color:var(--ink3);margin:10px 0 16px">Se acertar, soma o bônus; se errar, seus pontos positivos valem menos. Na pública, se seu adversário vencer, ele recebe +10%. Uma cantada por semana.</p>
+    <div style="display:flex;gap:8px"><button onclick="_net.fecharCantada()" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--linha2);background:none;color:var(--ink);cursor:pointer">Agora não</button><button onclick="_net.cantadaCriar()" style="flex:1;padding:12px;border:0;border-radius:12px;background:var(--marca);color:var(--marca-ink);font-weight:800;cursor:pointer">Confirmar cantada</button></div></div>`);
+}
+function netCantadaTipo(tipo){ if(_cantadaDraft){_cantadaDraft.tipo=tipo;netRenderCantada();} }
+function netCantadaVis(publica){ if(_cantadaDraft){_cantadaDraft.publica=!!publica;netRenderCantada();} }
+function netFecharCantada(){ _cantadaDraft=null; const e=document.getElementById('net-cantada');if(e)e.remove(); }
+async function netCriarCantada(){
+  const d=_cantadaDraft; if(!d) return;
+  try{
+    const {error}=await sb.rpc('cantada_criar',{p_match:d.mid,p_tipo:d.tipo,p_publica:d.publica});
+    if(error) throw error;
+    netFecharCantada(); if(window.toast) toast(d.publica?'Cantada pública lançada.':'Cantada guardada. Boa sorte!');
+    await netAtualizarInbox();
+  }catch(e){ alert('Não deu para cantar a pedra: '+(e.message||e)); }
+}
+async function netCantadaPreferencia(bloquear){
+  try{ const {error}=await sb.rpc('cantada_preferencia_publica',{p_bloquear:!!bloquear}); if(error) throw error;
+    if(window.toast) toast(bloquear?'Cantadas públicas bloqueadas.':'Cantadas públicas liberadas.');
+  }catch(e){ alert('Não deu para salvar a preferência: '+(e.message||e)); }
+}
 function netRenderInbox(){
   const linhas = _inbox.map(m=>{
     const outro=_nomeDe(_advId(m)).split(' ')[0];
@@ -2285,7 +2346,7 @@ function netRenderInbox(){
       const faltaMim   = !_meuCheckin(m);
       const faltaOutro = !_outroCheckin(m);
       const passouJanela = m.quando && Date.now() > new Date(m.quando).getTime() + 12*3600e3;
-      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m) + _checkinDe(m)
+      txt=`Partida marcada com <b>${outro}</b>` + _pinDe(m) + _checkinDe(m) + _cantadaLinha(m)
         + (faltaMim||faltaOutro
             ? `<div style="font-size:11px;color:var(--ink3);margin-top:7px;line-height:1.45">O placar abre quando os dois tocarem em <b>Cheguei</b>${
                 faltaMim && faltaOutro ? ' — falta você e ' + outro
@@ -2303,6 +2364,7 @@ function netRenderInbox(){
          encerra é o relógio do W.O., não o botão. */
       acoes=`${faltaMim?_btn('Cheguei',`_net.checkin('${m.id}')`):''}`
         + `${(!faltaMim && !faltaOutro)?_btn('Lançar placar',`_net.lancar('${m.id}')`,'ok'):''}`
+        + `${(!m.dupla && _souCapitao(m) && !m._cantada)?_btn('Cantar a pedra',`_net.abrirCantada('${m.id}')`):''}`
         + `${(faltaMim && faltaOutro && _podeCancelar(m))
               ? _btn('Cancelar',`_net.cancelarDesafio('${m.id}')`,'no') : ''}`;
     } else if(m.status==='pendente' && m.placar_por!==MEU_UID){
@@ -2645,7 +2707,7 @@ function netRenderOnline(){
       <div style="display:flex;gap:8px">${_btn('Cancelar','_net.fechar()')}${ehContra
         ? _btn('Propor','_net.enviarContra()','ok')
         : _btn('Desafiar','_net.confirmarDesafio()','ok')}</div>
-      ${ehContra?'':`<div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Cantar a pedra (apostar como vai ganhar) entra aqui em breve.</div>`}`;
+      ${ehContra?'':`<div style="font-size:11px;color:var(--ink3);margin-top:12px;text-align:center">Depois que os dois aceitarem, você pode cantar a pedra antes de lançar o placar.</div>`}`;
   }
   else if(_on.step==='mao'){
     const _p2m=(n)=>String(n).padStart(2,'0');
@@ -3529,7 +3591,7 @@ async function netTemporada(){
    partida ao mesmo tempo não credita em dobro. */
 async function netCreditarPontos(mid){
   if(!mid) return;
-  try{ await sb.rpc('pontos_creditar', { mid }); }
+  try{ await sb.rpc('cantada_pontos_creditar', { mid }); }
   catch(e){ /* pontos nunca derrubam a confirmação do placar */ }
 }
 
@@ -7760,6 +7822,9 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
   onPiso:_onPiso,   // (83) saibro | dura | rapida
   cancelarDesafio:netCancelarDesafio,
+  abrirCantada:netAbrirCantada, cantadaTipo:netCantadaTipo, cantadaVis:netCantadaVis,
+  cantadaCriar:netCriarCantada, fecharCantada:netFecharCantada,
+  cantadaPreferencia:netCantadaPreferencia,
   resumoDesafio:(m)=>_pinOuVazio(m), atualizarTudo:netAtualizarTudo,
   gcasa:netDefinirCasa, meusTrofeus:netMeusTrofeus, meusGrupos:netMeusGrupos,
   atividadeCriar:netAtividadeCriar, atividadesResumo:netAtividadesResumo,
