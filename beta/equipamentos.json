@@ -1,38 +1,33 @@
 {
   "_leia_me": [
-    "ONDE COMPRAR E ENCORDOAR — a categoria Equipamentos do Encontrar.",
-    "",
-    "O Reginaldo pediu a categoria na reunião de 25/08; os AFILIADOS ele mesmo",
-    "tirou de escopo ('essa camada inicial não é necessária'). Então isto aqui",
-    "NÃO é rede de anúncio nem parceria paga: é indicação nossa, e a tela diz",
-    "isso na cara ('ninguém aqui pagou pra aparecer'). No dia em que houver",
-    "afiliado de verdade, ele NÃO entra nesta lista — entra no espaço de mídia,",
-    "que é outro inventário e tem rótulo próprio.",
-    "",
-    "MESMO MOLDE DO noticias.json: arquivo, zero tabela, zero policy. Trocar a",
-    "lista é editar aqui e publicar.",
-    "",
-    "COMO ACRESCENTAR — um objeto por lugar:",
-    "  nome    obrigatório · como o lugar se chama",
-    "  tipo    obrigatório · loja | encordoamento | ambos",
-    "  bairro  opcional    · aparece do lado do tipo",
-    "  sobre   opcional    · uma linha, no máximo ~80 caracteres",
-    "  zap     opcional    · só números com DDD (ex: 71990001234)",
-    "  site    opcional    · precisa começar com https://",
-    "",
-    "REGRA DE CURADORIA, e ela é o motivo de a lista nascer vazia:",
-    "só entra lugar que a gente conhece e conferiu. Encher isto com resultado",
-    "de busca do Google seria transformar 'indicação nossa' em mentira — e é",
-    "justamente a palavra 'nossa' que faz a lista valer alguma coisa.",
-    "Enquanto estiver vazia, a tela explica que está sendo montada."
+    "EQUIPAMENTOS — poucos itens úteis, cada um apontando para uma loja diferente.",
+    "Não são anúncios nem links afiliados. Preço, estoque e entrega são da loja.",
+    "Para acrescentar: nome, tipo, sobre, loja, ícone e site HTTPS."
   ],
   "itens": [
     {
-      "nome": "Decathlon Salvador Shopping",
-      "tipo": "ambos",
-      "bairro": "Caminho das Árvores",
-      "sobre": "Raquetes, bolas e encordoamento de raquete.",
-      "site": "https://www.decathlon.com.br/lojas/decathlon-salvador-shopping"
+      "nome": "Raquete para iniciantes",
+      "tipo": "Escolha o peso e o tamanho do cabo antes de comprar.",
+      "sobre": "Modelos para quem está começando a jogar.",
+      "loja": "Decathlon",
+      "icone": "🎾",
+      "site": "https://www.decathlon.com.br/esportes/tenis/raquetes-de-tenis"
+    },
+    {
+      "nome": "Bolas de tênis",
+      "tipo": "Tubo com 3 bolas para treino ou partida.",
+      "sobre": "Prefira bolas próprias para a superfície em que você joga.",
+      "loja": "Centauro",
+      "icone": "🟡",
+      "site": "https://www.centauro.com.br/nav/categoria/tenis/subcategoria/bola-de-tenis"
+    },
+    {
+      "nome": "Overgrip para a raquete",
+      "tipo": "Fita para renovar a pegada do cabo.",
+      "sobre": "Uma troca simples que melhora conforto e firmeza.",
+      "loja": "Mercado Livre",
+      "icone": "✋",
+      "site": "https://lista.mercadolivre.com.br/overgrip-tenis"
     }
   ]
 }
