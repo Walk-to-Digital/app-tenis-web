@@ -288,8 +288,14 @@ async function netBoot(eu){
        asterisco passaria a incluir uma coluna sem privilégio e a consulta
        inteira falharia — derrubando o BOOT, não só o e-mail. Lista explícita
        é o que torna a revogação segura. */
+    /* 11/09 (mig 108): `genero` SAIU desta lista, e tinha de sair ANTES da
+       migração. A coluna era pedida aqui e o valor jogado fora — o
+       `hidratarJogador` nunca leu `row.genero`, porque o gênero do dono vem de
+       `player_privado`. Continuar pedindo uma coluna que a 108 apaga faria
+       esta consulta falhar inteira (42703) e derrubaria o BOOT, não o gênero.
+       App primeiro, banco depois: os dois não trocam de versão juntos. */
     const { data: meuRow, error: meuErr } = await sb.from('players')
-      .select('id,nome,ap,clube,nivel,nivelb,nivel_duplas,nivelb_duplas,calibrando,cal,bon,roupa,cor,cena,escudo,patroc,vestiario,bio,nascimento,maior_de_18,idade_declarada_em,mao,tempo_pratica,estilo,perfil,joga,livre_ate,banido_em,genero,uf,cidade,foto,created_at,updated_at')
+      .select('id,nome,ap,clube,nivel,nivelb,nivel_duplas,nivelb_duplas,calibrando,cal,bon,roupa,cor,cena,escudo,patroc,vestiario,bio,nascimento,maior_de_18,idade_declarada_em,mao,tempo_pratica,estilo,perfil,joga,livre_ate,banido_em,uf,cidade,foto,created_at,updated_at')
       .eq('id',uid).maybeSingle();
     /* 27/08 — SESSÃO ÓRFÃ. O JWT continua válido no aparelho depois que a conta
        morre no banco (wipe de teste hoje; LGPD ou banimento com purge amanhã).
@@ -381,6 +387,9 @@ async function netBoot(eu){
     try{ await netEntrarPorLink(); }catch(e){ console.error('[net] entrar por link', e); }
     // virada da temporada: apura troféus e abre a próxima, se a atual venceu
     try{ await netFecharTemporada(); }catch(e){}
+    // A sala de conquistas consulta temporadas já encerradas para manter o
+    // selo permanente depois da virada; a atual sozinha não carrega história.
+    try{ await netTemporadas(); }catch(e){}
     // sou ADM do app? acende a porta de entrada da aba ADM (migração 18)
     try{ await netCheckAdm(); }catch(e){}
     try{ await netCheckPerfil(); }catch(e){}   // (66) o papel decide a nav e a home
@@ -1154,7 +1163,7 @@ function _onLocal(v){ _on.localId = v || null; _on.quadra = null;
 /* 'eu' | 'ele' | null — vira uuid só na hora de gravar. Clicar no que já está
    escolhido desmarca: a escolha é opcional e precisa ter volta. */
 function _onQuadraPor(v){ _on.quadraPor = (_on.quadraPor===v) ? null : v; netRenderOnline(); }
-/* (83) saibro | dura | rapida. Clicar no que já está escolhido DESMARCA, pela
+/* saibro | dura | grama. Clicar no que já está escolhido DESMARCA, pela
    mesma razão do quadraPor: o piso é opcional e a escolha precisa ter volta —
    sem isso, quem tocou por engano fica preso a um combinado que não fez. */
 function _onPiso(v){ _on.piso = (_on.piso===v) ? null : v; netRenderOnline(); }
@@ -1241,7 +1250,7 @@ function _chip(on, rot, acao, extra){
 function _pisoBloco(rotulo){
   return `
       <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">${rotulo} <span style="color:var(--ink3)">(opcional)</span></div>
-      <div style="display:flex;gap:8px">${[['saibro','Saibro'],['dura','Dura'],['rapida','Rápida']].map(([v,n])=>
+      <div style="display:flex;gap:8px">${[['saibro','Saibro'],['dura','Dura'],['grama','Grama']].map(([v,n])=>
         _chip(_on.piso===v, n, `_net.onPiso('${v}')`, 'font-size:12px')).join('')}</div>`;
 }
 /* O bloco Simples/Duplas — UM só, usado pela folha do desafio E pela do
@@ -2126,10 +2135,9 @@ const _pinDe = (m, pref='')=>{
      Quem precisa do texto do vazio é a contraproposta, que pede o dito lá. */
   return h;
 };
-/* (83) os três pisos, escritos uma vez. O banco guarda a chave (`rapida`, sem
-   acento, porque valor de domínio não carrega ortografia); a tela mostra o
-   nome. Duas listas divergem na primeira que alguém editar sozinha. */
-const PISO_NOME = { saibro:'saibro', dura:'piso duro', rapida:'piso rápido' };
+/* Os pisos atuais ficam escritos uma vez. `rapida` sobrevive abaixo somente
+   para nomear partidas antigas; histórico não pode virar linha sem legenda. */
+const PISO_NOME = { saibro:'saibro', dura:'piso duro', grama:'grama', rapida:'piso rápido' };
 const _pinOuVazio = (m, pref='')=> _pinDe(m, pref)
   || `<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">a combinar</div>`;
 
@@ -3276,7 +3284,7 @@ async function netDeixarDeSeguir(id){
 async function netEstiloSalvar(valor){
   if(!MEU_UID) return {erro:'sem sessão'};
   const v = valor || null;
-  if(v && !['fundo','consistente','defensivo'].includes(v)) return {erro:'estilo inválido'};
+  if(v && !['completo','fundo','saque_voleio','contra_ataque'].includes(v)) return {erro:'estilo inválido'};
   const { error } = await sb.from('players').update({ estilo:v }).eq('id',MEU_UID);
   return error ? {erro:error.message} : {ok:true};
 }
@@ -3585,6 +3593,16 @@ async function netTemporada(){
     _temp = r.data ? r.data.n : null;
   }catch(e){ _temp = null; }
   return _temp;
+}
+
+/* Histórico das temporadas: a temporada vigente continua em `__temporada`,
+   mas o selo precisa reconhecer também qualquer período que já terminou. */
+async function netTemporadas(){
+  try{
+    const { data, error } = await sb.from('temporadas').select('n,inicio,fim').order('n');
+    if(!error) window.__temporadas = data || [];
+  }catch(e){ window.__temporadas = []; }
+  return window.__temporadas;
 }
 
 /* Idempotente pela PK do livro-caixa: dois aparelhos creditando a mesma
@@ -4246,7 +4264,7 @@ async function netVerGrupo(gid){
         <div style="font-size:11px;color:var(--ink2);margin-top:2px">${etiqueta}</div>
       </div></div>
       <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">
-        Passa pra quem vencer ${souEu?'você':'quem tem'} numa partida normal — sem desafio, sem marcar nada.
+        É o título rotativo da comunidade. Em uma partida simples confirmada entre membros, jogada depois do início do reinado, quem vencer ${souEu?'você':'quem tem'} assume o cinturão. Jogadores em calibração não assumem.
         ${est.congelado?'Aos 30 dias parado o cinturão vai pro 1º da comunidade.':'Parar 14 dias congela o reinado.'}</div>`;
   } else if(g.cinturao){
     cinturaoH = `<div style="margin:12px 0;padding:12px;border-radius:12px;border:1px dashed var(--linha2);background:var(--sup)">
@@ -4257,7 +4275,7 @@ async function netVerGrupo(gid){
         border:1px dashed var(--gold-bg);background:var(--sup);color:var(--gold);font:600 13px var(--f-ui);cursor:pointer;margin:12px 0 4px">
         🥇 Ligar o cinturão da comunidade</button>
       <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">
-        Um por comunidade, no ${g.esporte==='beach'?'beach':'tênis'}. Nasce com você e passa pra quem te vencer.</div>`;
+        É o título rotativo da comunidade: um por grupo, no ${g.esporte==='beach'?'beach':'tênis'}. Nasce com você e passa para quem vencer você em partida simples confirmada entre membros.</div>`;
   }
 
   // casa da comunidade (migração 19): todo mundo vê no cabeçalho; o gestor
@@ -7820,7 +7838,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
      silêncio nas DUAS folhas que o usam (desafiar e lançar na mão): o horário
      escolhido nunca chegava em `_on.quando` e a partida saía sem hora. */
   onLocal:_onLocal, onQuadra:_onQuadra, onQuando:_onQuando, onQuandoAtalho:_onQuandoAtalho,
-  onPiso:_onPiso,   // (83) saibro | dura | rapida
+  onPiso:_onPiso,   // saibro | dura | grama
   cancelarDesafio:netCancelarDesafio,
   abrirCantada:netAbrirCantada, cantadaTipo:netCantadaTipo, cantadaVis:netCantadaVis,
   cantadaCriar:netCriarCantada, fecharCantada:netFecharCantada,

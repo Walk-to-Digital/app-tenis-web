@@ -2498,7 +2498,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 <!-- Supabase (CDN) + camada de rede. Carregam antes do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="net.js?v=1789071345"></script>
+<script src="net.js?v=1789485811"></script>
 
 <script>
 /* =========================================================================
@@ -3092,7 +3092,12 @@ function categoriaDe(n, cl){
 const CAT_SUFIXO = { 1:'+++', 2:'++', 3:'+', 4:'' };
 /* 01/09 (mig 90) — os tres rotulos de estilo, DECLARADOS pela pessoa.
    A chave e o que o banco guarda; o texto e o que a tela mostra. */
-const ESTILO_ROTULO = { fundo:'Fundo de quadra', consistente:'Consistente', defensivo:'Defensivo' };
+const ESTILO_ROTULO = {
+  completo:'Completo',
+  fundo:'Fundo de quadra',
+  saque_voleio:'Saque e voleio',
+  contra_ataque:'Contra-ataque',
+};
 const catNome = (cl, cat)=> cl + CAT_SUFIXO[cat];
 // 'C+' — a etiqueta que aparece na vitrine
 const classeDe = (j)=> catNome(divDe(j), categoriaDe(nivelDe(j), divDe(j)));
@@ -6016,7 +6021,7 @@ radar(){
     const rot = x.t.agora && !sl ? '🎾 com bola na mão' : (sl? dispRotulo(sl) : '');
     const lug = sl && (sl.bairro||sl.cidade) ? [sl.bairro,sl.cidade,sl.uf].filter(Boolean).join(', ')
               : ((mapa[x.id] && window._net && _net.locNome) ? (_net.locNome(mapa[x.id].local_id)||'') : '');
-    const qd  = sl&&sl.quadra ? {saibro:'Quadra de saibro',dura:'Quadra dura',rapida:'Quadra rápida'}[sl.quadra] : '';
+    const qd  = sl&&sl.quadra ? {saibro:'Quadra de saibro',dura:'Quadra dura',grama:'Quadra de grama',rapida:'Quadra rápida'}[sl.quadra] : '';
     return `
     <div class="card oc">
       <div class="linha-item" style="align-items:flex-start">
@@ -6056,7 +6061,7 @@ radar(){
         style="width:100%;padding:11px;border-radius:var(--rp);cursor:pointer;font:700 13px var(--f-ui);margin-top:2px;
                border:1px solid ${euLivre?'var(--up)':'var(--linha2)'};
                background:${euLivre?'rgba(131,224,0,.14)':'var(--sup)'};color:${euLivre?'var(--up)':'var(--ink)'}">
-        ${euLivre?'🎾 Você está com bola na mão hoje — tocar desliga':'🎾 Tô livre hoje (sem hora marcada)'}</button>
+        ${euLivre?'Disponível para jogar':'🎾 Tô livre hoje (sem hora marcada)'}</button>
     </div>
 
     <!-- 29/08 (board): a disponibilidade ganhou um atalho no topo do radar.
@@ -6076,8 +6081,8 @@ radar(){
         style="width:100%;padding:14px;border-radius:var(--rp);cursor:pointer;
                font:700 13px var(--f-ui);border:1px solid var(--acc);
                background:none;color:var(--acc)">
-        Marcar quando você pode jogar</button>
-      <p class="nota" style="margin-top:8px">Conte dia, hora e bairro. O radar faz o resto.</p>
+        Adicionar disponibilidade</button>
+      <p class="nota" style="margin-top:8px">Informe dia, horário e bairro para aparecer no Radar.</p>
     </div>
 
     <div class="sec">
@@ -6094,14 +6099,14 @@ radar(){
       </div>
       ${lista.length ? lista.map(card).join('')
         : `<div class="card"><p class="nota">${
-            S.radarSub==='agora' ? 'Ninguém livre agora na sua faixa. Veja <b>Hoje</b> ou <b>Esta semana</b> — ou marque seu horário para aparecer no radar dos outros.'
+            S.radarSub==='agora' ? 'Ninguém disponível agora na sua faixa. Veja <b>Hoje</b> ou <b>Esta semana</b>, ou adicione sua disponibilidade.'
           : 'Ainda não apareceu ninguém neste horário. Marque a sua disponibilidade e seja o próximo a entrar no radar.'}</p></div>`}
-      <p class="nota" style="margin-top:10px">O radar só aparece quando você quer jogar. Você decide quando chamar alguém.</p>
+      <p class="nota" style="margin-top:10px">Você só aparece no Radar quando informa que está disponível.</p>
     </div>
 
     <div class="sec">
       <div class="rot">Fora do alcance</div>
-      <div class="card"><p class="nota">Jogadores a mais de uma classe de distância não aparecem aqui — nem pela busca por nome. É a mesma trava que faz o quadro ser somente leitura.</p></div>
+      <div class="card"><p class="nota">Jogadores com mais de uma classe de diferença não aparecem no Radar nem na busca.</p></div>
     </div>`};
 },
 
@@ -6123,8 +6128,8 @@ dispForm(){
   return {titulo:'Radar', html:`
     <div class="pad">
       <div class="card" style="padding:16px">
-        <b style="font-family:var(--f-disp);font-size:17px">Ajustar disponibilidade de jogo</b>
-        <p class="nota" style="margin:4px 0 14px">Cada horário marcado aparece pros oponentes da sua faixa no radar. Passou a hora, expira sozinho.</p>
+        <b style="font-family:var(--f-disp);font-size:17px">Adicionar disponibilidade</b>
+        <p class="nota" style="margin:4px 0 14px">Seus horários ficarão visíveis no Radar para jogadores da sua faixa e expirarão automaticamente.</p>
         <div class="rot">Data e hora</div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <input class="onb-input" style="margin:0;flex:1" type="date" value="${d.data||''}" min="${hojeLocal}" onchange="dispSet('data',this.value,true)">
@@ -6141,7 +6146,7 @@ dispForm(){
         <div class="rot">Modalidade</div>
         <div class="seg2" style="margin-bottom:14px">${seg('esporte','tenis','Tênis')}${seg('esporte','beach','Beach Tennis')}</div>
         <div class="rot">Quadra de preferência</div>
-        <div class="seg2">${seg('quadra','saibro','Saibro')}${seg('quadra','dura','Dura')}${seg('quadra','rapida','Rápida')}</div>
+        <div class="seg2">${seg('quadra','saibro','Saibro')}${seg('quadra','dura','Dura')}${seg('quadra','grama','Grama')}</div>
       </div>
       <button class="btn" style="margin-top:14px" onclick="dispSalvar()">Adicionar disponibilidade</button>
     </div>`};
@@ -6157,7 +6162,7 @@ dispEditar(){
   const bloco=Object.keys(porDia).sort().map(k=>`
     <div class="rot" style="margin-top:14px">${NOMES[k]}</div>
     ${porDia[k].map(x=>{ const dt=new Date(x.quando);
-      const pref=[{tenis:'Tênis',beach:'Beach'}[x.esporte], x.tipo, x.quadra?('quadra de '+{saibro:'saibro',dura:'piso duro',rapida:'piso rápido'}[x.quadra]):null].filter(Boolean).join(' · ');
+      const pref=[{tenis:'Tênis',beach:'Beach'}[x.esporte], x.tipo, x.quadra?('quadra de '+{saibro:'saibro',dura:'piso duro',grama:'grama',rapida:'piso rápido'}[x.quadra]):null].filter(Boolean).join(' · ');
       return `<div class="card" style="padding:10px 12px">
         <div class="linha-item">
           <span class="dpil">${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')} às ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}</span>
@@ -6236,7 +6241,7 @@ radarFiltros(){
         </div>
         <div class="col">
           <div class="cab"><i>▤</i><b>Tipo de quadra</b></div>
-          ${chip('quadra',null,'Tanto faz')}${chip('quadra','saibro','Saibro')}${chip('quadra','dura','Dura')}${chip('quadra','rapida','Rápida')}
+          ${chip('quadra',null,'Tanto faz')}${chip('quadra','saibro','Saibro')}${chip('quadra','dura','Dura')}${chip('quadra','grama','Grama')}
         </div>
         <div class="col">
           <div class="cab"><i>◎</i><b>Tipo de Jogo</b></div>
@@ -7143,7 +7148,7 @@ ficha(){
           <!-- 11/08: onde a pessoa joga (migração 19) — dado real, não o escudo
                cosmético do vestiário. É a porta das contas que nasceram antes
                do passo existir no cadastro. -->
-          <div class="sub" style="cursor:pointer" onclick="window.netAbrirMeusLocais&&netAbrirMeusLocais()">📍 ${(window.__meusLocais&&window.__meusLocais.principalNome)||'<u>Diga onde você joga</u>'}</div>
+          <div class="sub" style="cursor:pointer" onclick="window.netAbrirMeusLocais&&netAbrirMeusLocais()">📍 ${(window.__meusLocais&&window.__meusLocais.principalNome)||'<u>Adicione o local onde você joga</u>'}</div>
         </div>
       </div>
       <div class="linha-nivel">
@@ -7183,7 +7188,7 @@ ficha(){
          dali. (Sem crase neste comentario: ele vive dentro de um template
          literal.) -->
     <div class="sec">
-      <div class="rot">Dados esportivos</div>
+      <div class="rot">Sobre o seu jogo</div>
       <div class="card">
         <div class="linha-item" style="padding:10px 0">
           <div class="txt"><b>Mão dominante</b></div>
@@ -7201,7 +7206,7 @@ ficha(){
             const sl = (window.__dispMinhas||[]).filter(x=> new Date(x.quando) > new Date());
             const livre = !!(eu.livreAte && new Date(eu.livreAte) > new Date());
             if(livre && !sl.length) return 'Com bola na mão hoje, sem hora marcada';
-            if(!sl.length) return 'Nenhum horário marcado — toque pra marcar no radar';
+            if(!sl.length) return 'Nenhum horário disponível. Adicione um para aparecer no Radar.';
             const prox = sl.sort((a,b)=> new Date(a.quando)-new Date(b.quando))[0];
             const d = new Date(prox.quando);
             const hh = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -7244,7 +7249,7 @@ ficha(){
       <div class="card clic" onclick="irEditarPerfil('pessoais')">
         <div class="linha-item">
           <div class="av">✎</div>
-          <div class="txt"><b>Dados pessoais</b><small>Foto, nome, bio, telefone e onde você mora</small></div>
+          <div class="txt"><b>Dados pessoais</b><small>Foto, nome, bio, contato e endereço</small></div>
           <div class="seta">›</div>
         </div>
       </div>
@@ -7281,7 +7286,7 @@ ficha(){
       <div class="card clic" onclick="abrirTrofeus()">
         <div class="linha-item">
           <div class="av">🏆</div>
-          <div class="txt"><b>Sala de conquistas</b><small>Troféus, selos e patches · os bloqueados dizem como pegar</small></div>
+          <div class="txt"><b>Sala de conquistas</b><small>Troféus, selos e patches. Veja suas conquistas e o que falta desbloquear.</small></div>
           <div class="seta">›</div>
         </div>
       </div>
@@ -7477,7 +7482,7 @@ editarPerfil(){
           </label>
           ${fotoUrl
             ? `<button class="lk" style="margin-top:6px" onclick="perfFotoTirar()">Tirar foto</button>`
-            : `<p class="nota" style="margin-top:6px;font-size:11px">Sem foto, vale o boneco.</p>`}
+            : `<p class="nota" style="margin-top:6px;font-size:11px">Sem foto, aparecerá a do seu personagem.</p>`}
         </div>
         <div style="flex:1;min-width:0">
           <div class="rot">Nome completo</div>
@@ -7491,17 +7496,17 @@ editarPerfil(){
 
       <div class="rot">Bio</div>
       <textarea class="onb-input" style="margin:0 0 14px;height:92px;resize:none" maxlength="300"
-                placeholder="Golpes, horário que você joga, o que quiser"
+                placeholder="Conte um pouco sobre você e seu jeito de jogar"
                 oninput="perfSet('bio',this.value,true)">${_attr(d.bio)}</textarea>
 
       <div class="rot">Gênero</div>
       <div class="seg2" style="margin-bottom:4px">${seg('genero','f','Feminino')}${seg('genero','m','Masculino')}${seg('genero','o','Outro')}</div>
-      <p class="nota" style="margin:0 0 14px;font-size:11px">Só você e o ADM enxergam. Não aparece no radar nem no seu perfil.</p>
+      <p class="nota" style="margin:0 0 14px;font-size:11px">Visível apenas para você e para a equipe do Ranket. Não aparece no seu perfil nem no Radar.</p>
 
       <div class="rot">Telefone</div>
       <input class="onb-input" style="margin:0 0 4px" type="tel" maxlength="20" placeholder="(71) 90000-0000"
              value="${_attr(d.telefone)}" oninput="perfSet('telefone',this.value,true)">
-      <p class="nota" style="margin:0 0 14px;font-size:11px">Guardado só pra você — ninguém no app vê.</p>
+      <p class="nota" style="margin:0 0 14px;font-size:11px">Seu número não aparece no perfil nem para outros jogadores.</p>
 
       <div class="rot">Localização</div>
       <div style="display:flex;gap:8px">
@@ -7536,7 +7541,7 @@ editarPerfil(){
             <b>${NIVEL_ROT[k][0]}</b> <span>${NIVEL_ROT[k][1]}</span>
           </div>`).join('')}
       </div>
-      <p class="nota" style="margin-top:8px">Aqui você não escolhe: sua classe é ${minhaDiv} e quem mexe nela é o resultado dos jogos. ${eu.calibrando?'Você ainda está calibrando — os primeiros jogos valem mais.':'Cada partida confirmada sobe ou desce o seu Nível.'}</p>
+      <p class="nota" style="margin-top:8px">Seu nível inicial foi declarado no cadastro. Sua classe atual é ${minhaDiv} e é calculada pelos resultados das partidas. ${eu.calibrando?'Durante a calibração, os primeiros jogos têm mais peso.':'Cada partida confirmada pode atualizar seu Nível.'}</p>
     </div>
     <button class="btn" style="margin-top:14px" onclick="perfSalvar('esportiva')">Salvar alterações</button>`;
 
@@ -8375,9 +8380,9 @@ const TR_PECAS = [
   {id:'rapido',    arq:'t5',  n:'Confirmou já',    c:'Confirme o placar do adversário em menos de 1 hora'},
   {id:'estreante', arq:'t8',  n:'Estreante',       c:'Seja a primeira partida de alguém no app'},
   {id:'limpo',     arq:'t10', n:'Nada pendente',   c:'Termine uma temporada sem nenhum placar em aberto'},
-  {id:'temporada', arq:'t11', n:'Temporada',       c:'Chegue ao fim de uma temporada jogando'},
-  {id:'zebra',     arq:'t7',  n:'Zebra',           c:'Vença alguém 150 pontos de Nível acima de você'},
-  {id:'subiu',     arq:'t12', n:'Subiu de classe', c:'Passe para a classe de cima'},
+  {id:'temporada', arq:'t11', n:'Temporada',       c:'Conclua uma temporada com ao menos uma partida confirmada'},
+  {id:'zebra',     arq:'t7',  n:'Zebra',           c:'Vença alguém com 150 pontos a mais que você'},
+  {id:'subiu',     arq:'t12', n:'Subiu de classe', c:'Suba uma classe'},
   {id:'defendeu',  arq:'t1',  n:'Defendeu',        c:'Defenda o cinturão da sua comunidade'},
 ];
 let trSel=null, trAba='trofeus';   // trofeus | selos | patches
@@ -8447,9 +8452,20 @@ function trofeusConquistados(){
     if(zebra)  g.add('zebra');
     if(rapido) g.add('rapido');
 
-    /* 27/08 — os selos de TEMPORADA. Regra honesta: os três só podem acender
-       quando a temporada está no fim (semana 12+) — acender "semana cheia" na
-       primeira semana seria o vazio mentindo com cara de conquista. */
+    /* Selo de temporada: é permanente e só nasce quando a temporada acabou.
+       A regra é direta: ao menos uma partida confirmada dentro daquele período.
+       `__temporadas` traz o histórico inteiro porque, depois da virada, a
+       temporada vigente já não é mais a que precisa ser reconhecida. */
+    const temporadasEncerradas=(window.__temporadas||[]).filter(t=>
+      t && t.inicio && t.fim && Date.parse(t.fim)<=Date.now());
+    if(temporadasEncerradas.some(t=>{
+      const ini=Date.parse(t.inicio), fim=Date.parse(t.fim);
+      return todas.some(m=>{ const c=Date.parse(m.confirmed_at); return c>=ini && c<fim; });
+    })) g.add('temporada');
+
+    /* Os outros selos de temporada continuam olhando a temporada em curso.
+       Eles só podem acender na última semana, para não transformar um período
+       ainda aberto numa conquista concluída. */
     const T = window.__temporada;
     if(T && T.inicio && T.fim){
       const ini = Date.parse(T.inicio), fim = Date.parse(T.fim);
@@ -8463,7 +8479,6 @@ function trofeusConquistados(){
         let todasSemanas = true;
         for(let w=0; w<semanas && w<12; w++) if(!cheias.has(w)) todasSemanas = false;
         if(todasSemanas && minhasNaTemp.length) g.add('semana');
-        if(minhasNaTemp.length) g.add('temporada');
         const abertas = ((window.__minhasPartidas)||[]).filter(m=>
           m.status==='pendente' || m.status==='contestada');
         if(!abertas.length && minhasNaTemp.length) g.add('limpo');
@@ -8696,9 +8711,9 @@ function desenharTrofeus(){
   } else if(trSel==='cint'){
     const _pillC = _cint.tem ? 'com você' : _cint.ligado ? 'com '+_nomeCint(_cint.dono) : 'sem cinturão';
     const _txtC  = _cint.tem
-      ? 'Defenda jogando — quem te vencer na comunidade leva.'
+      ? 'É o título rotativo da comunidade. Quem vencer você em uma partida simples confirmada entre membros, depois do início do seu reinado, assume.'
       : _cint.ligado
-      ? 'Vença '+_nomeCint(_cint.dono)+' numa partida da comunidade pra tomar.'
+      ? 'É o título rotativo da comunidade. Vença '+_nomeCint(_cint.dono)+' em uma partida simples confirmada entre membros para assumir.'
       : 'Nenhuma comunidade sua tem cinturão ligado — quem liga é o gestor, na tela da comunidade.';
     det=`<b>Cinturão da Comunidade <span class="tr-pill ${temCint?'tem':'nao'}">${_pillC}</span></b>
       <p>${_txtC}</p>`;
@@ -8710,8 +8725,8 @@ function desenharTrofeus(){
   const vazio = trAba==='trofeus'
     ? `<b>Troféus</b><p>Vença um campeonato e a taça entra na prateleira — torneio, chave e data na etiqueta. Reinado e Coroa da temporada entram sozinhos. Pra sempre.</p>`
     : trAba==='patches'
-    ? `<b>Patches</b><p>Patch vem da comunidade: quando alguém te mandar um, aparece aqui. É pertencimento, não mérito.</p>`
-    : `<b>Toque numa peça</b><p>Bloqueada, ela fica de vulto e diz o que fazer pra conquistar.</p>`;
+    ? `<b>Patches</b><p>Patches são enviados por outros jogadores da comunidade. Quando você receber um, ele aparece aqui.</p>`
+    : `<b>Toque numa peça</b><p>Toque em um selo bloqueado para descobrir como conquistá-lo.</p>`;
   $('#tr-det').innerHTML = det || vazio;
   el.querySelectorAll('[data-src]').forEach(x=>{ trNormalizar(x.dataset.src).then(u=>{ if(u) x.src=u }) });
 }
@@ -9741,13 +9756,13 @@ function renderOnb(){
       <label class="onb-card" style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:14px">
         <input type="file" accept="image/*" hidden onchange="onbFoto(this)">
         ${onb.fotoUrl?`<img src="${onb.fotoUrl}" alt="Prévia" style="width:54px;height:54px;border-radius:50%;object-fit:cover">`:'<div class="dv">⌾</div>'}
-        <div class="tx"><b>${onb.fotoUrl?'Trocar foto':'Adicionar foto'}</b><small>Você também pode mudar depois no seu perfil.</small></div>
+        <div class="tx"><b>${onb.fotoUrl?'Trocar foto':'Adicionar foto'}</b><small>Você pode alterar no seu perfil.</small></div>
       </label>
       <div class="onb-rot">Data de nascimento</div>
       <input id="onb-nasc" class="onb-input" type="date" value="${onb.nasc||''}" oninput="onbNasc(this.value)" max="${new Date().toISOString().slice(0,10)}">
       <p class="nota">Sua data de nascimento não aparece para os outros usuários. O Ranket é só para maiores de 18.</p>
       <div class="onb-rot">Bio</div>
-      <textarea id="onb-bio" class="onb-area" placeholder="Uma linha sobre o seu jogo. Aparece no seu perfil." oninput="onbBio(this.value)" maxlength="160">${(onb.bio||'').replace(/</g,'&lt;')}</textarea>
+      <textarea id="onb-bio" class="onb-area" placeholder="Conte um pouco sobre seu estilo de jogo." oninput="onbBio(this.value)" maxlength="160">${(onb.bio||'').replace(/</g,'&lt;')}</textarea>
       <p class="nota">Opcional, até 160 caracteres.</p>
       <div class="onb-rot">Gênero</div>
       <div class="seg3">
@@ -9758,13 +9773,13 @@ function renderOnb(){
       <!-- 25/08 (mig 62): pedido literal do Rege — "ele escolhe o contato, se
            ele quer um e-mail, se ele quer WhatsApp". É diferente do e-mail de
            login: login é porta, contato é como te acham pra marcar jogo. -->
-      <p class="nota" style="margin:16px 0 6px"><b>Como você prefere ser chamado pra jogar?</b></p>
+      <p class="nota" style="margin:16px 0 6px"><b>Como você prefere receber convites para jogar?</b></p>
       <div class="seg2" style="margin-bottom:10px">
         <button class="${onb.canal==='email'?'on':''}" onclick="onbSet('canal','email')">E-mail</button>
         <button class="${onb.canal==='zap'?'on':''}" onclick="onbSet('canal','zap')">WhatsApp</button>
       </div>
       ${onb.canal ? `<input id="onb-contato" class="onb-input" placeholder="${onb.canal==='zap'?'(71) 90000-0000':'seu@email.com'}" value="${(onb.contato||'').replace(/"/g,'&quot;')}" oninput="onbSet2('contato',this.value)" maxlength="100" ${onb.canal==='zap'?'inputmode="tel"':'type="email" inputmode="email"'}>
-      <p class="nota">Quem te desafiar vê isso. Dá pra deixar em branco e ser chamado só pelo app.</p>` : ''}
+      <p class="nota">Só será exibido para quem te desafiar. Se preferir, deixe em branco e receba os convites pelo app.</p>` : ''}
       <button class="onb-check ${onb.termos?'on':''}" onclick="onbSet('termos',!onb.termos)"><span>Li e concordo com os <u>Termos de Uso</u>.</span></button>
       <div class="onb-nav"><button class="onb-prim" onclick="onbDadosOk()">Avançar</button></div>`;
   } else if(onb.step===3 && onb.perfil==='professor' && !onb.telaEsportiva){
@@ -9789,19 +9804,18 @@ function renderOnb(){
     const podeAvancar = onb.joga !== null && onb.joga !== undefined;
     body=`
       <div class="onb-head"><div class="onb-kick">Passo 3 de 4</div><h2>Ficha do Professor</h2></div>
-      <p class="nota" style="margin-bottom:6px"><b>Uma linha sobre você</b> — é o que quem procura aula lê primeiro.</p>
+      <p class="nota" style="margin-bottom:6px"><b>Apresente-se em poucas palavras</b></p>
       <input class="onb-input" placeholder="Ex.: 12 anos de quadra, aula individual e em dupla" maxlength="160"
              value="${(onb.apresentacao||'').replace(/"/g,'&quot;')}" oninput="onbSet2('apresentacao',this.value)">
       <p class="nota" style="margin:14px 0 6px"><b>Onde você dá aula?</b> Marque quantos quiser.</p>
       <div class="onb-cards">${onb.locais===null?'<p class="nota">Carregando os clubes…</p>':(linhas||'<p class="nota">Nenhum clube cadastrado ainda — dá pra seguir sem, e você marca depois.</p>')}</div>
         <button class="onb-quadra-nova" onclick="onbQuadraNova()">+ Minha quadra não está na lista</button>
-        <p class="nota" style="margin-top:6px;font-size:11px">A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b> — não entra na busca dos outros.</p>
+        <p class="nota" style="margin-top:6px;font-size:11px">Adicione uma quadra particular, de condomínio ou outro local onde você dá aula.</p>
       <p class="nota" style="margin:16px 0 6px"><b>Você também joga?</b> Dá pra ser as duas coisas — e dá pra mudar depois.</p>
       <div class="seg2">
-        <button class="${onb.joga===true?'on':''}" onclick="onbJoga(true)">Sim, também compito</button>
+        <button class="${onb.joga===true?'on':''}" onclick="onbJoga(true)">Sim, também jogo</button>
         <button class="${onb.joga===false?'on':''}" onclick="onbJoga(false)">Não, só dou aula</button>
       </div>
-      ${onb.joga===true?'<p class="nota" style="margin-top:8px">Na próxima tela você declara seu nível, como qualquer jogador.</p>':''}
       ${onb.joga===false?'<p class="nota" style="margin-top:8px">Você não vai aparecer no radar nem no ranking — o app fica sobre a sua turma.</p>':''}
       <div class="onb-nav"><button class="onb-prim" onclick="onbProfOk()" ${podeAvancar?'':'disabled'}>Avançar</button></div>`;
   } else if(onb.step===3){
@@ -9849,13 +9863,13 @@ function renderOnb(){
              segunda linha do app fica: ela é a que evita a pergunta que este
              passo mais gera ("e se eu errar meu nível?"), e o board não a
              contradiz — ele desenha um estado, não a explicação dele. -->
-        <p class="onb-pergunta"><b>Qual o seu nível de jogo?</b><small>Você se declara e já entra jogando — as 8 primeiras partidas ajustam de verdade.</small></p>
+        <p class="onb-pergunta"><b>Qual o seu nível de jogo?</b><small>Você informa seu nível inicial. Sua classe é calculada pelos resultados; durante a calibração, os primeiros jogos têm mais peso.</small></p>
         <div class="onb-cards">${niveisDesc.map(n=>`<button class="onb-card ${onb.div===n.d?'on':''}" onclick="onbSet('div','${n.d}')"><div class="dv">${n.d}</div><div class="tx"><b>${n.t}</b><small>${n.s}</small></div></button>`).join('')}</div>
         <button class="onb-link" onclick="onbAbrirQuiz()">Não sei meu nível — me ajuda a escolher</button>
         <p class="nota" style="margin:14px 0 6px"><b>Onde você joga?</b> Não precisa ser sócio — é onde você costuma jogar. O primeiro vira o principal.</p>
         <div class="onb-cards">${onb.locais===null?'<p class="nota">Carregando os clubes…</p>':(linhas||'<p class="nota">Nenhum clube cadastrado ainda — dá pra seguir sem, e você marca depois na sua ficha.</p>')}</div>
         <button class="onb-quadra-nova" onclick="onbQuadraNova()">+ Minha quadra não está na lista</button>
-        <p class="nota" style="margin-top:6px;font-size:11px">A quadra do seu prédio, do condomínio ou a que você aluga. Ela é <b>sua</b> — não entra na busca dos outros.</p>
+        <p class="nota" style="margin-top:6px;font-size:11px">Adicione uma quadra particular, de condomínio ou outro local onde você joga.</p>
         <div class="onb-nav"><button class="onb-prim" onclick="onbNext()" ${podeAvancar?'':'disabled'}>Avançar</button></div>`;
     }
   } else if(onb.step===4){
