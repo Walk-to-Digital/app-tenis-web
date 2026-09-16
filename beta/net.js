@@ -5424,6 +5424,12 @@ async function netCriarTorneio(d){
     tipo:d.tipo||'aberto',
     classes: d.tipo==='restrito' ? d.classes : null,
     categorias: d.tipo==='multi' ? d.cats : null,
+    // Configuração do campeonato. A migração 110 guarda estes fatos no banco;
+    // eles não podem ser inferidos depois que a chave e os placares começam.
+    formato:d.formato||'mata-mata', modalidade:d.modalidade||'simples', genero:d.genero||'livre',
+    inscricoes_ate:d.inscricoes_ate||null, local_id:d.local_id||null, quadras:d.quadras||null,
+    capa_url:d.capa_url||null, regulamento:d.regulamento||null,
+    regras_jogo:d.regras_jogo||{}, regras_operacao:d.regras_operacao||{},
     // 18/08 (mig 38): `|| null` e não string vazia — o campo `date` do HTML
     // devolve '' quando ninguém escolheu, e '' num `date` do Postgres é erro de
     // sintaxe, não null. Torneio sem data marcada é estado válido.
@@ -5661,7 +5667,9 @@ function netFecharTorneios(){ const el=document.getElementById('net-torneios'); 
 
 // -- UI: criar torneio --
 function netCriarTorneioUI(){
-  _tnew = _tnew || { nome:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', tamanho:8, aberto:false, tipo:'aberto', classes:[], cats:[] };
+  _tnew = _tnew || { nome:'', esporte:(typeof S!=='undefined'&&S.esporte)||'tenis', tamanho:8, aberto:false, tipo:'aberto', classes:[], cats:[], etapa:1,
+    formato:'mata-mata', modalidade:'simples', genero:'livre', regras_jogo:{pontuacao:'short_match_tiebreak',no_ad:true}, regras_operacao:{wo_minutos:15,aquecimento_minutos:5} };
+  _tnew.etapa=_tnew.etapa||1; _tnew.regras_jogo=_tnew.regras_jogo||{}; _tnew.regras_operacao=_tnew.regras_operacao||{};
   const seg=(campo,ops)=>ops.map(([v,n])=>`<button onclick="_net.tset('${campo}','${v}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--linha2);font:600 13px var(--f-ui);cursor:pointer;background:${_tnew[campo]==v?'var(--acc)':'var(--sup2)'};color:${_tnew[campo]==v?'var(--acc-ink)':'var(--ink)'}">${n}</button>`).join('');
   const chip=(d,on,click)=>`<button onclick="${click}" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--linha2);font:700 13px var(--f-ui);cursor:pointer;background:${on?'var(--acc)':'var(--sup2)'};color:${on?'var(--acc-ink)':'var(--ink)'}">${d}</button>`;
   // bloco extra conforme o tipo escolhido
@@ -5685,6 +5693,50 @@ function netCriarTorneioUI(){
     extra = `<div style="font-size:12px;color:var(--ink2);margin:14px 0 2px">Categorias (cada uma tem chave e campeão próprios)</div>
       ${_tnew.cats.map(catRow).join('')}
       <button onclick="_net.tcatadd()" style="width:100%;padding:11px;border-radius:11px;border:1px dashed var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui);cursor:pointer;margin-top:8px">+ Adicionar categoria</button>`;
+  }
+  const topo=`<div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:10px;color:var(--acc);font-weight:800;letter-spacing:.09em">${_tnew.id?'EDITAR CAMPEONATO':'CRIAR CAMPEONATO'} · ETAPA ${_tnew.etapa} DE 4</div><div style="font:700 17px var(--f-ui);margin-top:3px">${['Planejamento','Elegibilidade','Regras do jogo','Revisão'][_tnew.etapa-1]}</div></div><button onclick="_net.fecharTnew()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div><div style="display:flex;gap:4px;margin:12px 0">${[1,2,3,4].map(n=>`<i style="height:3px;flex:1;border-radius:3px;background:${n<=_tnew.etapa?'var(--acc)':'var(--linha2)'}"></i>`).join('')}</div>`;
+  const btn=(texto,acao)=>`<button onclick="${acao}" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:18px">${texto}</button>`;
+  if(_tnew.etapa===1){
+    _sheet('net-tnew',`${topo}
+      <p style="font-size:12px;color:var(--ink2);margin:4px 0 14px">Comece pela disputa que você quer organizar. As regras vêm depois, sem despejar tudo numa tela só.</p>
+      <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Nome do campeonato</div>
+      <input id="tn-nome" value="${(_tnew.nome||'').replace(/"/g,'&quot;')}" oninput="_net.tset('nome',this.value)" placeholder="Ex.: Copa de sábado" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 15px var(--f-ui)" autocomplete="off"/>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Esporte</div><div style="display:flex;gap:8px">${seg('esporte',[['tenis','Tênis'],['beach','Beach']])}</div>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Modalidade</div><div style="display:flex;gap:8px">${seg('modalidade',[['simples','Simples'],['duplas','Duplas']])}</div>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Tamanho da chave</div><div style="display:flex;gap:8px">${seg('tamanho',[[4,'4 pessoas'],[8,'8 pessoas'],[16,'16 pessoas']])}</div>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Inscrições</div><div style="display:flex;gap:8px">${seg('aberto',[[false,'Só convidados'],[true,'Abertas no Ranket']])}</div>
+      ${btn('Definir quem pode jogar',"_net.tpasso(2)")}`);
+    return;
+  }
+  if(_tnew.etapa===2){
+    _sheet('net-tnew',`${topo}
+      <p style="font-size:12px;color:var(--ink2);margin:4px 0 14px">Defina as categorias e limites antes de convidar jogadores.</p>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Quem pode jogar</div><div style="display:flex;gap:8px">${seg('tipo',[['aberto','Todas as classes'],['restrito','Classes escolhidas'],['multi','Categorias']])}</div>
+      ${extra}
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Gênero</div><div style="display:flex;gap:8px">${seg('genero',[['livre','Livre'],['masculino','Masc.'],['feminino','Fem.'],['misto','Misto']])}</div>
+      <div style="display:flex;gap:8px"><button onclick="_net.tpasso(1)" style="flex:1;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui)">Voltar</button>${btn('Definir regras',"_net.tpasso(3)")}</div>`);
+    return;
+  }
+  if(_tnew.etapa===3){
+    _sheet('net-tnew',`${topo}
+      <p style="font-size:12px;color:var(--ink2);margin:4px 0 14px">As regras ficam visíveis para inscritos e congelam quando a chave começa.</p>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Formato da disputa</div><div style="display:flex;gap:8px">${seg('formato',[['mata-mata','Mata-mata'],['grupos-chave','Grupos + chave'],['consolacao','Consolação'],['liga','Liga']])}</div>
+      ${_tnew.formato==='grupos-chave'?'<p style="font-size:11px;color:var(--ink3);line-height:1.4">A classificação dos grupos abre a chave final quando todos os resultados forem registrados.</p>':_tnew.formato==='consolacao'?'<p style="font-size:11px;color:var(--ink3);line-height:1.4">Quem cair na primeira rodada também entra automaticamente na chave de consolação.</p>':_tnew.formato==='liga'?'<p style="font-size:11px;color:var(--ink3);line-height:1.4">Todos se enfrentam uma vez; a tabela define o campeão ao fim da última rodada.</p>':''}
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Pontuação</div><div style="display:flex;gap:8px">${seg('pontuacao',[['short_match_tiebreak','Short sets'],['melhor3','Melhor de 3'],['proset8','Pro-Set até 8']])}</div>
+      <label style="display:block;font-size:12px;color:var(--ink2);margin-top:12px"><input type="checkbox" ${_tnew.regras_jogo.no_ad!==false?'checked':''} onchange="_net.tregra('jogo','no_ad',this.checked)"> Ponto de ouro (No-Ad) em 40–40</label>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">W.O. após quantos minutos?</div><input value="${_tnew.regras_operacao.wo_minutos||15}" inputmode="numeric" onchange="_net.tregra('operacao','wo_minutos',+this.value)" style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui)">
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Regulamento escrito</div><textarea onchange="_net.tset('regulamento',this.value)" placeholder="Regras específicas, arbitragem e conduta" style="width:100%;min-height:90px;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:13px var(--f-ui)">${_tnew.regulamento||''}</textarea>
+      <div style="display:flex;gap:8px"><button onclick="_net.tpasso(2)" style="flex:1;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui)">Voltar</button>${btn('Revisar campeonato',"_net.tpasso(4)")}</div>`);
+    return;
+  }
+  if(_tnew.etapa===4){
+    _sheet('net-tnew',`${topo}
+      <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">Você poderá convidar jogadores e acompanhar a chave logo após criar.</div>
+      <div style="font-size:12px;color:var(--ink2);margin:12px 0 6px">Imagem de capa <span style="color:var(--ink3)">(opcional)</span></div><label style="display:block;padding:13px;border:1px dashed var(--linha2);border-radius:11px;background:var(--sup);font:600 13px var(--f-ui);cursor:pointer;color:var(--ink)"><input type="file" accept="image/jpeg,image/png,image/webp" onchange="_net.tcapa(this.files&&this.files[0])" style="display:none">${_tnew.capaNome?'✓ '+_tnew.capaNome:'Adicionar imagem de capa'}</label><div style="font-size:11px;color:var(--ink3);margin-top:5px">JPG, PNG ou WEBP. O Ranket reduz para até 2 MB antes de enviar.</div>
+      <div style="font-size:12px;color:var(--ink2);margin:14px 0 6px">Prazo das inscrições <span style="color:var(--ink3)">(opcional)</span></div><input type="datetime-local" value="${_tnew.inscricoes_ate||''}" onchange="_net.tset('inscricoes_ate',this.value)" style="width:100%;padding:11px;border-radius:11px;border:1px solid var(--linha2);background:var(--bg);color:var(--ink);font:600 13px var(--f-ui);color-scheme:dark">
+      <div style="margin-top:16px;padding:13px;border:1px solid var(--linha);border-radius:12px;background:var(--sup)"><b>${_tnew.nome||'Campeonato sem nome'}</b><div style="font-size:12px;color:var(--ink2);margin-top:5px">${_tnew.esporte==='beach'?'Beach':'Tênis'} · ${_tnew.modalidade} · chave de ${_tnew.tamanho} · ${_tnew.formato}</div><div style="font-size:12px;color:var(--ink2);margin-top:3px">${_tnew.aberto?'Inscrições abertas':'Só convidados'} · ${_tnew.regras_jogo.pontuacao||'regras definidas'}</div></div>
+      <div style="display:flex;gap:8px"><button onclick="_net.tpasso(3)" style="flex:1;padding:13px;border-radius:12px;border:1px solid var(--linha2);background:var(--sup);color:var(--ink);font:600 13px var(--f-ui)">Voltar</button>${btn(_tnew.id?'Salvar regras':'Criar e abrir organização',"_net.tcriar()")}</div>`);
+    return;
   }
   _sheet('net-tnew', `<div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font:700 17px var(--f-ui)">${_tnew.id?'Editar regras':'Criar torneio'}</div>
@@ -5720,7 +5772,43 @@ function netCriarTorneioUI(){
     <button onclick="_net.tcriar()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--acc);color:var(--acc-ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:18px">${_tnew.id?'Salvar regras':'Criar torneio'}</button>`);
   const el=document.getElementById('tn-nome'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
 }
-function _tset(campo,v){ if(v==='true')v=true; if(v==='false')v=false; if(campo==='tamanho')v=+v; _tnew[campo]=v; if(campo!=='nome') netCriarTorneioUI(); }
+function _tset(campo,v){
+  if(v==='true')v=true; if(v==='false')v=false; if(campo==='tamanho')v=+v;
+  if(campo==='pontuacao') _tnew.regras_jogo.pontuacao=v;
+  else _tnew[campo]=v;
+  if(campo!=='nome') netCriarTorneioUI();
+}
+function _tpasso(n){ _tnew.etapa=n; netCriarTorneioUI(); }
+function _tregra(grupo,campo,v){
+  const alvo=grupo==='jogo'?(_tnew.regras_jogo=_tnew.regras_jogo||{}):(_tnew.regras_operacao=_tnew.regras_operacao||{});
+  alvo[campo]=v; netCriarTorneioUI();
+}
+function _tcapa(arquivo){
+  if(!arquivo) return;
+  _tnew.capaArquivo=arquivo; _tnew.capaNome=arquivo.name||'imagem selecionada';
+  netCriarTorneioUI();
+}
+function netTorneioCapaUrl(caminho){
+  if(!caminho) return null;
+  const {data}=sb.storage.from('torneio-capa').getPublicUrl(caminho);
+  return data&&data.publicUrl;
+}
+async function _tCapaEnviar(tid,arquivo){
+  if(!arquivo) return null;
+  if(!_fotoEntradaOk(arquivo)) throw new Error('Escolha uma imagem em JPG, PNG ou WEBP.');
+  if(arquivo.size>FOTO_ORIGINAL_MAX) throw new Error('A imagem original passa de 25 MB.');
+  const menor=await _fotoComprimir(arquivo);
+  if(!FOTO_TIPOS.includes(menor.type)||menor.size>FOTO_MAX) throw new Error('Não consegui reduzir a capa para até 2 MB.');
+  const ext=(menor.name||'capa.jpg').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+  const caminho=`${tid}/capa.${ext}`;
+  const antiga=(await sb.from('torneios').select('capa_url').eq('id',tid).maybeSingle()).data;
+  const {error:up}=await sb.storage.from('torneio-capa').upload(caminho,menor,{contentType:menor.type,upsert:true,cacheControl:'3600'});
+  if(up) throw new Error('Não deu para subir a capa: '+up.message);
+  const {error}=await sb.from('torneios').update({capa_url:caminho}).eq('id',tid).eq('status','inscricoes');
+  if(error){ await sb.storage.from('torneio-capa').remove([caminho]); throw error; }
+  if(antiga&&antiga.capa_url&&antiga.capa_url!==caminho) await sb.storage.from('torneio-capa').remove([antiga.capa_url]);
+  return caminho;
+}
 function _tclasse(d){ const i=_tnew.classes.indexOf(d); i>=0?_tnew.classes.splice(i,1):_tnew.classes.push(d); netCriarTorneioUI(); }
 function _tcatadd(){ _tnew.cats.push({ id:'c'+Date.now().toString(36), nome:'', esporte:_tnew.esporte, classes:[], tamanho:8 }); netCriarTorneioUI(); }
 function _tcatdel(i){ _tnew.cats.splice(i,1); netCriarTorneioUI(); }
@@ -5728,6 +5816,10 @@ function _tcatset(i,campo,v){ if(campo==='tamanho')v=+v; _tnew.cats[i][campo]=v;
 function _tcatclasse(i,d){ const c=_tnew.cats[i]; c.classes=c.classes||[]; const k=c.classes.indexOf(d); k>=0?c.classes.splice(k,1):c.classes.push(d); netCriarTorneioUI(); }
 async function _tcriar(){
   if(!_tnew.nome || !_tnew.nome.trim()){ alert('Dá um nome pro torneio.'); return; }
+  if(_tnew.modalidade==='duplas'){
+    alert('A organização de duplas precisa cadastrar os times antes de montar a chave. Por enquanto, crie este campeonato como simples.');
+    return;
+  }
   if(_tnew.tipo==='restrito' && !_tnew.classes.length){ alert('Marque pelo menos uma classe.'); return; }
   if(_tnew.tipo==='multi'){
     _tnew.cats=_tnew.cats.filter(c=>c.nome&&c.nome.trim());
@@ -5735,26 +5827,36 @@ async function _tcriar(){
   }
   try{
     if(_tnew.id){
+      const estado=_tnew;
       // edição de regras — só existe enquanto status='inscricoes' (o botão só aparece lá)
       const { error } = await sb.from('torneios').update({
         nome:_tnew.nome, esporte:_tnew.esporte, tamanho:_tnew.tamanho, aberto:!!_tnew.aberto,
         tipo:_tnew.tipo||'aberto',
         classes: _tnew.tipo==='restrito' ? _tnew.classes : null,
         categorias: _tnew.tipo==='multi' ? _tnew.cats : null,
+        formato:_tnew.formato||'mata-mata', modalidade:_tnew.modalidade||'simples', genero:_tnew.genero||'livre',
+        inscricoes_ate:_tnew.inscricoes_ate||null, local_id:_tnew.local_id||null, quadras:_tnew.quadras||null,
+        capa_url:_tnew.capa_url||null, regulamento:_tnew.regulamento||null,
+        regras_jogo:_tnew.regras_jogo||{}, regras_operacao:_tnew.regras_operacao||{},
         comeca_em:  _tnew.comeca_em  || null,
         termina_em: _tnew.termina_em || null,
       }).eq('id',_tnew.id).eq('status','inscricoes');
       if(error) throw error;
-      const id=_tnew.id; _tnew=null;
+      const id=_tnew.id;
+      if(estado.capaArquivo) await _tCapaEnviar(id,estado.capaArquivo);
+      _tnew=null;
       const el=document.getElementById('net-tnew'); if(el) el.remove();
       if(window.toast) toast('Regras salvas.');
       netVerTorneio(id);
       return;
     }
-    const t=await netCriarTorneio(_tnew); _tnew=null;
+    const estado=_tnew;
+    const t=await netCriarTorneio(estado);
+    if(estado.capaArquivo) await _tCapaEnviar(t.id,estado.capaArquivo);
+    _tnew=null;
     const el=document.getElementById('net-tnew'); if(el) el.remove();
-    if(window.toast) toast('Torneio criado! Chame a galera pra encher a chave.');
-    netAbrirTorneios();
+    if(window.toast) toast('Campeonato criado. Agora organize inscrições e convites.');
+    netVerTorneio(t.id);
   }catch(e){ alert('Erro ao salvar: '+(e.message||e)); }
 }
 function netFecharTnew(){ _tnew=null; const el=document.getElementById('net-tnew'); if(el) el.remove(); }
@@ -5766,6 +5868,10 @@ async function netEditarTorneio(id){
   if(t.status!=='inscricoes'){ alert('A chave já montou — as regras estão congeladas.'); return; }
   _tnew = { id:t.id, nome:t.nome, esporte:t.esporte, tamanho:t.tamanho, aberto:!!t.aberto,
     tipo:t.tipo||'aberto', classes:t.classes||[], cats:t.categorias||[],
+    formato:t.formato||'mata-mata', modalidade:t.modalidade||'simples', genero:t.genero||'livre',
+    inscricoes_ate:t.inscricoes_ate||'', local_id:t.local_id||null, quadras:t.quadras||null,
+    capa_url:t.capa_url||'', regulamento:t.regulamento||'',
+    regras_jogo:t.regras_jogo||{}, regras_operacao:t.regras_operacao||{},
     // 18/08: sem trazer as datas de volta, abrir "editar regras" e salvar
     // APAGARIA a data já marcada — o update manda `|| null` e o campo vazio
     // venceria. Formulário de edição que nasce sem o valor atual não é
@@ -5782,6 +5888,30 @@ function _ordemChave(n){
        : [[1,16],[8,9],[5,12],[4,13],[3,14],[6,11],[7,10],[2,15]];
 }
 const _winDe = m => (m && m.status==='confirmada') ? (m.venceu_criador ? m.criador_id : m.adversario_id) : null;
+
+/* Formatos de tabela: estes dois geradores não escolhem resultado nem mexem
+   em ranking. Eles apenas produzem a agenda determinística que o organizador
+   enxerga. A mesma lista de participantes sempre gera a mesma rodada. */
+function _rodadasLiga(ids){
+  const lista=[...ids];
+  if(lista.length%2) lista.push(null);
+  const n=lista.length, rodadas=[];
+  for(let r=0;r<n-1;r++){
+    const jogos=[];
+    for(let i=0;i<n/2;i++){
+      const a=lista[i], b=lista[n-1-i];
+      if(a&&b) jogos.push({rodada:r+1,pos:i+1,a,b});
+    }
+    rodadas.push(jogos);
+    lista.splice(1,0,lista.pop());
+  }
+  return rodadas;
+}
+function _distribuirGrupos(ids, porGrupo=4){
+  const grupos=Array.from({length:Math.ceil(ids.length/porGrupo)},()=>[]);
+  ids.forEach((id,i)=>{ const linha=Math.floor(i/grupos.length); const col=i%grupos.length; grupos[linha%2?grupos.length-1-col:col].push(id); });
+  return grupos;
+}
 
 // dono monta a chave: seed por Nível (banco = autoridade) e congela as regras.
 // Em torneio multi, monta UMA categoria por vez — elas enchem em ritmos
@@ -5811,6 +5941,16 @@ async function netMontarChave(id, catId){
   ids.sort((a,b)=>(n[b]||0)-(n[a]||0));
   for(let i=0;i<ids.length;i++){
     await sb.from('torneio_participantes').update({seed:i+1}).eq('torneio_id',id).eq('player_id',ids[i]);
+  }
+  // Liga, grupos e consolação são gerados pelo banco numa única transação. A
+  // lista de confrontos não fica na memória do navegador e continua intacta
+  // se o organizador trocar de aparelho ou fechar o app no meio da rodada.
+  if(t.formato!=='mata-mata'){
+    const {data,error}=await sb.rpc('torneio_gerar_formato',{p_torneio:id,p_categoria:catId||null});
+    if(error){ alert('Erro ao montar: '+error.message); return; }
+    if(window.toast) toast(t.formato==='liga' ? 'Liga montada. Os confrontos já estão na tabela.' : t.formato==='grupos-chave' ? 'Grupos montados. Registre os resultados para abrir a chave final.' : 'Chave principal e consolação montadas.');
+    netVerTorneio(id);
+    return;
   }
   const patch = multi
     ? { status:'em-andamento', categorias: cats.map(x=> x.id===catId ? Object.assign({},x,{montada:true}) : x) }
@@ -5912,8 +6052,91 @@ async function _onEnviarOrg(){
        (a versão velha exigia o mesmo); fica anotado como decisão pendente, não
        como regressão. */
     await _cinturaoTentarPassar({ id:mid, esporte:o.esporte, criador_id:o.a.id, adversario_id:o.b.id, venceu_criador:venceuA });
+    // O avanço só lê partidas confirmadas e é idempotente. Nas fases com mais
+    // de um jogo ele responde apenas “faltam resultados”; no último resultado
+    // gera a rodada seguinte ou fecha a liga automaticamente.
+    if(o.faseId){
+      const {error:avancoErro}=await sb.rpc('torneio_avancar_formato',{p_torneio:o.tid,p_categoria:o.catId||null,p_fase:o.faseId});
+      if(avancoErro) console.error('[campeonato] avançar fase',avancoErro);
+    }
     netVerTorneio(o.tid);
   }catch(e){ alert('Não deu: '+(e.message||e)); }
+}
+
+// Placar de uma partida que já nasceu no motor de liga/grupos/consolação.
+// O organizador é a autoridade do evento presencial e a mesma tela de placar
+// usada no mata-mata grava o resultado, o Nível e a progressão da tabela.
+async function netTorneioPlacarFaseOrg(matchId,tid){
+  const {data:m,error}=await sb.from('matches').select('*').eq('id',matchId).maybeSingle();
+  if(error||!m){ alert('Confronto não encontrado.'); return; }
+  if(m.status==='confirmada'){ netVerTorneio(tid); return; }
+  const t=(await sb.from('torneios').select('esporte,categorias').eq('id',tid).maybeSingle()).data||{};
+  const c=m.torneio_categoria?(t.categorias||[]).find(x=>x.id===m.torneio_categoria):null;
+  _on={ step:'placar-org', tid, rodada:m.torneio_rodada, pos:m.torneio_pos,
+        catId:m.torneio_categoria||null, faseId:m.torneio_fase_id||null, matchId:m.id,
+        esporte:(c&&c.esporte)||m.esporte||t.esporte||'tenis', fmt:m.formato||'md3', dupla:!!m.dupla,
+        a:{id:m.criador_id,nome:_nomeDe(m.criador_id)}, b:{id:m.adversario_id,nome:_nomeDe(m.adversario_id)},
+        placarTxt:m.placar||'', sets:m.sets||netParsePlacar(m.placar||'') };
+  netFecharTver(); netRenderOnline();
+}
+
+async function netAtualizarFormato(tid,catId,faseId){
+  const {data,error}=await sb.rpc('torneio_avancar_formato',{p_torneio:tid,p_categoria:catId||null,p_fase:faseId||null});
+  if(error){ alert('Não deu para atualizar a chave: '+error.message); return; }
+  if(window.toast) toast(data&&data.avancou ? 'Chave atualizada.' : 'Ainda há resultados pendentes.');
+  netVerTorneio(tid);
+}
+
+function _placarFaseH(m,tid,dono){
+  const nomes=`<b>${_nomeDe(m.criador_id)}</b> <span style="color:var(--ink3)">×</span> <b>${_nomeDe(m.adversario_id)}</b>`;
+  const status=m.status==='confirmada'
+    ? `<span style="color:var(--up);font-weight:700">${m.placar||'confirmado'}</span>`
+    : `<span style="color:var(--gold)">aguardando placar</span>`;
+  const botao=dono&&m.status!=='confirmada'
+    ? `<button onclick="_net.torneioPlacarFaseOrg('${m.id}','${tid}')" style="margin-top:7px;padding:7px 10px;border-radius:8px;border:1px solid var(--gold-bg);background:var(--sup2);color:var(--gold);font:700 11px var(--f-ui);cursor:pointer">Lançar placar</button>`:'';
+  return `<div style="padding:9px 0;border-bottom:1px solid var(--sup2);font-size:12px">${nomes}<div style="font-size:11px;margin-top:3px">${status}</div>${botao}</div>`;
+}
+
+function _classificacaoFase(ids,matches,seeds){
+  const s={}; ids.forEach(id=>s[id]={id,v:0,j:0});
+  matches.filter(m=>m.status==='confirmada').forEach(m=>{
+    if(!s[m.criador_id]||!s[m.adversario_id]) return;
+    s[m.criador_id].j++; s[m.adversario_id].j++;
+    const w=m.venceu_criador?m.criador_id:m.adversario_id; s[w].v++;
+  });
+  return Object.values(s).sort((a,b)=>b.v-a.v||a.j-b.j||(seeds[a.id]||999)-(seeds[b.id]||999));
+}
+
+async function _torneioFormatoH(t,ps,id){
+  const {data:fases}=await sb.from('torneio_fases').select('*').eq('torneio_id',id).order('ordem');
+  if(!(fases||[]).length) return '<p style="color:var(--ink2);font-size:13px;margin-top:12px">Aguardando o organizador montar a tabela.</p>';
+  const faseIds=fases.map(f=>f.id);
+  const [{data:grupos},{data:membros},{data:partidas}]=await Promise.all([
+    sb.from('torneio_grupos').select('*').in('fase_id',faseIds).order('ordem'),
+    sb.from('torneio_grupo_membros').select('*'),
+    sb.from('matches').select('*').eq('torneio_id',id).in('torneio_fase_id',faseIds).order('torneio_rodada').order('torneio_pos')
+  ]);
+  const dono=t.dono_id===MEU_UID, seeds={}; ps.forEach(p=>seeds[p.player_id]=p.seed||999);
+  const porFase={}; (partidas||[]).forEach(m=>(porFase[m.torneio_fase_id]||(porFase[m.torneio_fase_id]=[])).push(m));
+  const porGrupo={}; (membros||[]).forEach(x=>(porGrupo[x.grupo_id]||(porGrupo[x.grupo_id]=[])).push(x.player_id));
+  const blocos=(fases||[]).map(f=>{
+    const jogos=porFase[f.id]||[];
+    const participantes=f.categoria ? ps.filter(p=>p.categoria===f.categoria) : ps;
+    const atualizar=dono?`<button onclick="_net.atualizarFormato('${id}',${f.categoria?"'"+f.categoria+"'":'null'},'${f.id}')" style="width:100%;padding:9px;border-radius:9px;border:1px solid var(--linha2);background:var(--sup2);color:var(--ink);font:700 11px var(--f-ui);cursor:pointer;margin-top:9px">Atualizar chave e classificação</button>`:'';
+    if(f.tipo==='grupos'){
+      const gs=(grupos||[]).filter(g=>g.fase_id===f.id).map(g=>{
+        const ids=porGrupo[g.id]||[], jm=jogos.filter(m=>m.torneio_grupo_id===g.id);
+        const tabela=_classificacaoFase(ids,jm,seeds).map((x,i)=>`<div style="display:flex;gap:8px;padding:4px 0;font-size:12px"><span style="width:16px;color:var(--ink3)">${i+1}</span><span style="flex:1">${_nomeDe(x.id)}</span><b>${x.v} V</b><span style="color:var(--ink3)">${x.j} J</span></div>`).join('');
+        return `<div style="border:1px solid var(--linha);border-radius:11px;padding:10px;margin-top:9px"><b style="font-size:12px">${g.nome}</b>${tabela}<div style="margin-top:6px">${jm.map(m=>_placarFaseH(m,id,dono)).join('')}</div></div>`;
+      }).join('');
+      return `<div style="margin-top:14px"><div style="font:700 12px var(--f-ui);color:var(--gold);text-transform:uppercase;letter-spacing:.08em">${f.nome}</div>${gs}${atualizar}</div>`;
+    }
+    const rodadas={}; jogos.forEach(m=>(rodadas[m.torneio_rodada]||(rodadas[m.torneio_rodada]=[])).push(m));
+    const grade=Object.keys(rodadas).map(r=>`<div style="margin-top:9px"><b style="font-size:11px;color:var(--ink2)">Rodada ${r}</b>${rodadas[r].map(m=>_placarFaseH(m,id,dono)).join('')}</div>`).join('');
+    const tabela=f.tipo==='liga' ? `<div style="border:1px solid var(--linha);border-radius:11px;padding:10px;margin-top:8px">${_classificacaoFase(participantes.map(p=>p.player_id),jogos,seeds).map((x,i)=>`<div style="display:flex;gap:8px;padding:4px 0;font-size:12px"><span style="width:16px;color:var(--ink3)">${i+1}</span><span style="flex:1">${_nomeDe(x.id)}</span><b>${x.v} V</b><span style="color:var(--ink3)">${x.j} J</span></div>`).join('')}</div>`:'';
+    return `<div style="margin-top:14px"><div style="font:700 12px var(--f-ui);color:var(--gold);text-transform:uppercase;letter-spacing:.08em">${f.nome}</div>${tabela}${grade||'<p style="color:var(--ink3);font-size:12px">Aguardando a fase anterior.</p>'}${atualizar}</div>`;
+  }).join('');
+  return blocos;
 }
 
 /* ---- 4d: meus campeonatos ---------------------------------------------- */
@@ -5948,6 +6171,7 @@ async function netVerTorneio(id){
   if(window.aplicarJogadoresReais && ps.some(p=>!S.jogadores[_chaveLocal(p.player_id)])){ try{ window.aplicarJogadoresReais(await netAdversarios()); }catch(e){} }
   const souParticipante=ps.some(p=>p.player_id===MEU_UID);
   const cheio = ps.length>=t.tamanho;
+  const capa=netTorneioCapaUrl(t.capa_url);
   const linha=p=>`<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--sup2)">
       ${_discoUid(p.player_id, 28)}
       <div style="flex:1"><b>${_nomeDe(p.player_id)}</b> <span style="color:var(--ink3);font-size:11px">${netId(p.player_id)}</span></div>
@@ -5972,6 +6196,9 @@ async function netVerTorneio(id){
   let chaveH='';
   const jogando = t.tipo==='multi' ? cats.some(c=>c.montada) : t.status!=='inscricoes';
   if(jogando){
+    if(t.formato!=='mata-mata'){
+      chaveH=await _torneioFormatoH(t,ps,id);
+    } else {
     const mts=(await sb.from('matches').select('*').eq('torneio_id',id)).data||[];
     // a categoria entra na chave da partida — sem ela a semi 1 da A e a semi 1 da B colidem
     const mAt={}; mts.forEach(m=>{ mAt[(m.torneio_categoria||'')+'|'+m.torneio_rodada+'|'+m.torneio_pos]=m; });
@@ -6042,6 +6269,7 @@ async function netVerTorneio(id){
       }
       chaveH = pintar(k,null);
     }
+    }
   }
   // no multi quem fecha é a categoria: dá pra entrar numa enquanto outra já joga
   const inscricoesAbertas = t.tipo==='multi' ? cats.some(c=>!c.montada) : t.status==='inscricoes';
@@ -6056,9 +6284,9 @@ async function netVerTorneio(id){
     ? `<button onclick="_net.montarChave('${id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--gold-bg);color:var(--ink);font:700 14px var(--f-ui);cursor:pointer;margin-top:10px">⚔️ Montar a chave</button>`
     : '';
   _sheet('net-tver', `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font:700 17px var(--f-ui)">${t.nome}</div>
+      <div style="display:flex;align-items:center;gap:10px;font:700 17px var(--f-ui)">${capa?`<img src="${capa}" alt="" style="width:42px;height:42px;border-radius:9px;object-fit:cover">`:''}<div>${t.nome}</div></div>
       <button onclick="_net.fecharTver()" style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">×</button></div>
-    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${t.tipo==='multi'?(t.categorias||[]).length+' categorias':(t.esporte==='beach'?'Beach':'Tênis')} · mata-mata · ${ps.length}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos · ${t.aberto?'aberto':'fechado'}${t.tipo==='restrito'&&t.classes?' · divisões '+t.classes.join('/'):''}${t.tipo==='aberto'?' · todas as divisões':''}</div>
+    <div style="font-size:12px;color:var(--ink2);margin:4px 0 12px">${t.tipo==='multi'?(t.categorias||[]).length+' categorias':(t.esporte==='beach'?'Beach':'Tênis')} · ${(t.formato||'mata-mata').replace('grupos-chave','grupos + chave').replace('consolacao','consolação')} · ${ps.length}${t.tipo==='multi'?'':'/'+t.tamanho} inscritos · ${t.aberto?'aberto':'fechado'}${t.tipo==='restrito'&&t.classes?' · divisões '+t.classes.join('/'):''}${t.tipo==='aberto'?' · todas as divisões':''}</div>
     ${chaveH}
     ${lista||'<p style="color:var(--ink2);font-size:13px">Ninguém inscrito ainda.</p>'}
     ${acao}${donoMonta}
@@ -7772,7 +8000,7 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   abrirBusca:netAbrirBusca, fecharBusca:netFecharBusca, buscar:_onBuscar, addAmigo:netAddAmigo, desafiarUid:netDesafiarUid,
   aceitarAmizade:netAceitarAmizade, recusarAmizade:netRecusarAmizade,
   abrirTorneios:netAbrirTorneios, fecharTorneios:netFecharTorneios, criarTorneio:netCriarTorneioUI, fecharTnew:netFecharTnew,
-  tset:_tset, tcriar:_tcriar, verTorneio:netVerTorneio, fecharTver:netFecharTver, entrarTorneio:netEntrarTorneio, sairTorneio:netSairTorneio,
+  tset:_tset, tpasso:_tpasso, tregra:_tregra, tcapa:_tcapa, tcriar:_tcriar, verTorneio:netVerTorneio, fecharTver:netFecharTver, entrarTorneio:netEntrarTorneio, sairTorneio,
   convidarTorneio:netConvidarTorneio, enviarConvitesTorneio:netEnviarConvitesTorneio,
   abrirConvitesTorneio:netAbrirConvitesTorneio, responderConviteTorneio:netResponderConviteTorneio,
   tclasse:_tclasse, tcatadd:_tcatadd, tcatdel:_tcatdel, tcatset:_tcatset, tcatclasse:_tcatclasse,
@@ -7781,7 +8009,8 @@ window._net = { sb, netEntrar, netSyncJogador, netAdversarios, netBoot, uid:()=>
   mudarPapel:netMudarPapel, removerMembro:netRemoverMembro, sairGrupo:netSairGrupo, copiarLinkGrupo:netCopiarLinkGrupo, revogarLink:netRevogarLink, trocarConta:netTrocarConta,
   ligarCinturao:netLigarCinturao,
   copiarLinkTorneio:netCopiarLinkTorneio, editarTorneio:netEditarTorneio, montarChave:netMontarChave, torneioPlacar:netTorneioPlacar,
-  torneioPlacarOrg:netTorneioPlacarOrg, orgEnviar:_onEnviarOrg, meusCampeonatos:netMeusCampeonatos,
+  torneioPlacarOrg:netTorneioPlacarOrg, torneioPlacarFaseOrg:netTorneioPlacarFaseOrg, atualizarFormato:netAtualizarFormato,
+  orgEnviar:_onEnviarOrg, meusCampeonatos:netMeusCampeonatos,
   buscarGrupos:netBuscarGrupos, convidarAmigo:netConvidarAmigo,
   abrirLogin:netAbrirLogin, enviarLogin:netEnviarLogin,
   esqueciSenha:netEsqueciSenha, abrirNovaSenha:netAbrirNovaSenha,
